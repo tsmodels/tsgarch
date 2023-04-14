@@ -1,0 +1,19 @@
+#' Deutschemark/British pound Exchange Rate
+#'
+#' The Bollerslev-Ghysel benchmark dataset. The variables in the data set are
+#' the daily percentage nominal returns computed as 100 \deqn{ln(Pt) - ln(Pt-1)},
+#' where Pt is the bilateral Deutschemark/British pound rate constructed from
+#' the corresponding U.S. dollar rates, and a dummy variable that takes the
+#' value of 1 on Mondays and other days following no trading in the Deutschemark
+#' or British pound/ U.S. dollar market during regular European trading hours,
+#' and 0 otherwise.
+#' The data spans the period from 1984-01-03 through 1991-12-31, but exact dates
+#' are not known as this dataset did not provide an index.
+#' @format ## `dmbp`
+#' A data.frame containing 2x1974 observations
+#' \describe{
+#'   \item{rate}{The exchange rate}
+#'   \item{monday}{Dummy indicator (see descriptiom)}
+#' }
+#' @source Journal of Business & Economic Statistics Data Archive
+"dmbp"

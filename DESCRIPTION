@@ -1,0 +1,25 @@
+Package: tsgarch
+Type: Package
+Title: Univariate GARCH Models
+Version: 0.1.0
+Author: Alexios Galanos
+Maintainer: alexios galanos <alexios@4dscape.com>
+Depends: R (>= 3.5.0), methods, tsmethods
+LinkingTo: Rcpp (>= 0.10.6), TMB
+Imports: TMB (>= 1.7.20), nloptr, Rdpack, numDeriv, xts, zoo, generics, future.apply, future, progressr, dplyr, tibble, flextable, ggplot2, stats, utils, car, data.table, tsdistributions, tsaux, sandwich
+Description: Multiple flavors of GARCH with a rich assortment of distributions. Methods for specification, estimation, prediction, filtering, statistical testing and much more. Represents a partial re-write and re-think of rugarch, 10 years later.
+License: GPL-2
+Encoding: UTF-8
+LazyData: true
+RdMacros: Rdpack
+RoxygenNote: 7.2.3
+Roxygen: list(markdown = TRUE)
+remotes: tsmodels/tsmethods, tsmodels/tsdistributions, tsmodels/tsaux
+Suggests: 
+    knitr,
+    rmarkdown,
+    tsdatasets,
+    data.tree,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
+Config/testthat/edition: 3
