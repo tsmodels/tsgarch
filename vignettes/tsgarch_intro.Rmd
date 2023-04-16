@@ -111,7 +111,7 @@ Initialization of the GARCH recursion takes the following generalized form:
 
 where : $\hat\sigma^\delta=\frac{1}{T-1}\sum_{j=1}^{T}|\varepsilon|^\delta_j$
 
-Therefore setting $\lambda=1$ we obtain the sample variance, else values of $\lambda$ less than one and greater than zero yields the exponential smoothing backcast estimator, whereas setting $T$ to some value other than the total length of the residuals $\varepsilon$ and $\lambda=0$ will give the fixed sample estimator which has been somewhat popular (e.g. using only the first n observations). The exponent $\delta$ is for the power ARCH type models, otherwise it is set to 2 (variance). A review
+Therefore setting $\lambda=1$ we obtain the sample variance, else values of $\lambda$ less than one and greater than zero yields the exponential smoothing backcast estimator, whereas setting $T$ to some value other than the total length of the residuals $\varepsilon$ and $\lambda=0$ will give the fixed sample estimator which has been somewhat popular (e.g. using only the first n observations). The exponent $\delta$ is for the power ARCH type models, otherwise it is set to 2 (variance).
 
 ## Model Persistence, Long Run Variance and Half-Life {#estimation:persistence}
 

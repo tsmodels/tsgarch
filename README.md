@@ -1,6 +1,6 @@
 
 [![R-CMD-check](https://github.com/tsmodels/tsgarch/workflows/R-CMD-check/badge.svg)](https://github.com/tsgarch/tsarma/actions)
-[![Last-changedate](https://img.shields.io/badge/last%20change-2023--04--14-yellowgreen.svg)](/commits/master)
+[![Last-changedate](https://img.shields.io/badge/last%20change-2023--04--15-yellowgreen.svg)](/commits/master)
 [![packageversion](https://img.shields.io/badge/Package%20version-0.1.0-orange.svg?style=flat-square)](commits/master)
 [![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/tsgarch)](https://cran.r-project.org/package=tsgarch)
 
@@ -48,7 +48,8 @@ by the same author, with key differences summarized below:
   from [tsmethods](https://github.com/tsmodels/tsmethods), consistent
   with other packages in the **tsmodels** framework.
 
-The package vignette provides more details and a short demonstration.
+The package vignette is available in the new tsmodels site here
+[vignette](https://www.nopredict.com/packages/tsgarch.html)
 
 ## Installation
 
