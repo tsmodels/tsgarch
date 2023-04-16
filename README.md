@@ -48,8 +48,8 @@ by the same author, with key differences summarized below:
   from [tsmethods](https://github.com/tsmodels/tsmethods), consistent
   with other packages in the **tsmodels** framework.
 
-The package vignette is available in the new tsmodels site here
-[vignette](https://www.nopredict.com/packages/tsgarch.html)
+The package vignette is available in the new tsmodels site
+[here](https://www.nopredict.com/packages/tsgarch.html).
 
 ## Installation
 
