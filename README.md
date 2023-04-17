@@ -1,6 +1,6 @@
 
 [![R-CMD-check](https://github.com/tsmodels/tsgarch/workflows/R-CMD-check/badge.svg)](https://github.com/tsgarch/tsarma/actions)
-[![Last-changedate](https://img.shields.io/badge/last%20change-2023--04--15-yellowgreen.svg)](/commits/master)
+[![Last-changedate](https://img.shields.io/badge/last%20change-2023--04--17-yellowgreen.svg)](/commits/master)
 [![packageversion](https://img.shields.io/badge/Package%20version-0.1.0-orange.svg?style=flat-square)](commits/master)
 [![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/tsgarch)](https://cran.r-project.org/package=tsgarch)
 
@@ -59,3 +59,11 @@ installation may take some time due to the compilation of the TMB code.
 ``` r
 remotes::install_github("tsmodels/tsgarch", dependencies = TRUE)
 ```
+
+Note, that in order to make use of symbolic output, flextable requires
+[equatags](https://cran.r-project.org/web/packages/equatags/index.html)
+to be installed which has a dependency on
+[xlst](https://cran.r-project.org/web/packages/xslt/index.html) which in
+turn has SystemRequirements libxslt. Therefore, if you are seeing `NA`
+printed in place of symbols, then it is likely that xlst is not
+installed.
