@@ -5,6 +5,7 @@
 \alias{reexports}
 \alias{as_flextable}
 \alias{bread}
+\alias{estfun}
 \title{Objects exported from other packages}
 \keyword{internal}
 \description{
@@ -14,6 +15,6 @@ below to see their documentation.
 \describe{
   \item{flextable}{\code{\link[flextable]{as_flextable}}}
 
-  \item{sandwich}{\code{\link[sandwich]{bread}}}
+  \item{sandwich}{\code{\link[sandwich]{bread}}, \code{\link[sandwich]{estfun}}}
 }}
 
