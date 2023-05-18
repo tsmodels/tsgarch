@@ -330,7 +330,7 @@ garch_hess <- function(pars, env)
     return(list(solution = scaled_sol, env = scaled_env, lower = scaled_lower, upper = scaled_upper,
                 hessian = hessian, scores = scores, par_scale = par_scale,
                 target_omega = target_omega, kappa = kappa,
-                persistence_table - persistence_table,
+                persistence_table = persistence_table,
                 variance_target_table = variance_target_table,
                 kappa_table = kappa_table,
                 var_initial = var_initial, sigma = sig))

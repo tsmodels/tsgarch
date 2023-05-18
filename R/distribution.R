@@ -67,9 +67,10 @@ distribution_parameters <- function(distribution)
         return(tmp)
     }
     if (distribution == "ghst") {
+        # setting lower bound on shape for the existence of the fourth moment
         tmp <- rbind(tmp,
                      data.table(parameter = "skew", value = 0.1, lower = -80, upper = 80, estimate = 1, scale = 1, group = "distribution", equation = "[D]", symbol = "\\zeta"),
-                     data.table(parameter = "shape", value = 8.5, lower = 4.1, upper = 25, estimate = 1, scale = 1, group = "distribution", equation = "[D]", symbol = "\\nu"),
+                     data.table(parameter = "shape", value = 8.5, lower = 8.02, upper = 25, estimate = 1, scale = 1, group = "distribution", equation = "[D]", symbol = "\\nu"),
                      data.table(parameter = "lambda", value = -0.5, lower = -6, upper = 6, estimate = 0, scale = 1, group = "distribution", equation = "[D]", symbol = "\\lambda"))
         return(tmp)
     }
