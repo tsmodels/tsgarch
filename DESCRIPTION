@@ -16,11 +16,7 @@ RoxygenNote: 7.2.3
 Roxygen: list(markdown = TRUE)
 Remotes: tsmodels/tsmethods, tsmodels/tsdistributions, tsmodels/tsaux, tsmodels/tsdatasets
 Suggests: 
-    knitr,
     rmarkdown,
     tsdatasets,
-    data.tree,
-    bookdown,
     testthat (>= 3.0.0)
-VignetteBuilder: knitr
 Config/testthat/edition: 3
