@@ -276,8 +276,8 @@ variance_target <- function(object, ...)
     group <- NULL
     pmatrix <- copy(object$parmatrix)
     if (sum(pmatrix$estimate) == 0) {
-        pmatrix[group == "alpha", estimate == 1]
-        pmatrix[group == "beta", estimate == 1]
+        pmatrix[group == "alpha", estimate := 1]
+        pmatrix[group == "beta", estimate := 1]
     }
     pars <- pmatrix[estimate == 1]$value
     env <- list(distribution = object$distribution, parmatrix = pmatrix, model = object$model$model)
