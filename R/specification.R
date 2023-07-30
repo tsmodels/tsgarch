@@ -45,6 +45,7 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
 
 {
     # 1. check and initialize data
+    parameter <- value <- NULL
     if  (!is.xts(y)) {
         stop("y must be an xts object")
     }
@@ -59,6 +60,10 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
         mu <- mean(y, na.rm = TRUE)
     } else {
         mu <- 0.0
+    }
+    if (sum(order) == 0) {
+        variance_targeting <- FALSE
+        init <- "unconditional"
     }
     # egarch already in logs
     if (model == "egarch") {
@@ -123,7 +128,9 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
                                        sample_n = sample_n,
                                        distribution = distribution)
     if (model == "ewma") spec$model$model <- "igarch"
-
+    if (sum(order) == 0) {
+        parmatrix[parameter == "omega", value := as.numeric(var(y))]
+    }
     spec$parmatrix <- parmatrix
     spec$model_options <- cmodel
     spec$model$constant <- constant

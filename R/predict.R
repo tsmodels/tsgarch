@@ -40,7 +40,8 @@
             }
         }
     }
-    sigma <- sqrt(sigma_sqr[-c(1:maxpq)])
+    sigma <- sqrt(sigma_sqr)
+    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
     y <- y + mu
     if (bootstrap & h > 1) {
         out <- garch_boostrap(object, h, nsim, vreg = tail(v, h))
@@ -114,7 +115,8 @@
             }
         }
     }
-    sigma <- sqrt(exp(log_sigma_sqr[-c(1:maxpq)]))
+    sigma <- sqrt(exp(log_sigma_sqr))
+    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
     if (bootstrap & h > 1) {
         out <- garch_boostrap(object, h, nsim, vreg = tail(v, h))
         sigma_sim <- out$sigma
@@ -188,7 +190,8 @@
             }
         }
     }
-    sigma <- power_sigma[-c(1:maxpq)]^(1/delta)
+    sigma <- power_sigma^(1/delta)
+    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
     y <- y + mu
     if (bootstrap & h > 1) {
         out <- garch_boostrap(object, h, nsim, vreg = tail(v, h))
@@ -262,7 +265,9 @@
             }
         }
     }
-    sigma <- sqrt(sigma_squared[-c(1:maxpq)])
+    sigma <- sqrt(sigma_squared)
+    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
+
     y <- y + mu
     if (bootstrap & h > 1) {
         out <- garch_boostrap(object, h, nsim, vreg = tail(v, h))
@@ -337,7 +342,9 @@
             }
         }
     }
-    sigma <- power_sigma[-c(1:maxpq)]^(1/delta)
+    sigma <- power_sigma^(1/delta)
+    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
+
     y <- y + mu
     if (bootstrap & h > 1) {
         out <- garch_boostrap(object, h, nsim, vreg = tail(v, h))
@@ -419,8 +426,12 @@
         }
         k <- k + 1
     }
-    sigma <- sqrt(sigma_sqr[-c(1:maxpq)])
-    permanent_component <- permanent_component[-c(1:maxpq)]
+    sigma <- sqrt(sigma_sqr)
+    if (maxpq > 0) {
+        sigma <- sigma[-seq_len(maxpq)]
+        permanent_component <- permanent_component[-seq_len(maxpq)]
+    }
+
     y <- y + mu
     if (bootstrap & h > 1) {
         out <- garch_boostrap(object, h, nsim, vreg = tail(v, h))

@@ -45,7 +45,7 @@
     v <- c(rep(0, maxpq), v)
     # Rcpp code
     sigma <- .garchfilter(residuals, v, initstate, omega, alpha, beta, model)
-    sigma <- sigma[-c(1:maxpq)]
+    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
     # create filter object for spec input
     good <- rep(1, NROW(y_new))
     if (any(is.na(y_new))) {
@@ -237,7 +237,7 @@
     sigma <- .aparchfilter(residuals = residuals, v = v, initstate = initstate,
                            omega = omega, alpha = alpha, gamma = gamma, beta = beta,
                            delta = delta, model = model)
-    sigma <- sigma[-c(1:maxpq)]
+    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
     good <- rep(1, NROW(y_new))
     if (any(is.na(y_new))) {
         good[which(is.na(y_new))] <- 0
@@ -328,12 +328,12 @@
     residuals <- as.numeric(y_new) - mu
     residuals <- c(rep(0, maxpq), residuals)
     negative_indicator <- 1 * (residuals <= 0)
-    if (maxpq > 0) negative_indicator[1:maxpq] <- 1
+    if (maxpq > 0) negative_indicator[seq_len(maxpq)] <- 1
     v <- c(rep(0, maxpq), v)
     # Rcpp code
     sigma <- .gjrgarchfilter(residuals = residuals, negative_indicator, v = v, initstate = initstate,
                              omega = omega, alpha = alpha, gamma = gamma, beta = beta, model = model)
-    sigma <- sigma[-c(1:maxpq)]
+    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
     good <- rep(1, NROW(y_new))
     if (any(is.na(y_new))) {
         good[which(is.na(y_new))] <- 0
@@ -435,7 +435,7 @@
     sigma <- .fgarchfilter(residuals = residuals, v = v, initstate = initstate, omega = omega,
                            alpha = alpha, gamma = gamma, eta = eta, beta = beta,
                            delta = delta, model = model)
-    sigma <- sigma[-c(1:maxpq)]
+    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
     good <- rep(1, NROW(y_new))
     if (any(is.na(y_new))) {
         good[which(is.na(y_new))] <- 0
@@ -532,8 +532,10 @@
                           beta = beta, model = as.integer(model))
     sigma <- out$sigma
     permanent_component <- out$permanent_component
-    sigma <- sigma[-c(1:maxpq)]
-    permanent_component <- permanent_component[-c(1:maxpq)]
+    if (maxpq > 0) {
+        sigma <- sigma[-seq_len(maxpq)]
+        permanent_component <- permanent_component[-seq_len(maxpq)]
+    }
     transitory_component <- sigma - permanent_component
     good <- rep(1, NROW(y_new))
     if (any(is.na(y_new))) {

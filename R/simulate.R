@@ -39,7 +39,7 @@
     }
     if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
-        z[,1:maxpq] <- matrix(innov_init, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        z[,seq_len(maxpq)] <- matrix(innov_init, ncol = maxpq, nrow = nsim, byrow = TRUE)
     }
     if (is.null(var_init)) {
         initv <- omega/(1 - sum(alpha) - sum(beta))
@@ -48,11 +48,13 @@
     }
 
     sigma_sim <- sigma_sqr_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    sigma_sqr_sim[,1:maxpq] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
-    sigma_sim[,1:maxpq] <- matrix(sqrt(initv), ncol = maxpq, nrow = nsim, byrow = TRUE)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    epsilon[, 1:maxpq] <- matrix(z[,1:maxpq] * sigma_sim[,1:maxpq], ncol = maxpq, nrow = nsim, byrow = TRUE)
+    if (maxpq > 0) {
+        sigma_sqr_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sim[,seq_len(maxpq)] <- matrix(sqrt(initv), ncol = maxpq, nrow = nsim, byrow = TRUE)
+        epsilon[,seq_len(maxpq)] <- matrix(z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)], ncol = maxpq, nrow = nsim, byrow = TRUE)
+    }
     order <- object$model$order
     for (i in (maxpq + 1):(h + maxpq)) {
         sigma_sqr_sim[,i] <- variance_intercept[i]
@@ -70,8 +72,12 @@
         epsilon[,i] <- z[,i] * sigma_sim[,i]
         series_sim[,i] <- mu + epsilon[,i]
     }
-    sigma <- sigma_sim[,-c(1:maxpq), drop = FALSE]
-    series <- series_sim[,-c(1:maxpq), drop = FALSE]
+    sigma <- sigma_sim
+    series <- series_sim
+    if (maxpq > 0) {
+        sigma <- sigma[,-seq_len(maxpq), drop = FALSE]
+        series <- series[,-seq_len(maxpq), drop = FALSE]
+    }
     class(sigma) <- "tsmodel.distribution"
     class(series) <- "tsmodel.distribution"
     attr(sigma, "date_class") <- "numeric"
@@ -120,9 +126,9 @@
         z <- matrix(rdist(distribution, h * nsim, mu = 0, sigma = 1, skew = dist[1], shape = dist[2], lambda = dist[3]), nrow = nsim, ncol = h)
         z <- cbind(initz, z)
     }
-    if (!is.null(innov_init)) {
+    if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
-        z[,1:maxpq] <- innov_init
+        z[,seq_len(maxpq)] <- innov_init
     }
     kappa <- egarch_moment(distribution = distribution, skew = dist[1], shape = dist[2], lambda = dist[3])
     if (is.null(var_init)) {
@@ -132,11 +138,13 @@
         initv <- log(var_init)
     }
     sigma_sim <- sigma_log_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    sigma_log_sim[,1:maxpq] <- initv
-    sigma_sim[,1:maxpq] <- exp(initv)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    epsilon[,1:maxpq] <- z[,1:maxpq] * sigma_sim[,1:maxpq]
+    if (maxpq > 0) {
+        sigma_log_sim[,seq_len(maxpq)] <- initv
+        sigma_sim[,seq_len(maxpq)] <- exp(initv)
+        epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
+    }
     order <- object$model$order
     for (i in (maxpq + 1):(h + maxpq)) {
         sigma_log_sim[,i] <- variance_intercept[i]
@@ -154,8 +162,12 @@
         epsilon[,i] <- z[,i] * sigma_sim[,i]
         series_sim[,i] <- mu + epsilon[,i]
     }
-    sigma <- sigma_sim[,-c(1:maxpq), drop = FALSE]
-    series <- series_sim[,-c(1:maxpq), drop = FALSE]
+    sigma <- sigma_sim
+    series <- series_sim
+    if (maxpq > 0) {
+        sigma <- sigma[,-seq_len(maxpq), drop = FALSE]
+        series <- series[,-seq_len(maxpq), drop = FALSE]
+    }
     class(sigma) <- "tsmodel.distribution"
     class(series) <- "tsmodel.distribution"
     attr(sigma, "date_class") <- "numeric"
@@ -204,9 +216,9 @@
         z <- matrix(rdist(distribution, h * nsim, mu = 0, sigma = 1, skew = dist[1], shape = dist[2], lambda = dist[3]), nrow = nsim, ncol = h)
         z <- cbind(initz, z)
     }
-    if (!is.null(innov_init)) {
+    if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
-        z[,1:maxpq] <- innov_init
+        z[,seq_len(maxpq)] <- innov_init
     }
     if (is.null(var_init)) {
         kappa <- aparch_moment_v(distribution = distribution, gamma = gamma, delta = delta,
@@ -218,11 +230,13 @@
     }
 
     sigma_sim <- sigma_power_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    sigma_power_sim[,1:maxpq] <- initv
-    sigma_sim[,1:maxpq] <- initv^(1/delta)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    epsilon[,1:maxpq] <- z[,1:maxpq] * sigma_sim[,1:maxpq]
+    if (maxpq > 0) {
+        sigma_power_sim[,seq_len(maxpq)] <- initv
+        sigma_sim[,seq_len(maxpq)] <- initv^(1/delta)
+        epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
+    }
     order <- object$model$order
     for (i in (maxpq + 1):(h + maxpq)) {
         sigma_power_sim[,i] <- variance_intercept[i]
@@ -240,8 +254,12 @@
         epsilon[,i] <- z[,i] * sigma_sim[,i]
         series_sim[,i] <- mu + epsilon[,i]
     }
-    sigma <- sigma_sim[,-c(1:maxpq), drop = FALSE]
-    series <- series_sim[,-c(1:maxpq), drop = FALSE]
+    sigma <- sigma_sim
+    series <- series_sim
+    if (maxpq > 0) {
+        sigma <- sigma[,-seq_len(maxpq), drop = FALSE]
+        series <- series[,-seq_len(maxpq), drop = FALSE]
+    }
     class(sigma) <- "tsmodel.distribution"
     class(series) <- "tsmodel.distribution"
     attr(sigma, "date_class") <- "numeric"
@@ -289,9 +307,9 @@
         z <- matrix(rdist(distribution, h * nsim, mu = 0, sigma = 1, skew = dist[1], shape = dist[2], lambda = dist[3]), nrow = nsim, ncol = h)
         z <- cbind(initz, z)
     }
-    if (!is.null(innov_init)) {
+    if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
-        z[,1:maxpq] <- innov_init
+        z[,seq_len(maxpq)] <- innov_init
     }
     if (is.null(var_init)) {
         kappa <- gjrgarch_moment(distribution = distribution, skew = dist[1], shape = dist[2], lambda = dist[3])
@@ -302,11 +320,13 @@
     }
 
     sigma_sim <- sigma_squared_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    sigma_squared_sim[,1:maxpq] <- initv
-    sigma_sim[,1:maxpq] <- sqrt(initv)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    epsilon[,1:maxpq] <- z[,1:maxpq] * sigma_sim[,1:maxpq]
+    if (maxpq > 0) {
+        sigma_squared_sim[,seq_len(maxpq)] <- initv
+        sigma_sim[,seq_len(maxpq)] <- sqrt(initv)
+        epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
+    }
     order <- object$model$order
     for (i in (maxpq + 1):(h + maxpq)) {
         sigma_squared_sim[,i] <- variance_intercept[i]
@@ -324,8 +344,12 @@
         epsilon[,i] <- z[,i] * sigma_sim[,i]
         series_sim[,i] <- mu + epsilon[,i]
     }
-    sigma <- sigma_sim[,-c(1:maxpq), drop = FALSE]
-    series <- series_sim[,-c(1:maxpq), drop = FALSE]
+    sigma <- sigma_sim
+    series <- series_sim
+    if (maxpq > 0) {
+        sigma <- sigma[,-seq_len(maxpq), drop = FALSE]
+        series <- series[,-seq_len(maxpq), drop = FALSE]
+    }
     class(sigma) <- "tsmodel.distribution"
     class(series) <- "tsmodel.distribution"
     attr(sigma, "date_class") <- "numeric"
@@ -375,9 +399,9 @@
         z <- matrix(rdist(distribution, h * nsim, mu = 0, sigma = 1, skew = dist[1], shape = dist[2], lambda = dist[3]), nrow = nsim, ncol = h)
         z <- cbind(initz, z)
     }
-    if (!is.null(innov_init)) {
+    if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
-        z[,1:maxpq] <- innov_init
+        z[,seq_len(maxpq)] <- innov_init
     }
     if (is.null(var_init)) {
         kappa <- fgarch_moment_v(distribution = distribution, gamma = gamma, eta = eta, delta = delta,
@@ -389,11 +413,13 @@
     }
 
     sigma_sim <- sigma_power_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    sigma_power_sim[,1:maxpq] <- initv
-    sigma_sim[,1:maxpq] <- initv^(1/delta)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    epsilon[,1:maxpq] <- z[,1:maxpq] * sigma_sim[,1:maxpq]
+    if (maxpq > 0) {
+        sigma_power_sim[,seq_len(maxpq)] <- initv
+        sigma_sim[,seq_len(maxpq)] <- initv^(1/delta)
+        epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
+    }
     order <- object$model$order
     for (i in (maxpq + 1):(h + maxpq)) {
         sigma_power_sim[,i] <- variance_intercept[i]
@@ -411,13 +437,17 @@
         epsilon[,i] <- z[,i] * sigma_sim[,i]
         series_sim[,i] <- mu + epsilon[,i]
     }
-    sigma <- sigma_sim[,-c(1:maxpq), drop = FALSE]
-    series <- series_sim[,-c(1:maxpq), drop = FALSE]
+    sigma <- sigma_sim
+    series <- series_sim
+    if (maxpq > 0) {
+        sigma <- sigma[,-seq_len(maxpq), drop = FALSE]
+        series <- series[,-seq_len(maxpq), drop = FALSE]
+    }
     class(sigma) <- "tsmodel.distribution"
     class(series) <- "tsmodel.distribution"
     attr(sigma, "date_class") <- "numeric"
     attr(series, "date_class") <- "numeric"
-    out <- list(sigma = sigma_sim[-c(1:maxpq)], series = series_sim[-c(1:maxpq)])
+    out <- list(sigma = sigma, series = series)
     return(out)
 }
 
@@ -462,9 +492,9 @@
         z <- matrix(rdist(distribution, h * nsim, mu = 0, sigma = 1, skew = dist[1], shape = dist[2], lambda = dist[3]), nrow = nsim, ncol = h)
         z <- cbind(initz, z)
     }
-    if (!is.null(innov_init)) {
+    if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
-        z[,1:maxpq] <- innov_init
+        z[,seq_len(maxpq)] <- innov_init
     }
     if (is.null(var_init)) {
         initv <- omega/(1 - rho)
@@ -482,12 +512,14 @@
     }
     sigma_sim <- sigma_sqr_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     permanent_component_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    permanent_component_sim[,1:maxpq] <- initq
-    sigma_sqr_sim[,1:maxpq] <- initv
-    sigma_sim[,1:maxpq] <- sqrt(initv)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    epsilon[,1:maxpq] <- z[,1:maxpq] * sigma_sim[,1:maxpq]
+    if (maxpq > 0) {
+        permanent_component_sim[,seq_len(maxpq)] <- initq
+        sigma_sqr_sim[,seq_len(maxpq)] <- initv
+        sigma_sim[,seq_len(maxpq)] <- sqrt(initv)
+        epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
+    }
     order <- object$model$order
     for (i in (maxpq + 1):(h + maxpq)) {
         permanent_component_sim[,i] <- variance_intercept[i] + rho * permanent_component_sim[,i - 1] + phi * (sigma_sqr_sim[,i - 1] - permanent_component_sim[,i - 1])
@@ -508,10 +540,16 @@
     }
     # return
     transitory_component_sim <- sigma_sim - permanent_component_sim
-    sigma <- sigma_sim[,-c(1:maxpq)]
-    permanent_component <- permanent_component_sim[,-c(1:maxpq)]
-    transitory_component <- transitory_component_sim[,-c(1:maxpq)]
-    series <- series_sim[,-c(1:maxpq)]
+    sigma <- sigma_sim
+    permanent_component <- permanent_component_sim
+    transitory_component <- transitory_component_sim
+    series <- series_sim
+    if (maxpq > 0) {
+        sigma <- sigma[,-seq_len(maxpq)]
+        permanent_component <- permanent_component[,-seq_len(maxpq)]
+        transitory_component <- transitory_component[,-seq_len(maxpq)]
+        series <- series[,-seq_len(maxpq)]
+    }
     class(sigma) <- "tsmodel.distribution"
     class(series) <- "tsmodel.distribution"
     class(permanent_component) <- "tsmodel.distribution"
@@ -564,9 +602,9 @@
         z <- matrix(rdist(distribution, h * nsim, mu = 0, sigma = 1, skew = dist[1], shape = dist[2], lambda = dist[3]), nrow = nsim, ncol = h)
         z <- cbind(initz, z)
     }
-    if (!is.null(innov_init)) {
+    if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
-        z[,1:maxpq] <- innov_init
+        z[,seq_len(maxpq)] <- innov_init
     }
     if (is.null(var_init)) {
         # set the initial to some value close to integrated
@@ -576,11 +614,13 @@
     }
 
     sigma_sim <- sigma_sqr_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    sigma_sqr_sim[,1:maxpq] <- initv
-    sigma_sim[,1:maxpq] <- sqrt(initv)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
-    epsilon[, 1:maxpq] <- z[,1:maxpq] * sigma_sim[,1:maxpq]
+    if (maxpq > 0) {
+        sigma_sqr_sim[,seq_len(maxpq)] <- initv
+        sigma_sim[,seq_len(maxpq)] <- sqrt(initv)
+        epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
+    }
     order <- object$model$order
     for (i in (maxpq + 1):(h + maxpq)) {
         sigma_sqr_sim[,i] <- variance_intercept[i]
@@ -598,8 +638,12 @@
         epsilon[,i] <- z[,i] * sigma_sim[,i]
         series_sim[,i] <- mu + epsilon[,i]
     }
-    sigma <- sigma_sim[,-c(1:maxpq), drop = FALSE]
-    series <- series_sim[,-c(1:maxpq), drop = FALSE]
+    sigma <- sigma_sim
+    series <- series_sim
+    if (maxpq > 0) {
+        sigma <- sigma[,-seq_len(maxpq), drop = FALSE]
+        series <- series[,-seq_len(maxpq), drop = FALSE]
+    }
     class(sigma) <- "tsmodel.distribution"
     class(series) <- "tsmodel.distribution"
     attr(sigma, "date_class") <- "numeric"

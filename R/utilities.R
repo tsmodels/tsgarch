@@ -276,6 +276,7 @@ variance_target <- function(object, ...)
     group <- NULL
     pmatrix <- copy(object$parmatrix)
     if (sum(pmatrix$estimate) == 0) {
+        # should probably set all of them to 1 for calculations
         pmatrix[group == "alpha", estimate := 1]
         pmatrix[group == "beta", estimate := 1]
     }

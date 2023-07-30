@@ -171,7 +171,8 @@ garch_hess <- function(pars, env)
     hessian <- scaled_tmb$he()
     scores <- jacobian(score_function, scaled_sol$solution, env = scaled_env)
     m <- object$model_options[1]
-    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma[-(1:m)]
+    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma
+    if (m > 0) sig <- sig[-seq_len(m)]
     var_initial <- scaled_env$tmb$report(scaled_sol$solution)$initial_variance
     target_omega <- scaled_env$tmb$report(scaled_sol$solution)$target_omega
     rr <- summary(sdreport(scaled_tmb, par.fixed = scaled_sol$solution, getReportCovariance = T), p.value = TRUE)
@@ -316,7 +317,8 @@ garch_hess <- function(pars, env)
     hessian <- scaled_tmb$he(scaled_sol$solution)
     scores <- jacobian(score_function, scaled_sol$solution, env = scaled_env)
     m <- object$model_options[1]
-    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma[-(1:m)]
+    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma
+    if (m > 0) sig <- sig[-seq_len(m)]
     var_initial <- scaled_env$tmb$report(scaled_sol$solution)$initial_variance
     target_omega <- scaled_env$tmb$report(scaled_sol$solution)$target_omega
     kappa <- scaled_env$tmb$report(scaled_sol$solution)$kappa
@@ -491,7 +493,8 @@ aparch_jac_fun <- function(L, parmatrix)
     hessian <- scaled_tmb$he(scaled_sol$solution)
     scores <- jacobian(score_function, scaled_sol$solution, env = scaled_env)
     m <- object$model_options[1]
-    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma[-(1:m)]
+    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma
+    if (m > 0) sig <- sig[-seq_len(m)]
     var_initial <- scaled_env$tmb$report(scaled_sol$solution)$initial_variance
     target_omega <- scaled_env$tmb$report(scaled_sol$solution)$target_omega
     kappa <- scaled_env$tmb$report(scaled_sol$solution)$kappa
@@ -665,7 +668,8 @@ gjrgarch_jac_fun <- function(L, parmatrix)
     hessian <- scaled_tmb$he(scaled_sol$solution)
     scores <- jacobian(score_function, scaled_sol$solution, env = scaled_env)
     m <- object$model_options[1]
-    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma[-(1:m)]
+    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma
+    if (m > 0) sig <- sig[-seq_len(m)]
     var_initial <- scaled_env$tmb$report(scaled_sol$solution)$initial_variance
     target_omega <- scaled_env$tmb$report(scaled_sol$solution)$target_omega
     kappa <- scaled_env$tmb$report(scaled_sol$solution)$kappa
@@ -842,7 +846,8 @@ fgarch_jac_fun <- function(L, parmatrix)
     hessian <- scaled_tmb$he(scaled_sol$solution)
     scores <- jacobian(score_function, scaled_sol$solution, env = scaled_env)
     m <- object$model_options[1]
-    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma[-(1:m)]
+    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma
+    if (m > 0) sig <- sig[-seq_len(m)]
     var_initial <- scaled_env$tmb$report(scaled_sol$solution)$initial_variance
     target_omega <- scaled_env$tmb$report(scaled_sol$solution)$target_omega
     kappa <- scaled_env$tmb$report(scaled_sol$solution)$kappa
@@ -1032,8 +1037,12 @@ fgarch_jac_fun <- function(L, parmatrix)
     hessian <- scaled_tmb$he()
     scores <- jacobian(score_function, scaled_sol$solution, env = scaled_env)
     m <- object$model_options[1]
-    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma[-(1:m)]
-    permanent_component <- scaled_env$tmb$report(scaled_sol$solution)$permanent_component[-(1:m)]
+    permanent_component <- scaled_env$tmb$report(scaled_sol$solution)$permanent_component
+    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma
+    if (m > 0) {
+        sig <- sig[-seq_len(m)]
+        permanent_component <- permanent_component[-seq_len(m)]
+    }
     var_initial <- scaled_env$tmb$report(scaled_sol$solution)$initial_variance
     target_omega <- scaled_env$tmb$report(scaled_sol$solution)$target_omega
 
@@ -1172,7 +1181,10 @@ fgarch_jac_fun <- function(L, parmatrix)
     hessian <- scaled_tmb$he()
     scores <- jacobian(score_function, scaled_sol$solution, env = scaled_env)
     m <- object$model_options[1]
-    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma[-(1:m)]
+    sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma
+    if (m > 0) {
+        sig <- sig[-seq_len(m)]
+    }
     var_initial <- scaled_env$tmb$report(scaled_sol$solution)$initial_variance
     target_omega <- scaled_env$tmb$report(scaled_sol$solution)$target_omega
 
