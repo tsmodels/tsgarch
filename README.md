@@ -67,3 +67,14 @@ to be installed which has a dependency on
 turn has SystemRequirements libxslt. Therefore, if you are seeing `NA`
 printed in place of symbols, then it is likely that xlst is not
 installed.
+
+## Performance
+
+Due to the heavy use of the `data.table` package for parameter tracking and indexing, I have seen significant speed improvements by setting the following :
+
+```r
+options(datatable.optimize = 2L)
+```
+
+
+
