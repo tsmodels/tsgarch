@@ -1,5 +1,4 @@
 
-[![R-CMD-check](https://github.com/tsmodels/tsgarch/workflows/R-CMD-check/badge.svg)](https://github.com/tsmodels/tsgarch/actions)
 [![Last-changedate](https://img.shields.io/badge/last%20change-2023--07--30-yellowgreen.svg)](/commits/master)
 [![packageversion](https://img.shields.io/badge/Package%20version-0.2.1-orange.svg?style=flat-square)](commits/master)
 [![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/tsgarch)](https://cran.r-project.org/package=tsgarch)
