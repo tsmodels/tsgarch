@@ -143,7 +143,7 @@
     if (maxpq > 0) {
         sigma_log_sim[,seq_len(maxpq)] <- initv
         sigma_sim[,seq_len(maxpq)] <- exp(initv)
-        epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
+        epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sqrt(sigma_sim[,seq_len(maxpq)])
     }
     order <- object$model$order
     for (i in (maxpq + 1):(h + maxpq)) {

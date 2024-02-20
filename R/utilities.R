@@ -202,7 +202,7 @@ score_function <- function(x, env)
         old_args$constant <- spec$model$constant
         old_args$variance_targeting <- spec$model$variance_targeting
         if (spec$vreg$include_vreg) {
-            old_args$vreg <- spec$vreg$include_vreg
+            old_args$vreg <- xts(spec$vreg$include_vreg, spec$target$index)
         } else {
             old_args$vreg <- NULL
         }
@@ -243,7 +243,7 @@ score_function <- function(x, env)
         old_args$constant <- spec$model$constant
         old_args$variance_targeting <- spec$model$variance_targeting
         if (spec$vreg$include_vreg) {
-            old_args$vreg <- spec$vreg$include_vreg
+            old_args$vreg <- spec$vreg$vreg
         } else {
             old_args$vreg <- NULL
         }

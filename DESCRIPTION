@@ -1,7 +1,7 @@
 Package: tsgarch
 Type: Package
 Title: Univariate GARCH Models
-Version: 0.2.1
+Version: 0.2.2
 Author: Alexios Galanos
 Maintainer: alexios galanos <alexios@4dscape.com>
 Depends: R (>= 3.5.0), methods, tsmethods

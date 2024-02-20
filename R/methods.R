@@ -634,7 +634,7 @@ plot.tsgarch.estimate <- function(x, y = NULL, ...)
     layout(matrix(c(1,1,2,3), ncol = 2, nrow = 2, byrow = T))
     par(mar = c(2.5, 4, 2, 3))
     plot(as.zoo(sigma(x)), ylab = expression(~sigma[t]), col = "steelblue", xlab = "", ylim = ylim,
-         main = paste0(toupper(x$spec$model$model),"(",x$spec$model$order[1],",",x$spec$model$order[1],") - ",toupper(distribution)),
+         main = paste0(toupper(x$spec$model$model),"(",x$spec$model$order[1],",",x$spec$model$order[2],") - ",toupper(distribution)),
          cex.main = 0.9)
     lines(as.zoo(abs(x$spec$target$y)), col = "snow2")
     lines(as.zoo(sigma(x)), col = "steelblue")
@@ -648,7 +648,6 @@ plot.tsgarch.estimate <- function(x, y = NULL, ...)
     qqline(as.numeric(residuals(x, standardize = T)), col = "gray5", lty = 2)
     grid()
     return(invisible(x))
-
 }
 
 
