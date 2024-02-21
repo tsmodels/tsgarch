@@ -12,6 +12,12 @@
     }
     order <- object$spec$model$order
     omega <- omega(object)
+    if (object$spec$vreg$include_vreg) {
+        xi <- object$parmatrix[group == "xi"]$value
+        v <- object$spec$vreg$vreg
+        omega <- omega + as.numeric(sum(colMeans(v) * xi))
+    }
+    if (object$spec$vreg$multiplicative) omega <- exp(omega)
     alpha <- beta <- 0
     if (order[1] > 0) alpha <- object$parmatrix[group == "alpha"]$value[1]
     if (order[2] > 0) beta <- object$parmatrix[group == "beta"]$value[1]
@@ -39,6 +45,11 @@
     }
     order <- object$spec$model$order
     omega <- omega(object)
+    if (object$spec$vreg$include_vreg) {
+        xi <- object$parmatrix[group == "xi"]$value
+        v <- object$spec$vreg$vreg
+        omega <- omega + as.numeric(sum(colMeans(v) * xi))
+    }
     alpha <- beta <- gamma <- 0
     if (order[1] > 0) alpha <- object$parmatrix[group == "alpha"]$value[1]
     if (order[1] > 0) gamma <- object$parmatrix[group == "gamma"]$value[1]
@@ -74,6 +85,12 @@
     }
     order <- object$spec$model$order
     omega <- omega(object)
+    if (object$spec$vreg$include_vreg) {
+        xi <- object$parmatrix[group == "xi"]$value
+        v <- object$spec$vreg$vreg
+        omega <- omega + as.numeric(sum(colMeans(v) * xi))
+    }
+    if (object$spec$vreg$multiplicative) omega <- exp(omega)
     alpha <- beta <- gamma <- 0
     if (order[1] > 0) alpha <- object$parmatrix[group == "alpha"]$value[1]
     if (order[1] > 0) gamma <- object$parmatrix[group == "gamma"]$value[1]
@@ -106,6 +123,13 @@
     }
     order <- object$spec$model$order
     omega <- omega(object)
+    if (object$spec$vreg$include_vreg) {
+        xi <- object$parmatrix[group == "xi"]$value
+        v <- object$spec$vreg$vreg
+        omega <- omega + as.numeric(sum(colMeans(v) * xi))
+    }
+    if (object$spec$vreg$multiplicative) omega <- exp(omega)
+
     alpha <- beta <- gamma <- 0
     if (order[1] > 0) alpha <- object$parmatrix[group == "alpha"]$value[1]
     if (order[1] > 0) gamma <- object$parmatrix[group == "gamma"]$value[1]
@@ -138,6 +162,13 @@
     }
     order <- object$spec$model$order
     omega <- omega(object)
+    if (object$spec$vreg$include_vreg) {
+        xi <- object$parmatrix[group == "xi"]$value
+        v <- object$spec$vreg$vreg
+        omega <- omega + as.numeric(sum(colMeans(v) * xi))
+    }
+    if (object$spec$vreg$multiplicative) omega <- exp(omega)
+
     alpha <- beta <- gamma <- eta <- 0
     if (order[1] > 0) alpha <- object$parmatrix[group == "alpha"]$value[1]
     if (order[1] > 0) gamma <- object$parmatrix[group == "gamma"]$value[1]
@@ -173,6 +204,13 @@
     }
     order <- object$spec$model$order
     omega <- omega(object)
+    if (object$spec$vreg$include_vreg) {
+        xi <- object$parmatrix[group == "xi"]$value
+        v <- object$spec$vreg$vreg
+        omega <- omega + as.numeric(sum(colMeans(v) * xi))
+    }
+    if (object$spec$vreg$multiplicative) omega <- exp(omega)
+
     alpha <- beta <- 0
     if (order[1] > 0) alpha <- object$parmatrix[group == "alpha"]$value[1]
     if (order[2] > 0) beta <- object$parmatrix[group == "beta"]$value[1]

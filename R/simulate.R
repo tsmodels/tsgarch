@@ -19,15 +19,16 @@
     beta <- object$parmatrix[group == "beta"]$value
     dist <- object$parmatrix[group == "distribution"]$value
     distribution <- object$distribution
-    if (!is.null(vreg)) {
+    if (!is.null(vreg) & object$vreg$include_vreg) {
         vreg <- as.numeric(vreg)
         if (length(vreg) != h) stop("\nvreg must be a vector of length h.")
         variance_intercept <- omega + vreg
-        if (object$vreg$multiplicative) variance_intercept <- exp(variance_intercept)
         variance_intercept <- c(rep(0, maxpq), variance_intercept)
     } else {
         variance_intercept <- rep(omega, h + maxpq)
     }
+    if (object$vreg$multiplicative) variance_intercept <- exp(variance_intercept)
+
     if (!is.null(innov)) {
         innov <- as.matrix(innov)
         if (NROW(innov) != nsim | NCOL(innov) != h) stop("\ninnov must a matrix of dimensions nsim x h.")
@@ -109,7 +110,7 @@
     beta <- object$parmatrix[group == "beta"]$value
     dist <- object$parmatrix[group == "distribution"]$value
     distribution <- object$distribution
-    if (!is.null(vreg)) {
+    if (!is.null(vreg) & object$vreg$include_vreg) {
         vreg <- as.numeric(vreg)
         if (length(vreg) != h) stop("\nvreg must be a vector of length h.")
         variance_intercept <- omega + vreg
@@ -199,7 +200,7 @@
     delta <- object$parmatrix[group == "delta"]$value
     dist <- object$parmatrix[group == "distribution"]$value
     distribution <- object$distribution
-    if (!is.null(vreg)) {
+    if (!is.null(vreg) & object$vreg$include_vreg) {
         vreg <- as.numeric(vreg)
         if (length(vreg) != h) stop("\nvreg must be a vector of length h.")
         variance_intercept <- omega + vreg
@@ -207,6 +208,8 @@
     } else {
         variance_intercept <- rep(omega, h + maxpq)
     }
+    if (object$vreg$multiplicative) variance_intercept <- exp(variance_intercept)
+
     if (!is.null(innov)) {
         innov <- as.matrix(innov)
         if (NROW(innov) != nsim | NCOL(innov) != h) stop("\ninnov must a matrix of dimensions nsim x h.")
@@ -290,7 +293,7 @@
     beta <- object$parmatrix[group == "beta"]$value
     dist <- object$parmatrix[group == "distribution"]$value
     distribution <- object$distribution
-    if (!is.null(vreg)) {
+    if (!is.null(vreg) & object$vreg$include_vreg) {
         vreg <- as.numeric(vreg)
         if (length(vreg) != h) stop("\nvreg must be a vector of length h.")
         variance_intercept <- omega + vreg
@@ -298,6 +301,8 @@
     } else {
         variance_intercept <- rep(omega, h + maxpq)
     }
+    if (object$vreg$multiplicative) variance_intercept <- exp(variance_intercept)
+
     if (!is.null(innov)) {
         innov <- as.matrix(innov)
         if (NROW(innov) != nsim | NCOL(innov) != h) stop("\ninnov must a matrix of dimensions nsim x h.")
@@ -382,7 +387,7 @@
     delta <- object$parmatrix[group == "delta"]$value
     dist <- object$parmatrix[group == "distribution"]$value
     distribution <- object$distribution
-    if (!is.null(vreg)) {
+    if (!is.null(vreg) & object$vreg$include_vreg) {
         vreg <- as.numeric(vreg)
         if (length(vreg) != h) stop("\nvreg must be a vector of length h.")
         variance_intercept <- omega + vreg
@@ -390,6 +395,8 @@
     } else {
         variance_intercept <- rep(omega, h + maxpq)
     }
+    if (object$vreg$multiplicative) variance_intercept <- exp(variance_intercept)
+
     if (!is.null(innov)) {
         innov <- as.matrix(innov)
         if (NROW(innov) != nsim | NCOL(innov) != h) stop("\ninnov must a matrix of dimensions nsim x h.")
@@ -474,15 +481,16 @@
     beta <- object$parmatrix[group == "beta"]$value
     dist <- object$parmatrix[group == "distribution"]$value
     distribution <- object$distribution
-    if (!is.null(vreg)) {
+    if (!is.null(vreg) & object$vreg$include_vreg) {
         vreg <- as.numeric(vreg)
         if (length(vreg) != h) stop("\nvreg must be a vector of length h.")
         variance_intercept <- omega + vreg
-        if (object$vreg$multiplicative) variance_intercept <- exp(variance_intercept)
         variance_intercept <- c(rep(0, maxpq), variance_intercept)
     } else {
         variance_intercept <- rep(omega, h + maxpq)
     }
+    if (object$vreg$multiplicative) variance_intercept <- exp(variance_intercept)
+
     if (!is.null(innov)) {
         innov <- as.matrix(innov)
         if (NROW(innov) != nsim | NCOL(innov) != h) stop("\ninnov must a matrix of dimensions nsim x h.")
@@ -584,15 +592,16 @@
     beta <- object$parmatrix[group == "beta"]$value
     dist <- object$parmatrix[group == "distribution"]$value
     distribution <- object$distribution
-    if (!is.null(vreg)) {
+    if (!is.null(vreg) & object$vreg$include_vreg) {
         vreg <- as.numeric(vreg)
         if (length(vreg) != h) stop("\nvreg must be a vector of length h.")
         variance_intercept <- omega + vreg
-        if (object$vreg$multiplicative) variance_intercept <- exp(variance_intercept)
         variance_intercept <- c(rep(0, maxpq), variance_intercept)
     } else {
         variance_intercept <- rep(omega, h + maxpq)
     }
+    if (object$vreg$multiplicative) variance_intercept <- exp(variance_intercept)
+
     if (!is.null(innov)) {
         innov <- as.matrix(innov)
         if (NROW(innov) != nsim | NCOL(innov) != h) stop("\ninnov must a matrix of dimensions nsim x h.")

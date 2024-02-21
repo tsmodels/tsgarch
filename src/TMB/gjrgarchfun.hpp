@@ -114,6 +114,7 @@ Type gjrgarchfun(objective_function<Type>* obj) {
     }
     ADREPORT(persistence);
     variance_intercept.array() = variance_intercept.array() + regressors.array();
+    if (cmodel(4) > 0.5) variance_intercept = variance_intercept.array().exp();
 
     Type indicator = 0.0;
     for(int i = cmodel(0);i<timesteps;i++){

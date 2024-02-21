@@ -1,3 +1,4 @@
+# check multiplicative for other models
 .predict_garch <- function(object, h = 1, newxreg = NULL, newvreg = NULL, nsim = 1000, bootstrap = FALSE, forc_dates = NULL, init_states = NULL, ...)
 {
     parameter <- group <- NULL
@@ -18,10 +19,10 @@
     distribution <- object$parmatrix[group == "distribution"]$value
     xi = object$parmatrix[group == "xi"]$value
     constant <- omega + v
+    if (object$spec$vreg$multiplicative) constant <- exp(constant)
     res <- c(tail(as.numeric(residuals(object)), maxpq), rep(0, h))
     sigma_sqr <- c(tail(as.numeric(sigma(object)^2), maxpq), rep(0, h))
     y <- rep(0, h)
-    if (object$spec$vreg$multiplicative) constant <- exp(constant)
     for (i in (maxpq + 1):(h + maxpq)) {
         sigma_sqr[i] <- constant[i]
         if (garch_order[2] > 0) {
@@ -167,6 +168,7 @@
     distribution <- object$parmatrix[group == "distribution"]$value
     xi = object$parmatrix[group == "xi"]$value
     constant <- omega + v
+    if (object$spec$vreg$multiplicative) constant <- exp(constant)
     kappa <- object$kappa
     res <- c(tail(as.numeric(residuals(object)), maxpq), rep(0, h))
     sigma <- c(tail(as.numeric(sigma(object)), maxpq), rep(0, h))
@@ -240,6 +242,7 @@
     distribution <- object$parmatrix[group == "distribution"]$value
     xi = object$parmatrix[group == "xi"]$value
     constant <- omega + v
+    if (object$spec$vreg$multiplicative) constant <- exp(constant)
     kappa <- object$kappa
     res <- c(tail(as.numeric(residuals(object)), maxpq), rep(0, h))
     sigma <- c(tail(as.numeric(sigma(object)), maxpq), rep(0, h))
@@ -318,6 +321,7 @@
     distribution <- object$parmatrix[group == "distribution"]$value
     xi = object$parmatrix[group == "xi"]$value
     constant <- omega + v
+    if (object$spec$vreg$multiplicative) constant <- exp(constant)
     kappa <- object$kappa
     res <- c(tail(as.numeric(residuals(object)), maxpq), rep(0, h))
     sigma <- c(tail(as.numeric(sigma(object)), maxpq), rep(0, h))
@@ -394,11 +398,11 @@
     distribution <- object$parmatrix[group == "distribution"]$value
     xi = object$parmatrix[group == "xi"]$value
     constant <- omega + v
+    if (object$spec$vreg$multiplicative) constant <- exp(constant)
     res <- c(tail(as.numeric(residuals(object)), maxpq), rep(0, h))
     sigma_sqr <- c(tail(as.numeric(sigma(object)^2), maxpq), rep(0, h))
     permanent_component <- c(tail(as.numeric(object$permanent_component), maxpq), rep(0, h))
     y <- rep(0, h)
-    if (object$spec$vreg$multiplicative) constant <- exp(constant)
     k <- 1
     for (i in (maxpq + 1):(h + maxpq)) {
         if (k == 1) {

@@ -51,8 +51,8 @@
     }
     if (!is.null(vreg)) {
         eq_constant <- paste0(eq_constant," + ", regressor_equations$regressor)
-        if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
     }
+    if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
     eq_distribution <- .distribution_abb(distribution)
     if (order[1] > 0) {
         if (order[1] > 1) {
@@ -146,6 +146,8 @@
         m <- ncol(vreg)
         eq_constant <- paste0(eq_constant," + ", regressor_equations$regressor)
     }
+    if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
+
     eq_distribution <- .distribution_abb(distribution, standardized = FALSE)
     if (order[1] > 0) {
         if (order[1] > 1) {
@@ -192,6 +194,8 @@
         m <- ncol(vreg)
         eq_constant <- paste0(eq_constant," + ", regressor_equations$regressor)
     }
+    if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
+
     eq_distribution <- .distribution_abb(distribution, standardized = FALSE)
     if (order[1] > 0) {
         if (order[1] > 1) {
@@ -237,6 +241,8 @@
         m <- ncol(vreg)
         eq_constant <- paste0(eq_constant," + ", regressor_equations$regressor)
     }
+    if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
+
     eq_distribution <- .distribution_abb(distribution, standardized = TRUE)
     if (order[1] > 0) {
         if (order[1] > 1) {
@@ -280,8 +286,9 @@
     }
     if (!is.null(vreg)) {
         eq_constant <- paste0(eq_constant," + ", regressor_equations$regressor)
-        if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
     }
+    if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
+
     eq_distribution <- .distribution_abb(distribution)
     eq_permanent_component <- paste0("q_t = ",eq_constant," + \\rho q_{t-1} + \\phi \\left(\\varepsilon^2_{t-1} - \\sigma^2_{t-1}\\right)")
     if (order[1] > 0) {
@@ -327,8 +334,9 @@
     }
     if (!is.null(vreg)) {
         eq_constant <- paste0(eq_constant," + ", regressor_equations$regressor)
-        if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
     }
+    if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
+
     eq_distribution <- .distribution_abb(distribution)
     if (order[1] > 0) {
         if (order[1] > 1) {

@@ -114,6 +114,7 @@ Type aparchfun(objective_function<Type>* obj) {
         ADREPORT(target_omega);
     }
     power_sigma_intercept.array() = power_sigma_intercept.array() + regressors.array();
+    if (cmodel(4) > 0.5) power_sigma_intercept = power_sigma_intercept.array().exp();
 
     for(int i = cmodel(0);i<timesteps;i++){
         sigma_power(i) += power_sigma_intercept(i);

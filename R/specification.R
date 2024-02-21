@@ -78,6 +78,7 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
     if (model == "ewma") {
         if (variance_targeting) warning("\nvariance_targeting not valid for ewma (omega is zero). Setting to FALSE")
         variance_targeting <- FALSE
+        multiplicative <- FALSE
     }
     order <- c(order[1], order[2])
     variance_targeting <- as.logical(variance_targeting)

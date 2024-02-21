@@ -85,6 +85,7 @@ NumericVector aparchfilter(NumericVector residuals, NumericVector v, NumericVect
     }
     for(int i = model(0);i<timesteps;i++) {
         power_sigma(i) += omega(0) + v(i);
+        if (model(1) > 0.5) power_sigma(i) = exp(power_sigma(i));
         if (model(2) > 0) {
             for(int j = 0;j<model(2);j++) {
                 power_sigma(i) += alpha(j) * pow(fabs(residuals(i - j - 1)) - gamma(j) * residuals(i - j - 1), delta(0));
@@ -118,6 +119,8 @@ NumericVector gjrgarchfilter(NumericVector residuals, NumericVector negative_ind
     }
     for(int i = model(0);i<timesteps;i++) {
         sigma_squared(i) += omega(0) + v(i);
+        if (model(1) > 0.5) sigma_squared(i) = exp(sigma_squared(i));
+
         if (model(2) > 0) {
             for(int j = 0;j<model(2);j++) {
                 sigma_squared(i) += alpha(j) * pow(residuals(i - j - 1), 2.0) + gamma(j) * (pow(residuals(i - j - 1), 2.0) * negative_indicator(i - j - 1));
@@ -153,6 +156,8 @@ NumericVector fgarchfilter(NumericVector residuals, NumericVector v, NumericVect
     }
     for(int i = model(0);i<timesteps;i++) {
         power_sigma(i) += omega(0) + v(i);
+        if (model(1) > 0.5) power_sigma(i) = exp(power_sigma(i));
+
         if (model(2) > 0) {
             for(int j = 0;j<model(2);j++) {
                 power_sigma(i) += alpha(j) * power_sigma(i - j - 1) * pow(fabs(std_residuals(i - j - 1) - eta(j)) - gamma(j) * (std_residuals(i - j - 1) - eta(j)), delta(0));

@@ -299,6 +299,13 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
         parmatrix[parameter == "omega", estimate := 0]
         parmatrix[parameter == "omega", value := as.numeric(mean((y - mu)^2))]
     }
+    if (!is.null(vreg)) {
+        if (multiplicative) {
+            parmatrix[parameter == "omega", lower := log(1e-12)]
+            parmatrix[parameter == "omega", upper :=  log(upper)]
+            parmatrix[parameter == "omega", value :=  log(value)]
+        }
+    }
     if (order[1] == 0) {
         parmatrix <- rbind(parmatrix,
                            data.table("parameter" = "alpha1", value = 0,
@@ -400,6 +407,13 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
         parmatrix[parameter == "omega", estimate := 0]
         parmatrix[parameter == "omega", value := as.numeric(mean((y - mu)^2))]
     }
+    if (!is.null(vreg)) {
+        if (multiplicative) {
+            parmatrix[parameter == "omega", lower := log(1e-12)]
+            parmatrix[parameter == "omega", upper :=  log(upper)]
+            parmatrix[parameter == "omega", value :=  log(value)]
+        }
+    }
     if (order[1] == 0) {
         parmatrix <- rbind(parmatrix,
                            data.table("parameter" = "alpha1", value = 0,
@@ -494,6 +508,13 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
     if (variance_targeting) {
         parmatrix[parameter == "omega", estimate := 0]
         parmatrix[parameter == "omega", value := as.numeric(mean((y - mu)^2))]
+    }
+    if (!is.null(vreg)) {
+        if (multiplicative) {
+            parmatrix[parameter == "omega", lower := log(1e-12)]
+            parmatrix[parameter == "omega", upper :=  log(upper)]
+            parmatrix[parameter == "omega", value :=  log(value)]
+        }
     }
     if (order[1] == 0) {
         parmatrix <- rbind(parmatrix,

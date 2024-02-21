@@ -1,6 +1,6 @@
 
-[![Last-changedate](https://img.shields.io/badge/last%20change-2023--07--30-yellowgreen.svg)](/commits/master)
-[![packageversion](https://img.shields.io/badge/Package%20version-0.2.1-orange.svg?style=flat-square)](commits/master)
+[![Last-changedate](https://img.shields.io/badge/last%20change-2024--02--21-yellowgreen.svg)](/commits/master)
+[![packageversion](https://img.shields.io/badge/Package%20version-0.2.3-orange.svg?style=flat-square)](commits/master)
 [![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/tsgarch)](https://cran.r-project.org/package=tsgarch)
 
 # tsgarch
@@ -69,11 +69,10 @@ installed.
 
 ## Performance
 
-Due to the heavy use of the `data.table` package for parameter tracking and indexing, I have seen significant speed improvements by setting the following :
+Due to the heavy use of the `data.table` package for parameter tracking
+and indexing, I have seen significant speed improvements by setting the
+following :
 
-```r
+``` r
 options(datatable.optimize = 2L)
 ```
-
-
-
