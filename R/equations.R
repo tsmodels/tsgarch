@@ -52,7 +52,7 @@
     if (!is.null(vreg)) {
         eq_constant <- paste0(eq_constant," + ", regressor_equations$regressor)
     }
-    if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
+    if (multiplicative) eq_constant <- paste0("\\exp(",eq_constant,")")
     eq_distribution <- .distribution_abb(distribution)
     if (order[1] > 0) {
         if (order[1] > 1) {
@@ -74,7 +74,11 @@
     }
     # persistence
     eq_persistence <- paste0("P = \\sum_{j=1}^q \\alpha_j + \\sum_{j=1}^p \\beta_j")
-    eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}")
+    if (multiplicative) {
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - P}")
+    } else {
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}")
+    }
     # collect equations
     eq_garch <- paste0("\\sigma^2_t = ",eq_constant)
     if (!is.null(eq_alpha)) eq_garch <- paste0(eq_garch, " + ", eq_alpha)
@@ -146,7 +150,7 @@
         m <- ncol(vreg)
         eq_constant <- paste0(eq_constant," + ", regressor_equations$regressor)
     }
-    if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
+    if (multiplicative) eq_constant <- paste0("\\exp(",eq_constant,")")
 
     eq_distribution <- .distribution_abb(distribution, standardized = FALSE)
     if (order[1] > 0) {
@@ -168,7 +172,11 @@
         eq_beta <- NULL
     }
     eq_persistence <- paste0("P = \\sum_{j=1}^p \\beta_j + \\sum_{j=1}^q \\alpha_j \\kappa_j,\\quad \\kappa_j = E\\left[\\left(\\left|z_{t-j}\\right| - \\gamma_j z_{t-j}\\right)^{\\delta}\\right]")
-    eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega}{1 - P}\\right)^{2/\\delta}")
+    if (multiplicative) {
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - P}\\right)^{2/\\delta}")
+    } else {
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)^{2/\\delta}")
+    }
     # collect equations
     eq_garch <- paste0(" \\sigma^{\\delta}_t = ",eq_constant)
     if (!is.null(eq_alpha)) eq_garch <- paste0(eq_garch, " + ", eq_alpha)
@@ -194,7 +202,7 @@
         m <- ncol(vreg)
         eq_constant <- paste0(eq_constant," + ", regressor_equations$regressor)
     }
-    if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
+    if (multiplicative) eq_constant <- paste0("\\exp(",eq_constant,")")
 
     eq_distribution <- .distribution_abb(distribution, standardized = FALSE)
     if (order[1] > 0) {
@@ -216,7 +224,11 @@
         eq_beta <- NULL
     }
     eq_persistence <- paste0("P = \\sum_{j=1}^p \\beta_j + \\sum_{j=1}^q \\alpha_j  + \\sum_{j=1}^q \\gamma_j \\kappa,\\quad \\kappa = E\\left[I_t z^2_t\\right]")
-    eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega}{1 - P}\\right)")
+    if (multiplicative) {
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - P}\\right)")
+    } else {
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)")
+    }
     # collect equations
     eq_garch <- paste0(" \\sigma^2_t = ",eq_constant)
     if (!is.null(eq_alpha)) eq_garch <- paste0(eq_garch, " + ", eq_alpha)
@@ -241,7 +253,7 @@
         m <- ncol(vreg)
         eq_constant <- paste0(eq_constant," + ", regressor_equations$regressor)
     }
-    if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
+    if (multiplicative) eq_constant <- paste0("\\exp(",eq_constant,")")
 
     eq_distribution <- .distribution_abb(distribution, standardized = TRUE)
     if (order[1] > 0) {
@@ -263,7 +275,11 @@
         eq_beta <- NULL
     }
     eq_persistence <- paste0("P = \\sum_{j=1}^p \\beta_j + \\sum_{j=1}^q \\alpha_j \\kappa_j,\\quad \\kappa_j = E\\left[\\left(\\left|z_{t-j} - \\eta_j\\right| - \\gamma_j \\left(z_{t-j} - \\eta_j\\right)\\right)^{\\delta}\\right]")
-    eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega}{1 - P}\\right)^{2/\\delta}")
+    if (multiplicative) {
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - P}\\right)^{2/\\delta}")
+    } else {
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)^{2/\\delta}")
+    }
     # collect equations
     eq_garch <- paste0(" \\sigma^{\\delta}_t = ",eq_constant)
     if (!is.null(eq_alpha)) eq_garch <- paste0(eq_garch, " + ", eq_alpha)
@@ -287,7 +303,7 @@
     if (!is.null(vreg)) {
         eq_constant <- paste0(eq_constant," + ", regressor_equations$regressor)
     }
-    if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
+    if (multiplicative) eq_constant <- paste0("\\exp(",eq_constant,")")
 
     eq_distribution <- .distribution_abb(distribution)
     eq_permanent_component <- paste0("q_t = ",eq_constant," + \\rho q_{t-1} + \\phi \\left(\\varepsilon^2_{t-1} - \\sigma^2_{t-1}\\right)")
@@ -311,7 +327,11 @@
     }
     # persistence
     eq_persistence <- paste0("P = \\sum_{j=1}^q \\alpha_j + \\sum_{j=1}^p \\beta_j")
-    eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - \\rho}")
+    if (multiplicative) {
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - \\rho}")
+    } else {
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - \\rho}")
+    }
     # collect equations
     eq_garch <- paste0("\\sigma^2_t = ",eq_constant)
     if (!is.null(eq_alpha)) eq_garch <- paste0(eq_garch, " + ", eq_alpha)
@@ -335,7 +355,7 @@
     if (!is.null(vreg)) {
         eq_constant <- paste0(eq_constant," + ", regressor_equations$regressor)
     }
-    if (multiplicative) eq_constant <- paste0("exp(",eq_constant,")")
+    if (multiplicative) eq_constant <- paste0("\\exp(",eq_constant,")")
 
     eq_distribution <- .distribution_abb(distribution)
     if (order[1] > 0) {
