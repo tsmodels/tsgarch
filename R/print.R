@@ -73,14 +73,20 @@
         out <- out |> add_footer_lines(top = FALSE, values = "Model Equation")
         out <- out |> add_footer_row(top = FALSE, values = " ", colwidths = length(out$col_keys))
         k <- k + 2
-        out <- out |> add_footer_lines(values = " ", top = FALSE) |> append_chunks(i = k, j = "term", part = "footer", as_equation(paste0(x$equation[[1]])))
-        out <- out |> add_footer_lines(values = " ", top = FALSE) |> append_chunks(i = k + 1, j = "term", part = "footer", as_equation(paste0(x$equation[[2]])))
-        k <- k + 2
+        out <- out |> add_footer_lines(values = " ", top = FALSE) |> append_chunks(i = k, j = "term", part = "footer", as_equation(paste0(x$equation$eq_distribution)))
+        out <- out |> add_footer_lines(values = " ", top = FALSE) |> append_chunks(i = k + 1, j = "term", part = "footer", as_equation(paste0(x$equation$eq_garch)))
+        if (x$model == 'cgarch') {
+            out <- out |> add_footer_lines(values = " ", top = FALSE) |> append_chunks(i = k + 2, j = "term", part = "footer", as_equation(paste0(x$equation$eq_permanent_component)))
+            add_k <- 3
+        } else {
+            add_k <- 2
+        }
+        k <- k + add_k
         out <- out |> add_footer_row(top = FALSE, values = "Persistence (P) and Unconditional Variance Equations", colwidths = length(out$col_keys))
         out <- out |> add_footer_row(top = FALSE, values = " ", colwidths = length(out$col_keys))
         k <- k + 2
-        out <- out |> add_footer_lines(values = " ", top = FALSE) |> append_chunks(i = k, j = "term", part = "footer", as_equation(paste0(x$equation[[3]])))
-        out <- out |> add_footer_lines(values = " ", top = FALSE) |> append_chunks(i = k + 1, j = "term", part = "footer", as_equation(paste0(x$equation[[4]])))
+        out <- out |> add_footer_lines(values = " ", top = FALSE) |> append_chunks(i = k, j = "term", part = "footer", as_equation(paste0(x$equation$eq_persistence)))
+        out <- out |> add_footer_lines(values = " ", top = FALSE) |> append_chunks(i = k + 1, j = "term", part = "footer", as_equation(paste0(x$equation$eq_unconditional)))
         k <- k + 2
         if (!flag) out <- out |> hline(part = "footer",i = k - 8, j = 1)
         out <- out |> hline(part = "footer",i = k - 4, j = 1)

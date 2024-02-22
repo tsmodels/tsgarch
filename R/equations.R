@@ -74,17 +74,21 @@
     }
     # persistence
     eq_persistence <- paste0("P = \\sum_{j=1}^q \\alpha_j + \\sum_{j=1}^p \\beta_j")
-    if (multiplicative) {
-        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - P}")
+    if (!is.null(vreg)) {
+        if (multiplicative) {
+            eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - P}")
+        } else {
+            eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}")
+        }
     } else {
-        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}")
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\omega}{1 - P}")
     }
     # collect equations
     eq_garch <- paste0("\\sigma^2_t = ",eq_constant)
     if (!is.null(eq_alpha)) eq_garch <- paste0(eq_garch, " + ", eq_alpha)
     if (!is.null(eq_beta)) eq_garch <- paste0(eq_garch, " + ", eq_beta)
     eq_distribution <- paste0("\\varepsilon_t \\sim ", eq_distribution)
-    out <- list(eq_distribution = eq_distribution, eq_garch = eq_garch,eq_persistence = eq_persistence,eq_unconditional = eq_unconditional)
+    out <- list(eq_distribution = eq_distribution, eq_garch = eq_garch,eq_persistence = eq_persistence, eq_unconditional = eq_unconditional)
     return(out)
 }
 
@@ -123,7 +127,11 @@
         eq_beta <- NULL
     }
     eq_persistence <- paste0("P = \\sum_{j=1}^p \\beta_j")
-    eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = exp\\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)")
+    if (!is.null(vreg)) {
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = exp\\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)")
+    } else {
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = exp\\left(\\frac{\\omega}{1 - P}\\right)")
+    }
     # collect equations
     eq_garch <- paste0(" log\\left(\\sigma^2_t\\right) = ",eq_constant)
     if (!is.null(eq_alpha)) eq_garch <- paste0(eq_garch, " + ", eq_alpha)
@@ -172,10 +180,14 @@
         eq_beta <- NULL
     }
     eq_persistence <- paste0("P = \\sum_{j=1}^p \\beta_j + \\sum_{j=1}^q \\alpha_j \\kappa_j,\\quad \\kappa_j = E\\left[\\left(\\left|z_{t-j}\\right| - \\gamma_j z_{t-j}\\right)^{\\delta}\\right]")
-    if (multiplicative) {
-        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - P}\\right)^{2/\\delta}")
+    if (!is.null(vreg)) {
+        if (multiplicative) {
+            eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - P}\\right)^{2/\\delta}")
+        } else {
+            eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)^{2/\\delta}")
+        }
     } else {
-        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)^{2/\\delta}")
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega}{1 - P}\\right)^{2/\\delta}")
     }
     # collect equations
     eq_garch <- paste0(" \\sigma^{\\delta}_t = ",eq_constant)
@@ -224,10 +236,14 @@
         eq_beta <- NULL
     }
     eq_persistence <- paste0("P = \\sum_{j=1}^p \\beta_j + \\sum_{j=1}^q \\alpha_j  + \\sum_{j=1}^q \\gamma_j \\kappa,\\quad \\kappa = E\\left[I_t z^2_t\\right]")
-    if (multiplicative) {
-        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - P}\\right)")
-    } else {
-        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)")
+    if (!is.null(vreg)) {
+        if (multiplicative) {
+            eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - P}\\right)")
+        } else {
+            eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)")
+        }
+    } else{
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega}{1 - P}\\right)")
     }
     # collect equations
     eq_garch <- paste0(" \\sigma^2_t = ",eq_constant)
@@ -275,10 +291,14 @@
         eq_beta <- NULL
     }
     eq_persistence <- paste0("P = \\sum_{j=1}^p \\beta_j + \\sum_{j=1}^q \\alpha_j \\kappa_j,\\quad \\kappa_j = E\\left[\\left(\\left|z_{t-j} - \\eta_j\\right| - \\gamma_j \\left(z_{t-j} - \\eta_j\\right)\\right)^{\\delta}\\right]")
-    if (multiplicative) {
-        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - P}\\right)^{2/\\delta}")
+    if (!is.null(vreg)) {
+        if (multiplicative) {
+            eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - P}\\right)^{2/\\delta}")
+        } else {
+            eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)^{2/\\delta}")
+        }
     } else {
-        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)^{2/\\delta}")
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\left(\\frac{\\omega}{1 - P}\\right)^{2/\\delta}")
     }
     # collect equations
     eq_garch <- paste0(" \\sigma^{\\delta}_t = ",eq_constant)
@@ -327,17 +347,21 @@
     }
     # persistence
     eq_persistence <- paste0("P = \\sum_{j=1}^q \\alpha_j + \\sum_{j=1}^p \\beta_j")
-    if (multiplicative) {
-        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - \\rho}")
+    if (!is.null(vreg)) {
+        if (multiplicative) {
+            eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\exp(\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j})}{1 - \\rho}")
+        } else {
+            eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - \\rho}")
+        }
     } else {
-        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - \\rho}")
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = \\frac{\\omega}{1 - \\rho}")
     }
     # collect equations
-    eq_garch <- paste0("\\sigma^2_t = ",eq_constant)
+    eq_garch <- paste0("\\sigma^2_t = q_{t}")
     if (!is.null(eq_alpha)) eq_garch <- paste0(eq_garch, " + ", eq_alpha)
     if (!is.null(eq_beta)) eq_garch <- paste0(eq_garch, " + ", eq_beta)
     eq_distribution <- paste0("\\varepsilon_t \\sim ", eq_distribution)
-    out <- list(eq_distribution = eq_distribution, eq_garch = eq_garch,eq_persistence = eq_persistence,eq_unconditional = eq_unconditional)
+    out <- list(eq_distribution = eq_distribution, eq_garch = eq_garch, eq_permanent_component = eq_permanent_component, eq_persistence = eq_persistence, eq_unconditional = eq_unconditional)
     return(out)
 }
 
@@ -384,6 +408,6 @@
     if (!is.null(eq_alpha)) eq_garch <- paste0(eq_garch, " + ", eq_alpha)
     if (!is.null(eq_beta)) eq_garch <- paste0(eq_garch, " + ", eq_beta)
     eq_distribution <- paste0("\\varepsilon_t \\sim ", eq_distribution)
-    out <- list(eq_distribution = eq_distribution, eq_garch = eq_garch,eq_persistence = eq_persistence,eq_unconditional = eq_unconditional)
+    out <- list(eq_distribution = eq_distribution, eq_garch = eq_garch, eq_persistence = eq_persistence, eq_unconditional = eq_unconditional)
     return(out)
 }
