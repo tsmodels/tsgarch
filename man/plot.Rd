@@ -11,7 +11,8 @@
 
 \item{y}{not used.}
 
-\item{...}{not used.}
+\item{...}{additional arguments pass to \code{\link[graphics]{plot.xy}} other
+than \dQuote{xlab}, \dQuote{ylab} and \dQuote{main}.}
 }
 \description{
 Plot method for newsimpact class.

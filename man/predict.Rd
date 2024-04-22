@@ -10,10 +10,12 @@
   h = 1,
   newxreg = NULL,
   newvreg = NULL,
-  bootstrap = FALSE,
-  nsim = 1000,
+  nsim = 0,
+  sim_method = c("parametric", "bootstrap"),
+  block = 1,
   forc_dates = NULL,
   init_states = NULL,
+  seed = NULL,
   ...
 )
 }
@@ -28,11 +30,15 @@
 a numeric or xts matrix. Only needed if the model was estimated with regressors in the
 variance equation.}
 
-\item{bootstrap}{whether to generate a bootstrap distribution for the conditional
-volatility using re-sampling of the empirical innovations as in the paper by Pascual et al (2006).}
-
 \item{nsim}{the number of simulations to use for generating the simulated
-predictive distribution.}
+predictive distribution. Defaults to zero (no simulated distribution).}
+
+\item{sim_method}{the simulation method to use when \strong{nsim} great than zero. The \dQuote{parametric}
+method samples from the model distribution whilst the \dQuote{bootstrap} from the standardized
+model residuals.}
+
+\item{block}{for the \dQuote{bootstrap} \strong{sim_method}, this allows to generate
+block length samples (defaults to 1).}
 
 \item{forc_dates}{an optional vector of forecast dates equal to h. If NULL will use the
 implied periodicity of the data to generate a regular sequence of dates after the
@@ -41,6 +47,8 @@ last available date in the data.}
 \item{init_states}{an optional vector of states to initialize the forecast.
 If NULL, will use the last available state from the estimated model. This must
 be equal to the max of the ARCH and GARCH terms.}
+
+\item{seed}{an integer that will be used in a call to set.seed before simulating.}
 
 \item{...}{additional arguments for future expansion options.}
 }
@@ -54,10 +62,11 @@ Prediction function for class \dQuote{tsgarch.estimate}.
 The bootstrap method considered here, is based on re-sampling innovations
 from the empirical distribution of the fitted GARCH model to generate future
 realizations of the series and sigma. This only considers distributional uncertainty
-and will not generate prediction intervals for the sigma 1 step ahead forecast
+and will not generate prediction intervals for the 1-step ahead sigma forecast
 for which only the parameter uncertainty is relevant in GARCH type models (and
-not currently implemented). Hence if h=1 and bootstrap = TRUE, no distribution
-will be returned.
+not currently implemented).
+When the horizon \strong{h} is equal to 1, no simulation is performaed since there is
+no uncertainty to account for.
 }
 \references{
 \insertRef{Pascual2006}{tsgarch}

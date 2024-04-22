@@ -360,9 +360,8 @@ namespace distfun{
     {
         Type rho2 = Type(1.0) - skew * skew;
         Type zeta2 = shape * shape;
-        Type alpha = zeta2 * kappagh(shape, lambda)/rho2;
-        alpha = alpha * (Type(1.0) + skew * skew * zeta2 * deltakappagh(shape, lambda)/rho2);
-        alpha = sqrt(alpha);
+        Type alpha_tmp = zeta2 * kappagh(shape, lambda)/rho2;
+        Type alpha = sqrt(alpha_tmp * (Type(1.0) + skew * skew * zeta2 * deltakappagh(shape, lambda)/rho2));
         Type beta = alpha * skew;
         Type delta = shape / ( alpha * sqrt(rho2) );
         Type d = delta*delta;
@@ -380,9 +379,8 @@ namespace distfun{
     {
         Type rho2 = Type(1.0) - skew * skew;
         Type zeta2 = shape * shape;
-        Type alpha = zeta2 * fwd_kappagh(shape, lambda)/rho2;
-        alpha = alpha * (Type(1.0) + skew * skew * zeta2 * fwd_deltakappagh(shape, lambda)/rho2);
-        alpha = sqrt(alpha);
+        Type alpha_tmp = zeta2 * fwd_kappagh(shape, lambda)/rho2;
+        Type alpha = sqrt(alpha_tmp * (Type(1.0) + skew * skew * zeta2 * fwd_deltakappagh(shape, lambda)/rho2));
         Type beta = alpha * skew;
         Type delta = shape / ( alpha * sqrt(rho2) );
         Type d = delta*delta;

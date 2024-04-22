@@ -18,7 +18,7 @@
 #' @param trace whether to show the progress bar. The user is expected to have
 #' set up appropriate handlers for this using the \\dQuote{progressr} package.
 #' @param ... not currently used.
-#' @return A list which includes a data.table having the following columns:
+#' @returns A list which includes a data.table having the following columns:
 #' \itemize{
 #' \item estimation_date: the date at which the model was estimated.
 #' \item convergence: whether both kkt1 and kkt2 were TRUE (
@@ -80,7 +80,7 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
     # check for ending period to avoid overlap
     index_table <- rbindlist(lapply(1:length(seqdates), function(i) {
         if (i == length(seqdates)) {
-            s <- index(data[paste0(seqdates[i],"/",max(idates))])
+            s <- index(data[paste0(seqdates[i],"/",max(idates[end]))])
             s <- s[-length(s)]
         } else {
             s <- index(data[paste0(seqdates[i],"/",seqdates[i + 1])])
@@ -89,12 +89,12 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
         if (length(s) == 0) return(NULL)
         rbindlist(lapply(1:length(s), function(j){
             idx <- which(idates == s[j])
-            maxh <- min(idx + h, NROW(data))
+            maxh <- min(idx + h, NROW(data[1:end]))
             tmp <- na.omit(index(data[idx:maxh]))
             data.table(estimate_date = seqdates[i], filter_date = tmp[1], forecast_dates = tmp[-1], h = length(tmp[-1]))
         }))
     }))
-    max_index <- max(idates)
+    max_index <- max(idates[end])
     index_table <- index_table[forecast_dates <= max_index]
     index_table <- split(index_table, by = "estimate_date")
     if (trace) {
@@ -115,6 +115,7 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
                                 backcast_lambda = object$model$backcast_lambda, sample_n = object$model$sample_n,
                                 distribution = object$distribution)
         mod <- try(estimate(spec), silent = TRUE)
+        model_coef <- coef(mod)
         skew <- mod$parmatrix[parameter == "skew"]$value
         shape <- mod$parmatrix[parameter == "shape"]$value
         lambda <- mod$parmatrix[parameter == "lambda"]$value
@@ -125,13 +126,13 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
         # first index is the estimation so we start with the prediction
         # vreg
         if (use_vreg) {
-            vreg_test <- vreg[paste0(seqdates[i],"/",M[[1]]$forecast_dates)]
+            vreg_test <- vreg[M[[1]]$forecast_dates]
         } else {
             vreg_test <- NULL
         }
         # actual
         P <- vector(mode = "list", length = rolls)
-        tmp <- predict(mod, h = M[[1]]$h[1], newvreg = vreg_test, forc_dates = M[[1]]$forecast_dates)
+        tmp <- predict(mod, h = M[[1]]$h[1], newvreg = vreg_test, forc_dates = M[[1]]$forecast_date, nsim = 0)
         if (rolls > 1 & rolling) {
             y_test <- data[M[[1]]$forecast_dates]
             nh <- length(M[[1]]$h)
@@ -161,7 +162,7 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
                 } else {
                     vreg_test <- NULL
                 }
-                tmp <- predict(f, h = M[[j]]$h[1], newvreg = vreg_test, forc_dates = M[[j]]$forecast_dates)
+                tmp <- predict(f, h = M[[j]]$h[1], newvreg = vreg_test, forc_dates = M[[j]]$forecast_dates, nsim = 0)
                 y_test <- data[M[[j]]$forecast_dates]
                 nh <- length(M[[j]]$h)
                 P[[j]] <- data.table("estimation_date" = rep(seqdates[i], nh),
@@ -195,7 +196,7 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
                               "actual" = as.numeric(y_test))
         }
         return(out)
-    }, future.packages = c("tsmethods","tsgarch","xts","data.table"), future.seed = TRUE)
+    }, future.packages = c("tsmethods","tsgarch","xts","data.table"), future.stdout	= FALSE, future.seed = FALSE)
     b <- eval(b)
     b <- rbindlist(b)
     out <- list(table = b, distribution = object$distribution, h = h, estimate_every = estimate_every, rolling = rolling)

@@ -21,26 +21,26 @@
 a numeric or xts matrix. Only needed if the model was estimated with regressors in the
 variance equation.}
 
-\item{...}{additional arguments for future expansion options.}
+\item{...}{additional arguments for future expansion.}
 }
 \value{
 A \dQuote{tsgarch.estimate} object with updated information.
 }
 \description{
-Filters new data based on an already estimated model.
+Filters new data based on an already estimated model or filters data
+based on a specification object.
 }
 \details{
 The method filters new data and updates the object with this new information
 so that it can be called recursively as new data arrives. It is also possible to use
 a specification object with fixed parameters, by appropriately setting the values
-of the parmatrix object in the specification slot. In this case, the returned object
-will also be of classs \dQuote{tsgarch.estimate} but with missing information
-regarding the hessian and scores. However, it will still be possible to use the
-returned object for prediction.
-For the argument y, this should strictly be new data coming after the last
-time index of the existing object data. The existing dataset and y are merged
-on their time indices and only information coming after the existing data set
-time index is appended. No replacement of existing data is possible using this
-approach (the user can directly replace the existing data or parts of manually
-for this type of use case).
+of the \dQuote{parmatrix} object in the specification slot. In this case, the returned object
+will also be of classs \dQuote{tsgarch.estimate}.
+If an object of \dQuote{tsgarch.spec} is used with y not NULL, then the method will
+first filter the values of the data in the object, generating an object of
+\dQuote{tsgarch.estimate} and then call the method again on this new object and the
+new y values (and optionally any newvreg values). In this way, using either object
+classes will return the exact same results. The timestamp indices of y must be
+strictly greater than the maximum timestamp index of the data within the object (i.e.
+we only filter on new data).
 }

@@ -14,6 +14,7 @@
   innov = NULL,
   innov_init = NULL,
   vreg = NULL,
+  burn = 0,
   ...
 )
 }
@@ -43,7 +44,12 @@ model for the purpose of continuing the modeled series from some fixed point).}
 \item{vreg}{an optional vector of length h representing any pre-multiplied
 variance regressors to use in the simulation.}
 
-\item{...}{not currently used.}
+\item{burn}{burn in. Will be discarded before returning the output.}
+
+\item{...}{for aparch, fgarch, egarch and gjrgarch models, an optional
+vector of length max(q,p) with values for initializing the ARCH equation and
+named \dQuote{arch_initial}. This is mostly used for validation purposes. The
+\dQuote{arch_initial} value is always returned by an estimated object.}
 }
 \value{
 An object of class \dQuote{tsgarch.simulate} with slots for the
@@ -63,9 +69,9 @@ pieces of information used in the simulation. The \dQuote{vreg} argument in
 the spec will be ignored. Instead, the user can supply a pre-multiplied vector
 to the simulate function which will be used. Note that the \dQuote{multiplicative}
 argument in the specification will be used in this case to determine how the
-regressors enter the conditional variance equation. While the innov argument
-must be a matrix, all other values are vectors and assume that they will be
-the same across all sample paths. If the user wants to assign different values
-for arguments var_init, innov_init and vreg, then the simulate method should be
-called multiple times.
+regressors enter the conditional variance equation. While the \dQuote{innov}
+argument must be a matrix, all other values are vectors and assume that they
+will be the same across all sample paths. If the user wants to assign different values
+for arguments \dQuote{var_init}, \dQuote{innov_init} and \dQuote{vreg}, then
+the simulate method should be called multiple times.
 }

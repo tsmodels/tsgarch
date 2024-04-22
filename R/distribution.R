@@ -50,7 +50,7 @@ distribution_parameters <- function(distribution)
                      data.table(parameter = "lambda", value = -0.5, lower = -6, upper = 6, estimate = 0, scale = 1, group = "distribution", equation = "[D]", symbol = "\\lambda"))
         return(tmp)
     }
-    if (distribution == "ghyp") {
+    if (distribution == "gh") {
         tmp <- rbind(tmp,
                      data.table(parameter = "skew", value = 0.2, lower = -0.99, upper = 0.99, estimate = 1, scale = 1, group = "distribution", equation = "[D]", symbol = "\\zeta"),
                      data.table(parameter = "shape", value = 2, lower = 0.25, upper = 25, estimate = 1, scale = 1, group = "distribution", equation = "[D]", symbol = "\\nu"),
@@ -86,7 +86,7 @@ distribution_class <- function(distribution)
            "ged" = 5,
            "sged" = 6,
            "nig" = 7,
-           "ghyp" = 8,
+           "gh" = 8,
            "jsu" = 9,
            "ghst" = 10
            )
@@ -102,7 +102,7 @@ distribution_abb <- function(distribution)
            "ged" = "GED",
            "sged" = "SGED",
            "nig" = "NIG",
-           "ghyp" = "GH",
+           "gh" = "GH",
            "jsu" = "JSU",
            "ghst" = "GHST"
     )
@@ -110,7 +110,7 @@ distribution_abb <- function(distribution)
 # validation function for currently implemented distriibutions
 valid_distributions <- function()
 {
-    c("norm", "std", "snorm", "sstd", "ged", "sged", "nig", "ghyp", "jsu", "ghst")
+    c("norm", "std", "snorm", "sstd", "ged", "sged", "nig", "gh", "jsu", "ghst")
 }
 
 # Absolute Moments (egarch model)
@@ -125,7 +125,7 @@ egarch_moment <- function(distribution = "norm", skew = 0.9, shape = 4, lambda =
            "sged" = .sged_egarch_moment(skew, shape),
            "jsu" = .jsu_egarch_moment(skew, shape),
            "nig" = .nig_egarch_moment(skew, shape),
-           "ghyp" = .ghyp_egarch_moment(skew, shape, lambda),
+           "gh" = .gh_egarch_moment(skew, shape, lambda),
            "ghst"  = .ghst_egarch_moment(skew, shape)
            )
     return(unname(moment))
@@ -185,9 +185,9 @@ egarch_moment <- function(distribution = "norm", skew = 0.9, shape = 4, lambda =
     return(moment)
 }
 
-.ghyp_egarch_moment <- function(skew, shape, lambda)
+.gh_egarch_moment <- function(skew, shape, lambda)
 {
-    f <- function(x) abs(x) * ddist("ghyp", x, mu = 0, sigma = 1, skew = skew, shape = shape, lambda = lambda)
+    f <- function(x) abs(x) * ddist("gh", x, mu = 0, sigma = 1, skew = skew, shape = shape, lambda = lambda)
     moment <- integrate(f, -Inf, Inf)$value
     return(moment)
 }
@@ -211,7 +211,7 @@ gjrgarch_moment <- function(distribution = "norm", skew = 0.9, shape = 4, lambda
                       "sged" = .sged_gjrgarch_moment(skew, shape),
                       "jsu" = .jsu_gjrgarch_moment(skew, shape),
                       "nig" = .nig_gjrgarch_moment(skew, shape),
-                      "ghyp" = .ghyp_gjrgarch_moment(skew, shape, lambda),
+                      "gh" = .gh_gjrgarch_moment(skew, shape, lambda),
                       "ghst"  = .ghst_gjrgarch_moment(skew, shape)
     )
     return(unname(moment))
@@ -271,9 +271,9 @@ gjrgarch_moment <- function(distribution = "norm", skew = 0.9, shape = 4, lambda
     return(moment)
 }
 
-.ghyp_gjrgarch_moment <- function(skew, shape, lambda)
+.gh_gjrgarch_moment <- function(skew, shape, lambda)
 {
-    f <- function(x) ddist("ghyp", x, 0, 1, skew = skew, shape = shape, lambda = lambda)
+    f <- function(x) ddist("gh", x, 0, 1, skew = skew, shape = shape, lambda = lambda)
     moment <- integrate(f, -Inf, 0)$value
     return(moment)
 }
@@ -297,7 +297,7 @@ aparch_moment <- function(distribution = "norm", gamma = 0.01, delta = 2, skew =
                        "sged" = .sged_aparch_moment(gamma, delta, skew, shape),
                        "jsu" = .jsu_aparch_moment(gamma, delta, skew, shape),
                        "nig" = .nig_aparch_moment(gamma, delta, skew, shape),
-                       "ghyp" = .ghyp_aparch_moment(gamma, delta, skew, shape, lambda),
+                       "gh" = .gh_aparch_moment(gamma, delta, skew, shape, lambda),
                        "ghst"  = .ghst_aparch_moment(gamma, delta, skew, shape)
     )
     return(unname(moment))
@@ -358,9 +358,9 @@ aparch_moment_v <- Vectorize(aparch_moment, USE.NAMES = FALSE)
     return(moment)
 }
 
-.ghyp_aparch_moment <- function(gamma, delta, skew, shape, lambda)
+.gh_aparch_moment <- function(gamma, delta, skew, shape, lambda)
 {
-    f <- function(x) (abs(x) - gamma*x)^delta * ddist("ghyp",x, 0, 1, skew = skew, shape = shape, lambda = lambda)
+    f <- function(x) (abs(x) - gamma*x)^delta * ddist("gh",x, 0, 1, skew = skew, shape = shape, lambda = lambda)
     moment <- integrate(f, -Inf, Inf)$value
     return(moment)
 }

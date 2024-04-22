@@ -38,6 +38,7 @@ Type aparchfun(objective_function<Type>* obj) {
     int dclass = cmodel(5);
     int m = v.cols();
     int j = 0;
+
     // re-scale parameters
     int k = 0;
     mu *= pscale(k);
@@ -77,34 +78,47 @@ Type aparchfun(objective_function<Type>* obj) {
     distribution(0) *= pscale(k);
     distribution(1) *= pscale(k + 1);
     distribution(2) *= pscale(k + 2);
+
+    // variance initialization based on user choice
     vector<Type> residuals = y.array() - mu;
+    // extract the actual, not zero augmented vector for calculations
     vector<Type> tmp_block = residuals.tail(timesteps - cmodel(0));
     Type initial_power_sigma = garchextra::init_power_variance(tmp_block, initmethod, backcast_lambda, delta, samplen);
     Type initial_variance = pow(initial_power_sigma, Type(2.0)/delta);
-    // initialize variance
     for(j = 0;j<cmodel(0);j++) {
         sigma_power(j) += initial_power_sigma;
         // zero out the initial values
         residuals(j) = 0.0;
         sigma(j) = pow(sigma_power(j), Type(1.0)/delta);
     }
+
+    // arch initialization (respects user choice for initialization)
+    // persistence
     Type persistence = beta.sum();
     vector<Type> kappa(cmodel(1));
+    vector<Type> initial_arch(cmodel(1));
+    initial_arch.setZero();
     for(j = 0;j<cmodel(1);j++) {
         kappa(j) = aparchkappa::aparch_moment_func(gamma(j), delta, distribution(0), distribution(1), distribution(2), dclass);
         persistence += alpha(j) * kappa(j);
+        initial_arch(j) = garchextra::init_aparch(tmp_block, initmethod, gamma(j), delta, backcast_lambda, samplen);
     }
     ADREPORT(persistence);
     ADREPORT(kappa);
+
+    // variance targeting (will not respect user choice of initialization since
+    // we use the full sample to capture unconditional sigma)
     regressors = v * xi;
     vector<Type> power_sigma_intercept(timesteps);
     Type target_omega = 0.0;
     if (cmodel(3) > 0.5) {
-        Type sample_power_sigma = residuals.tail(timesteps - cmodel(0)).abs().pow(delta).mean();
+        Type sample_power_sigma = residuals.tail(timesteps - cmodel(0)).pow(2.0).mean();
+        sample_power_sigma = pow(sample_power_sigma, delta/2.0);
         target_omega = sample_power_sigma * (Type(1.0) - persistence);
-        // subtract (mean of v) * xi
-        vector<Type> meanc = v.colwise().mean();
+        // use the actual, not zero augmented vector for calculations
+        vector<Type> meanc = v.bottomRows(timesteps - cmodel(0)).colwise().mean();
         Type mean_regressors = (meanc.array() * xi.array()).sum();
+        // subtract (mean of v) * xi
         target_omega -= mean_regressors;
         power_sigma_intercept.fill(target_omega);
         ADREPORT(target_omega);
@@ -113,13 +127,19 @@ Type aparchfun(objective_function<Type>* obj) {
         power_sigma_intercept.fill(omega);
         ADREPORT(target_omega);
     }
-    power_sigma_intercept.array() = power_sigma_intercept.array() + regressors.array();
-    if (cmodel(4) > 0.5) power_sigma_intercept = power_sigma_intercept.array().exp();
 
+    // variance intercept
+    power_sigma_intercept.array() = power_sigma_intercept.array() + regressors.array();
+    // multiplicative adjustment
+    if (cmodel(4) > 0.5) power_sigma_intercept = power_sigma_intercept.array().exp();
     for(int i = cmodel(0);i<timesteps;i++){
         sigma_power(i) += power_sigma_intercept(i);
         for(j = 0;j<cmodel(1);j++){
-            sigma_power(i) += alpha(j) * pow(fabs(residuals(i - j - 1)) - gamma(j) * residuals(i - j - 1), delta);
+            if((cmodel(1) + j) >= i ) {
+                sigma_power(i) += alpha(j) * initial_arch(j);
+            } else {
+                sigma_power(i) += alpha(j) * pow(fabs(residuals(i - j - 1)) - gamma(j) * residuals(i - j - 1), delta);
+            }
         }
         for(j = 0;j<cmodel(2);j++){
             sigma_power(i) += beta(j) * sigma_power(i - j - 1);
@@ -128,11 +148,13 @@ Type aparchfun(objective_function<Type>* obj) {
         std_residuals(i) = residuals(i)/sigma(i);
     }
     vector<Type> tmp_vector = distfun::distlike(std_residuals, distribution(0), distribution(1), distribution(2), dclass)/sigma.array();
+    // remove initialization values
     vector<Type> ll_vector = tmp_vector.tail(timesteps - cmodel(0));
     REPORT(target_omega);
     REPORT(persistence);
     REPORT(kappa);
     REPORT(initial_variance);
+    REPORT(initial_arch);
     REPORT(sigma);
     REPORT(ll_vector);
     Type nll = Type(-1.0) * ll_vector.log().sum();

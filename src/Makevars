@@ -15,10 +15,10 @@
 
 .PHONY: all tmblib
 
-all: $(SHLIB)
+all: $(SHLIB) $(LAPACK_LIBS) $(BLAS_LIBS)
 $(SHLIB): tmblib
 
-tmblib: 
+tmblib:
 	(cd TMB; $(R_HOME)/bin$(R_ARCH_BIN)/Rscript \
 	--no-save --no-restore compile.R '$(TMB_FLAGS)')
 

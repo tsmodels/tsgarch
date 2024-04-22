@@ -6,6 +6,18 @@
 \alias{tsgarch-package}
 \title{tsgarch: Univariate GARCH Models}
 \description{
-Multiple flavors of GARCH with a rich assortment of distributions. Methods for specification, estimation, prediction, filtering, statistical testing and much more. Represents a partial re-write and re-think of rugarch, 10 years later.
+Multiple flavors of GARCH with a large choice of conditional distributions. Methods for specification, estimation, prediction, filtering, statistical testing and much more. Represents a partial re-write and re-think of 'rugarch', making use of automatic differentiation for estimation.
+}
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/tsmodels/tsgarch}
+  \item Report bugs at \url{https://github.com/tsmodels/tsgarch/issues}
+}
+
+}
+\author{
+\strong{Maintainer}: Alexios Galanos \email{alexios@4dscape.com} [copyright holder]
+
 }
 \keyword{internal}

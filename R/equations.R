@@ -10,7 +10,7 @@
                "jsu" = "JSU\\left(0,1,\\zeta, \\nu\\right)",
                "nig" = "NIG\\left(0,1,\\zeta, \\nu\\right)",
                "ghst" = "GHST\\left(0,1,\\zeta, \\nu\\right)",
-               "ghyp" = "GH\\left(0,1,\\zeta, \\nu,\\lambda\\right)")
+               "gh" = "GH\\left(0,1,\\zeta, \\nu,\\lambda\\right)")
     if (!standardized) {
         out <- gsub("0,1","0,\\\\sigma_t",out)
     }
@@ -127,10 +127,11 @@
         eq_beta <- NULL
     }
     eq_persistence <- paste0("P = \\sum_{j=1}^p \\beta_j")
+    eq_prod_approx <- paste0("\\prod\\limits_{i=1}^{\\infty}{(\\int\\limits_{-\\infty}^{\\infty}{\\exp(\\beta^{i-1}(\\alpha z+\\gamma (\\left|{z}\\right|-E\\left|{z}\\right|)))D(z,0,1,\\zeta ,\\nu ,\\lambda)dz)}}")
     if (!is.null(vreg)) {
-        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = exp\\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)")
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = exp\\left(\\frac{\\omega + \\sum_{j=1}^r \\xi_j \\hat v_{j}}{1 - P}\\right)", eq_prod_approx)
     } else {
-        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = exp\\left(\\frac{\\omega}{1 - P}\\right)")
+        eq_unconditional <- paste0("E\\left[\\varepsilon^2_t\\right] = exp\\left(\\frac{\\omega}{1 - P}\\right)",eq_prod_approx)
     }
     # collect equations
     eq_garch <- paste0(" log\\left(\\sigma^2_t\\right) = ",eq_constant)

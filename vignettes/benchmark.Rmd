@@ -1,0 +1,35 @@
+---
+title: "Benchmark"
+author: "Alexios Galanos"
+date: "`r Sys.Date()`"
+output: 
+    rmarkdown::html_vignette:
+        css: custom.css
+        code_folding: show
+bibliography: references.bib
+vignette: >
+  %\VignetteIndexEntry{Benchmark}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+The package includes two published benchmarks, one for the GARCH(1,1)
+and one for the APARCH(1,1) model. Below we present the results of 
+the former based on the benchmark of @Fiorentini1996. Note that this is 
+not a saved benchmark, but rather estimated every time it is called. 
+As can be seen from the values of the log relative error, this achieves a 
+very high rate of accuracy, addressing the questions raised by @Hill2019.
+
+```{r}
+library(tsgarch)
+as_flextable(benchmark_fcp())
+```
+
+

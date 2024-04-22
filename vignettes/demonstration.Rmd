@@ -1,0 +1,81 @@
+---
+title: "Package Demo"
+author: "Alexios Galanos"
+date: "`r Sys.Date()`"
+output: 
+    rmarkdown::html_vignette:
+        css: custom.css
+        code_folding: show
+vignette: >
+  %\VignetteIndexEntry{Package Demo}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Estimation
+
+We use the Deutsche Mark British Pound dataset for this demonstration throughout
+the document.
+
+```{r}
+library(tsgarch)
+suppressMessages(library(data.table))
+suppressMessages(library(xts))
+data(dmbp)
+dmbp <- xts(dmbp, as.Date(1:nrow(dmbp), origin = '1970-01-01'))
+spec <- garch_modelspec(dmbp[1:1500,1], model = 'fgarch', constant = TRUE, 
+                        init = 'unconditional', distribution = 'jsu')
+mod <- estimate(spec)
+as_flextable(summary(mod))
+```
+Notice that the `as_flextable` method provides for a publication ready option
+for printing out the model summary.
+
+We next take a look at a summary plot of the estimated model:
+
+```{r, fig.width=7,fig.height=6}
+par(mar = c(2,2,2,2))
+plot(mod)
+```
+
+Notice the news impact curve which is both shifted and rotated, a particularly
+appealing feature of the Family GARCH model.
+
+
+# Simulation and Prediction
+
+The code below shows how to predict from an estimated model and how to simulate
+using a specification with fixed parameters.
+
+```{r, fig.width=7,fig.height=4}
+delta <- coef(mod)["delta"]
+new_spec <- spec
+new_spec$parmatrix <- copy(mod$parmatrix)
+sim <- simulate(new_spec, nsim = 500, h = 10000, seed = 100, burn = 1000)
+mean_sim <- mean(rowMeans(sim$sigma^delta))^(2/delta)
+pred <- predict(mod, h = 1000, nsim = 0)
+par(mar = c(2,2,2,2))
+plot(as.numeric(pred$sigma^2), type = "l", xlab = "horizon", 
+     ylab = expression(sigma^2), ylim = c(0.25, 0.41), main = "Family GARCH - JSU Prediction")
+abline(h = as.numeric(unconditional(mod)), col = 2)
+abline(h = mean_sim, col = 3)
+legend("bottomright", c("h-step prediction","unconditional variance","simulated unconditional variance"), col = c(1,2,3), lty = 1, bty = "n")
+```
+
+
+# Conclusion
+
+There are other methods available such as one for profiling the parameter distribution (`tsprofile`),
+a backtest method (`tsbacktest`) as well as other methods for extracting information from
+the estimated object such as `vcov`, `pit` (probability integral transform), `confint` etc.
+
+The package does not include any tests, as most of these have been moved to the 
+[tstests](https://github.com/tsmodels/tstests/) package and there are ample packages 
+which include testing methods.

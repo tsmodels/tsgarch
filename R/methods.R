@@ -6,7 +6,7 @@
 #' @param stationarity_constraint the bound on the inequality constraint for ensuring
 #' the stationary of the GARCH process (see details).
 #' @param ... not currently used.
-#' @return An object of class \dQuote{tsgarch.estimate}.
+#' @returns An object of class \dQuote{tsgarch.estimate}.
 #' @details The underlying code is written using the TMB framework which uses
 #' automatic differentiation and hence allows the generation of analytic
 #' derivatives.
@@ -35,19 +35,12 @@ estimate.tsgarch.spec <- function(object, solver = "nloptr", control = NULL, sta
     all_fixed_pars <- sum(object$parmatrix$estimate)
     if (all_fixed_pars == 0) {
         warning("\nall parameters are fixed (estimate = 0). Dispatching to tsfilter method instead.")
-        out <- tsfilter(object)
+        out <- .filter.tsgarch.spec(object)
         return(out)
     }
     if (is.null(control)) control <- nloptr_fast_options(trace = FALSE)
     start_timer <- Sys.time()
-    out <- try(switch(object$model$model,
-                  "garch" = .estimate_garch(object, solver, control, stationarity_constraint = stationarity_constraint, ...),
-                  "egarch" = .estimate_egarch(object, solver, control, stationarity_constraint = stationarity_constraint, ...),
-                  "aparch" = .estimate_aparch(object, solver, control, stationarity_constraint = stationarity_constraint, ...),
-                  "gjrgarch" = .estimate_gjrgarch(object, solver, control, stationarity_constraint = stationarity_constraint, ...),
-                  "fgarch" = .estimate_fgarch(object, solver, control, stationarity_constraint = stationarity_constraint, ...),
-                  "cgarch" = .estimate_cgarch(object, solver, control, stationarity_constraint = stationarity_constraint, ...),
-                  "igarch" = .estimate_igarch(object, solver, control, stationarity_constraint = stationarity_constraint, ...)), silent = TRUE)
+    out <- .estimate_garch_model(object, solver, control, stationarity_constraint, ...)
     if (inherits(out, 'try-error')) {
         if (!object$model$variance_targeting) {
             warning("\ndefault model failed. Trying with variance targeting turned on.")
@@ -66,7 +59,7 @@ estimate.tsgarch.spec <- function(object, solver = "nloptr", control = NULL, sta
 #' @description Extract the estimated coefficients of a model.
 #' @param object an object of class \dQuote{tsgarch.estimate}.
 #' @param ... not currently used.
-#' @return A numeric named vector of estimated coefficients.
+#' @returns A numeric named vector of estimated coefficients.
 #' @aliases coef
 #' @method coef tsgarch.estimate
 #' @rdname coef
@@ -86,7 +79,7 @@ coef.tsgarch.estimate <- function(object, ...)
 #' @param object an object of class \dQuote{tsgarch.estimate}, \dQuote{tsgarch.predict}
 #' or \dQuote{tsgarch.simulate}.
 #' @param ... not currently used.
-#' @return An xts vector of the conditional volatility.
+#' @returns An xts vector of the conditional volatility.
 #' @aliases sigma
 #' @method sigma tsgarch.estimate
 #' @rdname sigma
@@ -104,7 +97,7 @@ sigma.tsgarch.estimate <- function(object, ...)
 #' @description Extract the fitted values of the estimated model.
 #' @param object an object of class \dQuote{tsgarch.estimate}.
 #' @param ... not currently used.
-#' @return An xts vector of the fitted values. Since only a constant is supported
+#' @returns An xts vector of the fitted values. Since only a constant is supported
 #' in the conditional mean equation this is either a vector with a constant else
 #' a vector with zeros.
 #' @aliases fitted
@@ -129,7 +122,7 @@ fitted.tsgarch.estimate <- function(object, ...)
 #' @param standardize logical. Whether to standardize the residuals by the
 #' conditional volatility.
 #' @param ... not currently used.
-#' @return An xts vector of the residuals. If the model had no constant in
+#' @returns An xts vector of the residuals. If the model had no constant in
 #' the conditional mean equation then this just returns the original data (which
 #' is assumed to be zero mean noise).
 #' @aliases residuals
@@ -161,7 +154,7 @@ residuals.tsgarch.estimate <- function(object, standardize = FALSE, ...)
 #' adjusted sandwich estimator (a HAC estimator).
 #' @param ... additional parameters passed to the Newey-West bandwidth function to
 #' determine the optimal lags.
-#' @return The variance-covariance matrix of the estimated parameters.
+#' @returns The variance-covariance matrix of the estimated parameters.
 #' @method vcov tsgarch.estimate
 #' @aliases vcov
 #' @rdname vcov
@@ -169,6 +162,7 @@ residuals.tsgarch.estimate <- function(object, standardize = FALSE, ...)
 #'
 vcov.tsgarch.estimate <- function(object, adjust = FALSE, type = c("H","OP","QMLE","NW"), ...)
 {
+    estimate <- NULL
     type <- match.arg(type[1],c("H","OP","QMLE","NW"))
     N <- nrow(estfun(object))
     if (type == "H") {
@@ -213,6 +207,7 @@ vcov.tsgarch.estimate <- function(object, adjust = FALSE, type = c("H","OP","QML
 confint.tsgarch.estimate <- function(object, parm, level = 0.95, vcov_type = "H", ...)
 {
     # extract the names of the estimated parameters
+    estimate <- NULL
     par_names <- object$parmatrix[estimate == 1]$parameter
     coefficients <- coef(object)
     if (missing(parm)) {
@@ -271,7 +266,7 @@ logLik.tsgarch.estimate <- function(object, ...)
 #' @param digits integer, used for number formatting. Optionally, to avoid
 #' scientific notation, set \sQuote{options(scipen=999)}.
 #' @param ... not currently used.
-#' @return A list with summary information of class \dQuote{tsgarch.summary}.
+#' @return A list with summary information of class \dQuote{summary.tsgarch.estimate}.
 #' @aliases summary
 #' @method summary tsgarch.estimate
 #' @rdname summary
@@ -326,26 +321,26 @@ summary.tsgarch.estimate <- function(object, digits = 4, vcov_type = "H", includ
                 elapsed = elapsed, conditions = conditions, equation = equation,
                 model = object$spec$model$model, symbol = syms,
                 equation = object$parmatrix[estimate == 1]$equation)
-    class(out) <- "summary.tsgarch"
+    class(out) <- "summary.tsgarch.estimate"
     return(out)
 }
 
 #' Model Estimation Summary Print method
 #'
-#' @description Print method for class \dQuote{summary.tsgarch}
-#' @param x an object of class \dQuote{summary.tsgarch}.
+#' @description Print method for class \dQuote{summary.tsgarch.estimate}
+#' @param x an object of class \dQuote{summary.tsgarch.estimate}.
 #' @param digits integer, used for number formatting. Optionally, to avoid
 #' scientific notation, set \sQuote{options(scipen=999)}.
 #' @param signif.stars logical. If TRUE, ‘significance stars’ are printed for each coefficient.
 #' @param ... not currently used.
 #' @return Invisibly returns the original summary object.
-#' @aliases print.summary.tsgarch
-#' @method print summary.tsgarch
+#' @aliases print.summary.tsgarch.estimate
+#' @method print summary.tsgarch.estimate
 #' @rdname print
 #' @export
 #'
 #'
-print.summary.tsgarch <- function(x, digits = max(3L, getOption("digits") - 3L),
+print.summary.tsgarch.estimate <- function(x, digits = max(3L, getOption("digits") - 3L),
                                   signif.stars = getOption("show.signif.stars"),
                                   ...)
 {
@@ -367,11 +362,11 @@ print.summary.tsgarch <- function(x, digits = max(3L, getOption("digits") - 3L),
 #' @param ... additional arguments passed to flextable method.
 #' @importFrom flextable as_flextable
 #' @return A flextable object.
-#' @aliases as_flextable.summary.tsgarch
-#' @method as_flextable summary.tsgarch
+#' @aliases as_flextable.summary.tsgarch.estimate
+#' @method as_flextable summary.tsgarch.estimate
 #' @rdname as_flextable.summary
 #' @export
-as_flextable.summary.tsgarch <- function(x, digits = max(3L, getOption("digits") - 3L),
+as_flextable.summary.tsgarch.estimate <- function(x, digits = max(3L, getOption("digits") - 3L),
                                         signif.stars = getOption("show.signif.stars"),
                                         include.symbols = TRUE, include.equation = TRUE,
                                         include.statistics = TRUE,
@@ -471,13 +466,31 @@ persistence.tsgarch.estimate <- function(object, ...)
     return(.persistence(pars, env))
 }
 
+#' @method persistence tsgarch.spec
+#' @rdname persistence
+#' @export
+#'
+#
+persistence.tsgarch.spec <- function(object, ...)
+{
+    env <- list()
+    env$parmatrix <- copy(object$parmatrix)
+    env$distribution <- object$distribution
+    pars <- object$parmatrix[estimate == 1]$value
+    env$model <- object$model$model
+    return(.persistence(pars, env))
+}
 
 #' Unconditional Value
 #'
 #' @description Unconditional value of a GARCH model variance.
-#' @param object an object of class \dQuote{tsgarch.estimate}.
+#' @param object an object of class \dQuote{tsgarch.estimate} or \dQuote{tsgarch.spec}.
 #' @param ... not currently used.
-#' @return A numeric vector of length 1 of the unconditional variance of the model.
+#' @details
+#' For some models, there is no closed form solution available for the unconditional
+#' variance of higher order model (e.g. GARCH(2,1)) in which case a simulation
+#' based approach is adopted to approximate the value.
+#' @returns A numeric vector of length 1 of the unconditional variance of the model.
 #' @aliases unconditional
 #' @method unconditional tsgarch.estimate
 #' @rdname unconditional
@@ -495,6 +508,29 @@ unconditional.tsgarch.estimate <- function(object, ...)
            "cgarch" = .unconditional_cgarch(object),
            # technically Inf, but we calculate it for validation
            "igarch" = .unconditional_garch(object))
+    return(out)
+}
+
+
+#' @method unconditional tsgarch.spec
+#' @rdname unconditional
+#' @export
+#'
+#
+unconditional.tsgarch.spec <- function(object, ...)
+{
+    # trick to use same dispatch as the estimated object
+    sp <- copy(object)
+    sp$spec <- sp
+    out <- switch(sp$spec$model$model,
+                  "garch" = .unconditional_garch(sp),
+                  "egarch" = .unconditional_egarch(sp),
+                  "aparch" = .unconditional_aparch(sp),
+                  "gjrgarch" = .unconditional_gjrgarch(sp),
+                  "fgarch" = .unconditional_fgarch(sp),
+                  "cgarch" = .unconditional_cgarch(sp),
+                  # technically Inf, but we calculate it for validation
+                  "igarch" = .unconditional_garch(sp))
     return(out)
 }
 
@@ -537,9 +573,9 @@ BIC.tsgarch.estimate <- function(object, ...)
 }
 
 
-#' Extract the Number of Observations from a Fit.
+#' Extract the Number of Observations
 #'
-#' @description Extract the number of ‘observations’ from an estimated model.
+#' @description Extract the number of observations from an estimated model.
 #' This is principally intended to be used in computing BIC and used in other
 #' tidy methods
 #' @param object an object of class \dQuote{tsgarch.estimate}.
@@ -560,12 +596,13 @@ nobs.tsgarch.estimate <- function(object, ...)
 #' News Impact Curve
 #'
 #' @description General method the news impact of a model
-#' @param object an object.
+#' @param object an object of class \dQuote{tsgarch.estimate}.
 #' @param epsilon a user supplied zero mean noise vector. If this is NULL
 #' then a vector is created from the actual data using the minimum and maximum
 #' range.
 #' @param ... additional parameters passed to the method.
-#' @return An object of class \dQuote{tsgarch.newsimpact}.
+#' @note The method does not support higher order GARCH models.
+#' @returns An object of class \dQuote{tsgarch.newsimpact}.
 #' @aliases newsimpact
 #' @rdname newsimpact
 #' @export
@@ -600,7 +637,8 @@ newsimpact.tsgarch.estimate <- function(object, epsilon = NULL, ...)
 #' @description Plot method for newsimpact class.
 #' @param x an object of class \dQuote{tsgarch.newsimpact}.
 #' @param y not used.
-#' @param ... not used.
+#' @param ... additional arguments pass to \code{\link[graphics]{plot.xy}} other
+#' than \dQuote{xlab}, \dQuote{ylab} and \dQuote{main}.
 #' @method plot tsgarch.newsimpact
 #' @rdname plot
 #' @export
@@ -626,6 +664,8 @@ plot.tsgarch.newsimpact <- function(x, y = NULL, ...)
 #
 plot.tsgarch.estimate <- function(x, y = NULL, ...)
 {
+    op <- par(no.readonly = TRUE)
+    par(mgp = c(2,1,0))
     dpars <- extract_model_values(x, object_type = "estimate", "distribution")
     distribution <- x$spec$distribution
     dist_print <- distribution_abb(distribution)
@@ -647,36 +687,37 @@ plot.tsgarch.estimate <- function(x, y = NULL, ...)
            main = paste0("Standardized Residuals (z)\n Sampling Distribution : ",dist_print), col = "snow3", cex.main = 0.8)
     qqline(as.numeric(residuals(x, standardize = T)), col = "gray5", lty = 2)
     grid()
+    par(op)
     return(invisible(x))
 }
 
 
 #' Model Filtering
 #'
-#' @description Filters new data based on an already estimated model.
+#' @description Filters new data based on an already estimated model or filters data
+#' based on a specification object.
 #' @param object an object of class \dQuote{tsgarch.estimate} or \dQuote{tsgarch.spec}.
 #' @param y an xts vector of new values to filter. Can also be NULL in which case the
-#` original object is returnws (if of class \dQuote{tsgarch.estimate}), or the existing
-#` data filtered (if of class \dQuote{tsgarch.spec}).
+#` original object is returned (if of class \dQuote{tsgarch.estimate}), or the existing
+#` data filtered (if of class \dQuote{tsgarch.spec}). See details.
 #' @param newxreg not currently used,
 #' @param newvreg variance regressors with the same number of rows as y. This can be either
 #' a numeric or xts matrix. Only needed if the model was estimated with regressors in the
 #' variance equation.
-#' @param ... additional arguments for future expansion options.
+#' @param ... additional arguments for future expansion.
 #' @return A \dQuote{tsgarch.estimate} object with updated information.
 #' @details The method filters new data and updates the object with this new information
 #' so that it can be called recursively as new data arrives. It is also possible to use
 #' a specification object with fixed parameters, by appropriately setting the values
-#' of the parmatrix object in the specification slot. In this case, the returned object
-#' will also be of classs \dQuote{tsgarch.estimate} but with missing information
-#' regarding the hessian and scores. However, it will still be possible to use the
-#' returned object for prediction.
-#' For the argument y, this should strictly be new data coming after the last
-#' time index of the existing object data. The existing dataset and y are merged
-#' on their time indices and only information coming after the existing data set
-#' time index is appended. No replacement of existing data is possible using this
-#' approach (the user can directly replace the existing data or parts of manually
-#' for this type of use case).
+#' of the \dQuote{parmatrix} object in the specification slot. In this case, the returned object
+#' will also be of classs \dQuote{tsgarch.estimate}.
+#' If an object of \dQuote{tsgarch.spec} is used with y not NULL, then the method will
+#' first filter the values of the data in the object, generating an object of
+#' \dQuote{tsgarch.estimate} and then call the method again on this new object and the
+#' new y values (and optionally any newvreg values). In this way, using either object
+#' classes will return the exact same results. The timestamp indices of y must be
+#' strictly greater than the maximum timestamp index of the data within the object (i.e.
+#' we only filter on new data).
 #' @aliases tsfilter
 #' @method tsfilter tsgarch.estimate
 #' @rdname tsfilter
@@ -685,21 +726,7 @@ plot.tsgarch.estimate <- function(x, y = NULL, ...)
 #'
 tsfilter.tsgarch.estimate <- function(object, y = NULL, newxreg = NULL, newvreg = NULL, ...)
 {
-    if (is.null(y)) {
-        warning("\ny is null. Returning object without filtering.")
-        return(object)
-    }
-    model <- object$spec$model$model
-    out <- switch(model,
-                  "garch" = .filter_garch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "estimate", ...),
-                  "egarch" = .filter_egarch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "estimate", ...),
-                  "aparch" = .filter_aparch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "estimate", ...),
-                  "gjrgarch" = .filter_gjrgarch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "estimate", ...),
-                  "fgarch" = .filter_fgarch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "estimate", ...),
-                  "cgarch" = .filter_cgarch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "estimate", ...),
-                  "igarch" = .filter_garch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "estimate", ...)
-    )
-    return(out)
+    return(.filter.tsgarch.estimate(object, y = y, newxreg = newxreg, newvreg = newvreg))
 }
 
 #' @aliases tsfilter
@@ -710,18 +737,9 @@ tsfilter.tsgarch.estimate <- function(object, y = NULL, newxreg = NULL, newvreg 
 #'
 tsfilter.tsgarch.spec <- function(object, y = NULL, newxreg = NULL, newvreg = NULL, ...)
 {
-    model <- object$model$model
-    out <- switch(model,
-                  "garch" = .filter_garch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "spec", ...),
-                  "egarch" = .filter_egarch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "spec", ...),
-                  "aparch" = .filter_aparch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "spec", ...),
-                  "gjrgarch" = .filter_gjrgarch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "spec", ...),
-                  "fgarch" = .filter_fgarch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "spec", ...),
-                  "cgarch" = .filter_cgarch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "spec", ...),
-                  "igarch" = .filter_garch(object, y = y, newxreg = newxreg, newvreg = newvreg, object_type = "spec", ...)
-    )
-    return(out)
+    return(.filter.tsgarch.spec(object, y = y, newxreg = newxreg, newvreg = newvreg))
 }
+
 
 #' Model Prediction
 #'
@@ -732,25 +750,30 @@ tsfilter.tsgarch.spec <- function(object, y = NULL, newxreg = NULL, newvreg = NU
 #' @param newvreg variance regressors rows equal to h. This can be either
 #' a numeric or xts matrix. Only needed if the model was estimated with regressors in the
 #' variance equation.
-#' @param bootstrap whether to generate a bootstrap distribution for the conditional
-#' volatility using re-sampling of the empirical innovations as in the paper by Pascual et al (2006).
 #' @param nsim the number of simulations to use for generating the simulated
-#' predictive distribution.
+#' predictive distribution. Defaults to zero (no simulated distribution).
+#' @param sim_method the simulation method to use when \strong{nsim} great than zero. The \dQuote{parametric}
+#' method samples from the model distribution whilst the \dQuote{bootstrap} from the standardized
+#' model residuals.
+#' @param block for the \dQuote{bootstrap} \strong{sim_method}, this allows to generate
+#' block length samples (defaults to 1).
 #' @param forc_dates an optional vector of forecast dates equal to h. If NULL will use the
 #' implied periodicity of the data to generate a regular sequence of dates after the
 #' last available date in the data.
 #' @param init_states an optional vector of states to initialize the forecast.
 #' If NULL, will use the last available state from the estimated model. This must
 #' be equal to the max of the ARCH and GARCH terms.
+#' @param seed an integer that will be used in a call to set.seed before simulating.
 #' @param ... additional arguments for future expansion options.
 #' @return A \dQuote{tsgarch.predict} object.
 #' @details The bootstrap method considered here, is based on re-sampling innovations
 #' from the empirical distribution of the fitted GARCH model to generate future
 #' realizations of the series and sigma. This only considers distributional uncertainty
-#' and will not generate prediction intervals for the sigma 1 step ahead forecast
+#' and will not generate prediction intervals for the 1-step ahead sigma forecast
 #' for which only the parameter uncertainty is relevant in GARCH type models (and
-#' not currently implemented). Hence if h=1 and bootstrap = TRUE, no distribution
-#' will be returned.
+#' not currently implemented).
+#' When the horizon \strong{h} is equal to 1, no simulation is performaed since there is
+#' no uncertainty to account for.
 #' @references
 #' \insertRef{Pascual2006}{tsgarch}
 #' @aliases predict
@@ -759,17 +782,25 @@ tsfilter.tsgarch.spec <- function(object, y = NULL, newxreg = NULL, newvreg = NU
 #' @export
 #'
 #'
-predict.tsgarch.estimate <- function(object, h = 1, newxreg = NULL, newvreg = NULL, bootstrap = FALSE, nsim = 1000, forc_dates = NULL, init_states = NULL, ...)
+predict.tsgarch.estimate <- function(object, h = 1, newxreg = NULL, newvreg = NULL, nsim = 0, sim_method = c("parametric","bootstrap"), block = 1, forc_dates = NULL, init_states = NULL, seed = NULL, ...)
 {
+    if (is.null(forc_dates)) {
+        forc_dates <- .forecast_dates(forc_dates, h = h, sampling = object$spec$target$sampling, last_index = tail(object$spec$target$index, 1))
+    }
+    sim_method <- match.arg(sim_method[1], c("parametric","bootstrap"))
+    h <- max(1, as.integer(h[1]))
+    if (h == 1) nsim <- 0
+    nsim <- max(0, as.integer(nsim[1]))
+    block <- max(0, as.integer(block[1]))
     model <- object$spec$model$model
     p <- switch(model,
-           "garch" = .predict_garch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, bootstrap = bootstrap, nsim = nsim, forc_dates = forc_dates, init_states = init_states),
-           "egarch" = .predict_egarch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, bootstrap = bootstrap, nsim = nsim, forc_dates = forc_dates, init_states = init_states),
-           "aparch" = .predict_aparch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, bootstrap = bootstrap, nsim = nsim, forc_dates = forc_dates, init_states = init_states),
-           "gjrgarch" = .predict_gjrgarch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, bootstrap = bootstrap, nsim = nsim, forc_dates = forc_dates, init_states = init_states),
-           "fgarch" = .predict_fgarch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, bootstrap = bootstrap, nsim = nsim, forc_dates = forc_dates, init_states = init_states),
-           "cgarch" = .predict_cgarch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, bootstrap = bootstrap, nsim = nsim, forc_dates = forc_dates, init_states = init_states),
-           "igarch" = .predict_garch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, bootstrap = bootstrap, nsim = nsim, forc_dates = forc_dates, init_states = init_states)
+           "garch" = .predict_garch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, nsim = nsim, sim_method = sim_method, block = block, forc_dates = forc_dates, init_states = init_states, seed = seed, ...),
+           "egarch" = .predict_egarch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, nsim = nsim, sim_method = sim_method, block = block, forc_dates = forc_dates, init_states = init_states, seed = seed, ...),
+           "aparch" = .predict_aparch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, nsim = nsim, sim_method = sim_method, block = block, forc_dates = forc_dates, init_states = init_states, seed = seed, ...),
+           "gjrgarch" = .predict_gjrgarch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, nsim = nsim, sim_method = sim_method, block = block, forc_dates = forc_dates, init_states = init_states, seed = seed, ...),
+           "fgarch" = .predict_fgarch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, nsim = nsim, sim_method = sim_method, block = block, forc_dates = forc_dates, init_states = init_states, seed = seed, ...),
+           "cgarch" = .predict_cgarch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, nsim = nsim, sim_method = sim_method, block = block, forc_dates = forc_dates, init_states = init_states, seed = seed, ...),
+           "igarch" = .predict_garch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, nsim = nsim, sim_method = sim_method, block = block, forc_dates = forc_dates, init_states = init_states, seed = seed, ...)
     )
     return(p)
 }
@@ -894,7 +925,11 @@ omega.tsgarch.spec <- function(object, ...)
 #' model for the purpose of continuing the modeled series from some fixed point).
 #' @param vreg an optional vector of length h representing any pre-multiplied
 #' variance regressors to use in the simulation.
-#' @param ... not currently used.
+#' @param burn burn in. Will be discarded before returning the output.
+#' @param ... for aparch, fgarch, egarch and gjrgarch models, an optional
+#' vector of length max(q,p) with values for initializing the ARCH equation and
+#' named \dQuote{arch_initial}. This is mostly used for validation purposes. The
+#' \dQuote{arch_initial} value is always returned by an estimated object.
 #' @details Once a GARCH model is specified via \code{\link{garch_modelspec}},
 #' the slot \dQuote{parmatrix} contains initial values for the parameters
 #' which can be used to set them to any value for the simulation. This matrix
@@ -903,11 +938,11 @@ omega.tsgarch.spec <- function(object, ...)
 #' the spec will be ignored. Instead, the user can supply a pre-multiplied vector
 #' to the simulate function which will be used. Note that the \dQuote{multiplicative}
 #' argument in the specification will be used in this case to determine how the
-#' regressors enter the conditional variance equation. While the innov argument
-#' must be a matrix, all other values are vectors and assume that they will be
-#' the same across all sample paths. If the user wants to assign different values
-#' for arguments var_init, innov_init and vreg, then the simulate method should be
-#' called multiple times.
+#' regressors enter the conditional variance equation. While the \dQuote{innov}
+#' argument must be a matrix, all other values are vectors and assume that they
+#' will be the same across all sample paths. If the user wants to assign different values
+#' for arguments \dQuote{var_init}, \dQuote{innov_init} and \dQuote{vreg}, then
+#' the simulate method should be called multiple times.
 #' @return An object of class \dQuote{tsgarch.simulate} with slots for the
 #' simulated sigma and series simulated distributions which are each of class
 #' \dQuote{tsmodel.distribution}. The simulated error (not returned) is equal to
@@ -919,23 +954,26 @@ omega.tsgarch.spec <- function(object, ...)
 #'
 #'
 simulate.tsgarch.spec <- function(object, nsim = 1, seed  = NULL, h = 1000, var_init = NULL,
-                                  innov = NULL, innov_init = NULL, vreg = NULL, ...)
+                                  innov = NULL, innov_init = NULL, vreg = NULL, burn = 0, ...)
 {
-    out <- switch(object$model$model,
-                  "garch" = .simulate_garch(object, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                            innov_init = innov_init, vreg = vreg),
-                  "egarch" = .simulate_egarch(object, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                              innov_init = innov_init, vreg = vreg),
-                  "aparch" = .simulate_aparch(object, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                              innov_init = innov_init, vreg = vreg),
-                  "gjrgarch" = .simulate_gjrgarch(object, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                              innov_init = innov_init, vreg = vreg),
-                  "fgarch" = .simulate_fgarch(object, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                                  innov_init = innov_init, vreg = vreg),
-                  "cgarch" = .simulate_cgarch(object, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                              innov_init = innov_init, vreg = vreg),
-                  "igarch" = .simulate_igarch(object, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                              innov_init = innov_init, vreg = vreg))
+    new_spec <- .spec2newspec(object)
+    new_spec$parmatrix$value <- object$parmatrix$value
+
+    out <- switch(new_spec$model$model,
+                  "garch" = .simulate_garch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
+                                            innov_init = innov_init, vreg = vreg, burn = burn, ...),
+                  "egarch" = .simulate_egarch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
+                                              innov_init = innov_init, vreg = vreg, burn = burn, ...),
+                  "aparch" = .simulate_aparch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
+                                              innov_init = innov_init, vreg = vreg, burn = burn, ...),
+                  "gjrgarch" = .simulate_gjrgarch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
+                                              innov_init = innov_init, vreg = vreg, burn = burn, ...),
+                  "fgarch" = .simulate_fgarch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
+                                                  innov_init = innov_init, vreg = vreg, burn = burn, ...),
+                  "cgarch" = .simulate_cgarch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
+                                              innov_init = innov_init, vreg = vreg, burn = burn, ...),
+                  "igarch" = .simulate_igarch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
+                                              innov_init = innov_init, vreg = vreg, burn = burn, ...))
 
     class(out) <- "tsgarch.simulate"
     return(out)

@@ -22,7 +22,7 @@ in the output.}
 \item{...}{not currently used.}
 }
 \value{
-A list with summary information of class \dQuote{tsgarch.summary}.
+A list with summary information of class \dQuote{summary.tsgarch.estimate}.
 }
 \description{
 Summary method for class \dQuote{tsgarch.estimate}

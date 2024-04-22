@@ -3,12 +3,15 @@
 \name{unconditional.tsgarch.estimate}
 \alias{unconditional.tsgarch.estimate}
 \alias{unconditional}
+\alias{unconditional.tsgarch.spec}
 \title{Unconditional Value}
 \usage{
 \method{unconditional}{tsgarch.estimate}(object, ...)
+
+\method{unconditional}{tsgarch.spec}(object, ...)
 }
 \arguments{
-\item{object}{an object of class \dQuote{tsgarch.estimate}.}
+\item{object}{an object of class \dQuote{tsgarch.estimate} or \dQuote{tsgarch.spec}.}
 
 \item{...}{not currently used.}
 }
@@ -17,4 +20,9 @@ A numeric vector of length 1 of the unconditional variance of the model.
 }
 \description{
 Unconditional value of a GARCH model variance.
+}
+\details{
+For some models, there is no closed form solution available for the unconditional
+variance of higher order model (e.g. GARCH(2,1)) in which case a simulation
+based approach is adopted to approximate the value.
 }

@@ -10,7 +10,7 @@ newsimpact(object, epsilon = NULL, ...)
 \method{newsimpact}{tsgarch.estimate}(object, epsilon = NULL, ...)
 }
 \arguments{
-\item{object}{an object.}
+\item{object}{an object of class \dQuote{tsgarch.estimate}.}
 
 \item{epsilon}{a user supplied zero mean noise vector. If this is NULL
 then a vector is created from the actual data using the minimum and maximum
@@ -23,4 +23,7 @@ An object of class \dQuote{tsgarch.newsimpact}.
 }
 \description{
 General method the news impact of a model
+}
+\note{
+The method does not support higher order GARCH models.
 }

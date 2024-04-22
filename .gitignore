@@ -42,3 +42,4 @@ README.Rmd
 *.so
 *.o
 *.tmp
+inst/doc

@@ -30,5 +30,6 @@ or British pound/ U.S. dollar market during regular European trading hours,
 and 0 otherwise.
 The data spans the period from 1984-01-03 through 1991-12-31, but exact dates
 are not known as this dataset did not provide an index.
+This dataset is included as it is used for the GARCH benchmark.
 }
 \keyword{datasets}

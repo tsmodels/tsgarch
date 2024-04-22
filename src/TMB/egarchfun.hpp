@@ -39,6 +39,7 @@ Type egarchfun(objective_function<Type>* obj) {
     int dclass = cmodel(5);
     int m = v.cols();
     int j = 0;
+
     // re-scale parameters
     int k = 0;
     mu *= pscale(k);
@@ -76,25 +77,31 @@ Type egarchfun(objective_function<Type>* obj) {
     distribution(0) *= pscale(k);
     distribution(1) *= pscale(k + 1);
     distribution(2) *= pscale(k + 2);
+
+    // variance and arch initialization based on user choice
     vector<Type> residuals = y.array() - mu;
     vector<Type> tmp_block = residuals.tail(timesteps - cmodel(0));
     Type initial_variance = garchextra::init_power_variance(tmp_block, initmethod, backcast_lambda, Type(2.0), samplen);
     Type initial_log_variance = log(initial_variance);
-    //Type initial_variance = exp(initial_log_variance);
-    Type skew = distribution(0);
-    Type shape = distribution(1);
-    Type lambda = distribution(2);
-    Type kappa = egarchkappa::egarch_moment_func(skew, shape, lambda, dclass);
-    ADREPORT(kappa);
-    // initialize variance
+    vector<Type> initial_arch(cmodel(1));
     for(j = 0;j<cmodel(0);j++) {
         sigma_squared(j) += initial_variance;
         log_sigma_squared(j) = initial_log_variance;
         // zero out the initial values
         residuals(j) = 0.0;
+        initial_arch(j) = 0.0;
         sigma(j) = sqrt(sigma_squared(j));
     }
+
+    // expectation of abs(z)
+    Type kappa = egarchkappa::egarch_moment_func(distribution(0), distribution(1), distribution(2), dclass);
+    ADREPORT(kappa);
+
+    // persistence
     Type persistence = beta.sum();
+
+    // variance targeting (will not respect user choice of initialization since
+    // we use the full sample to capture unconditional sigma)
     regressors = v * xi;
     vector<Type> residuals_squared = residuals.array().square();
     vector<Type> variance_intercept(timesteps);
@@ -102,9 +109,9 @@ Type egarchfun(objective_function<Type>* obj) {
     if (cmodel(3) > 0.5) {
         Type log_sample_variance = log(residuals.tail(timesteps - cmodel(0)).square().mean());
         target_omega = log_sample_variance * (Type(1.0) - persistence);
-        // subtract (mean of v) * xi
-        vector<Type> meanc = v.colwise().mean();
+        vector<Type> meanc = v.bottomRows(timesteps - cmodel(0)).colwise().mean();
         Type mean_regressors = (meanc.array() * xi.array()).sum();
+        // subtract (mean of v) * xi
         target_omega -= mean_regressors;
         variance_intercept.fill(target_omega);
         ADREPORT(target_omega);
@@ -114,12 +121,18 @@ Type egarchfun(objective_function<Type>* obj) {
         ADREPORT(target_omega);
     }
     ADREPORT(persistence);
+
+    // variance intercept
     variance_intercept.array() = variance_intercept.array() + regressors.array();
 
     for(int i = cmodel(0);i<timesteps;i++){
         log_sigma_squared(i) += variance_intercept(i);
         for(j = 0;j<cmodel(1);j++){
-            log_sigma_squared(i) += alpha(j) * std_residuals(i - j - 1) + gamma(j) * (fabs(std_residuals(i - j - 1)) - kappa);
+            if ((cmodel(1) + j) >= i) {
+                log_sigma_squared(i) += alpha(j) * Type(0.0) + gamma(j) * initial_arch(j);
+            } else {
+                log_sigma_squared(i) += alpha(j) * std_residuals(i - j - 1) + gamma(j) * (fabs(std_residuals(i - j - 1)) - kappa);
+            }
         }
         for(j = 0;j<cmodel(2);j++){
             log_sigma_squared(i) += beta(j) * log_sigma_squared(i - j - 1);
@@ -129,10 +142,12 @@ Type egarchfun(objective_function<Type>* obj) {
         std_residuals(i) = residuals(i)/sigma(i);
     }
     vector<Type> tmp_vector = distfun::distlike(std_residuals, distribution(0), distribution(1), distribution(2), dclass)/sigma.array();
+    // remove initialization values
     vector<Type> ll_vector = tmp_vector.tail(timesteps - cmodel(0));
     REPORT(target_omega);
     REPORT(kappa);
     REPORT(initial_variance);
+    REPORT(initial_arch);
     REPORT(sigma);
     REPORT(ll_vector);
     Type nll = Type(-1.0) * ll_vector.log().sum();

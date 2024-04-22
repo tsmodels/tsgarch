@@ -3,11 +3,14 @@
 \name{persistence}
 \alias{persistence}
 \alias{persistence.tsgarch.estimate}
+\alias{persistence.tsgarch.spec}
 \title{Model Persistence}
 \usage{
 persistence(object, ...)
 
 \method{persistence}{tsgarch.estimate}(object, ...)
+
+\method{persistence}{tsgarch.spec}(object, ...)
 }
 \arguments{
 \item{object}{an object of some class.}

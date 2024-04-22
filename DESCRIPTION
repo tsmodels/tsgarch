@@ -1,22 +1,25 @@
 Package: tsgarch
 Type: Package
 Title: Univariate GARCH Models
-Version: 0.2.3
-Author: Alexios Galanos
-Maintainer: alexios galanos <alexios@4dscape.com>
+Version: 1.0.0
+Authors@R: c(person("Alexios", "Galanos", role = c("aut", "cre","cph"), email = "alexios@4dscape.com"))
+Maintainer: Alexios Galanos <alexios@4dscape.com>
 Depends: R (>= 3.5.0), methods, tsmethods
-LinkingTo: Rcpp (>= 0.10.6), TMB
-Imports: TMB (>= 1.7.20), nloptr, Rdpack, numDeriv, xts, zoo, generics, future.apply, future, progressr, dplyr, tibble, flextable, stats, utils, car, data.table, tsdistributions, tsaux, sandwich
-Description: Multiple flavors of GARCH with a rich assortment of distributions. Methods for specification, estimation, prediction, filtering, statistical testing and much more. Represents a partial re-write and re-think of rugarch, 10 years later.
+LinkingTo: Rcpp (>= 0.10.6), RcppArmadillo, TMB(>= 1.7.20)
+Imports: TMB (>= 1.7.20), Rcpp, nloptr, Rdpack, numDeriv, xts, zoo, future.apply, future, progressr, flextable, stats, utils, data.table, tsdistributions, lubridate, sandwich
+Description: Multiple flavors of GARCH with a large choice of conditional distributions. Methods for specification, estimation, prediction, filtering, statistical testing and much more. Represents a partial re-write and re-think of 'rugarch', making use of automatic differentiation for estimation.
 License: GPL-2
 Encoding: UTF-8
 LazyData: true
+BugReports: https://github.com/tsmodels/tsgarch/issues
 RdMacros: Rdpack
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.1
 Roxygen: list(markdown = TRUE)
-Remotes: tsmodels/tsmethods, tsmodels/tsdistributions, tsmodels/tsaux, tsmodels/tsdatasets
+ByteCompile: true
+URL: https://github.com/tsmodels/tsgarch
 Suggests: 
+    knitr,
     rmarkdown,
-    tsdatasets,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+VignetteBuilder: knitr

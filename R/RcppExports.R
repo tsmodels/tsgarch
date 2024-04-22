@@ -25,3 +25,27 @@
     .Call(`_tsgarch_cgarchfilter`, residuals, v, initstate, omega, alpha, rho, phi, beta, model)
 }
 
+.garchsimvec <- function(epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, beta, mu, order) {
+    .Call(`_tsgarch_garchsimvec`, epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, beta, mu, order)
+}
+
+.egarchsimvec <- function(z, sigma_log_sim, variance_intercept, init, alpha, gamma, beta, kappa, mu, order) {
+    .Call(`_tsgarch_egarchsimvec`, z, sigma_log_sim, variance_intercept, init, alpha, gamma, beta, kappa, mu, order)
+}
+
+.aparchsimvec <- function(epsilon, sigma_power_sim, z, variance_intercept, init, alpha, gamma, beta, delta, mu, order) {
+    .Call(`_tsgarch_aparchsimvec`, epsilon, sigma_power_sim, z, variance_intercept, init, alpha, gamma, beta, delta, mu, order)
+}
+
+.gjrsimvec <- function(epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, gamma, beta, mu, order) {
+    .Call(`_tsgarch_gjrsimvec`, epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, gamma, beta, mu, order)
+}
+
+.fgarchsimvec <- function(epsilon, sigma_power_sim, z, variance_intercept, init, alpha, gamma, eta, beta, delta, mu, order) {
+    .Call(`_tsgarch_fgarchsimvec`, epsilon, sigma_power_sim, z, variance_intercept, init, alpha, gamma, eta, beta, delta, mu, order)
+}
+
+.cgarchsimvec <- function(epsilon, sigma_sqr_sim, z, variance_intercept, transitory_component_sim, permanent_component_sim, alpha, phi, rho, beta, mu, order) {
+    .Call(`_tsgarch_cgarchsimvec`, epsilon, sigma_sqr_sim, z, variance_intercept, transitory_component_sim, permanent_component_sim, alpha, phi, rho, beta, mu, order)
+}
+

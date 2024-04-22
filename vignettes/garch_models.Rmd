@@ -1,0 +1,1217 @@
+---
+title: "GARCH Models"
+author: "Alexios Galanos"
+date: "`r Sys.Date()`"
+output: 
+    pdf_document:
+        citation_package: natbib
+        includes:
+          keep_tex: yes
+        number_sections: yes
+        toc: yes
+        toc_depth: 3
+urlcolor: PineGreen
+toccolor: PineGreen
+bibliography: references.bib
+bibliography-style: apalike
+natbiboptions: round
+vignette: >
+  %\VignetteIndexEntry{GARCH Models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+library(knitr)
+```
+
+\section{Introduction}\label{sec:introduction}
+
+The Generalized Auto-Regressive Conditional Heteroscedasticity
+(**GARCH**) model of @Bollerslev1986 and the numerous extensions which
+have followed since, is a framework for modeling the dynamics of the
+conditional variance. It has proved particularly popular, particularly
+among financial market practitioners, but also in other areas were the
+arrival of unexpected new information may lead to non-instantaneous
+decay (*persistence*) and/or asymmetric reaction to good and bad news
+(*news impact*).
+
+Many programming languages have one or more implementations of GARCH,
+with R having no less than 3, including the `garch` function
+from the
+[tseries](https://CRAN.R-project.org/package=tseries)
+package,
+[fGarch](https://CRAN.R-project.org/package=fGarch) and
+[rugarch](https://CRAN.R-project.org/package=rugarch). A
+select R package review is provided in @Hill2019, and a cross language
+package review on asymmetric GARCH in @Charles2019. The suggestions
+and constructive feedback in these papers were taken into account when
+developing this new package, as were many of the user comments over the
+last 10+ years.
+
+The **tsgarch** package is a partial re-implementation of
+[rugarch](https://CRAN.R-project.org/package=rugarch),
+by the same author, with key differences summarized below:
+
+-   does not (yet) implement all GARCH models in rugarch. FIGARCH,
+    Multiplicative Component GARCH and Realized GARCH are not currently
+    implemented.
+
+-   does not implement joint ARFIMA-GARCH estimation. The conditional
+    mean equation only allows for a constant. With so many options for
+    modelling the conditional mean, many of which are available in the
+    **tsmodels** framework, it was decided to keep this package simpler
+    and avoid the joint estimation of both conditional mean and variance
+    dynamics. While the 2 step estimation approach, whereby the
+    residuals of the conditional mean are passed to the variance
+    dynamics estimation, may be less efficient for small sized datasets,
+    it is expected to be more flexible in what can be achieved.
+    Additionally, the ARCH-in-mean model is no longer available, as it
+    was found to have very limited value within the **tsmodels**
+    framework or in general, this author's experience. A separate
+    [tsarma](https://github.com/tsmodels/tsarma) package for ARMA(p,q)-X
+    models is however available.
+
+-   makes use of automatic differentiation (autodiff) during
+    estimation, via the
+    [TMB](https://CRAN.R-project.org/package=TMB)
+    package. This is in line with similar approaches in other models
+    written in the **tsmodels** framework. Using autodiff allows for
+    more confident estimation and more accurate standard errors. Autodiff
+    is also used for the more complex inequality constraints of some models
+    which involve evaluation of an expectation, in order to generate more
+    accurate Jacobians of these inequalities for use during optimization.
+    
+-   adopts a custom approach in optimization using parameter scaling
+    which avoids problems with convergence and numerical stability.
+
+-   fully implements and correctly documents a number of sandwich
+    estimators making use of the
+    [sandwich](https://CRAN.R-project.org/package=sandwich)
+    package framework (with methods for `bread` and `estfun` and
+    `meat`/`meat_HAC` functions).
+
+-   makes use of S3 methods and classes, abandoning the S4 approach
+    of **rugarch**. Additionally, while making use of standard methods
+    from the stats package, some of the methods are based on those
+    exported from [tsmethods](https://CRAN.R-project.org/package=tsmethods),
+    consistent with other packages in the **tsmodels** framework. The
+    [Appendix](#sec-appendix-functionmap) provides a table with a
+    hierarchical overview of the main functions and methods currently
+    implemented in the package.
+
+-   provides more accurate and informative output, including
+    standard errors, confidence intervals, and a more detailed summary
+    output including a fancy [flextable](https://CRAN.R-project.org/package=flextable)
+    output for the `summary` method.
+    
+-   provides numerous fixes and enhancements to the original
+    **rugarch** code, including the unconditional variance of the
+    exponential GARCH(1,1) model, and better startup conditions for the
+    initialization of the recursion.
+    
+-   provides more extensive documentation and high coverage of unit
+    tests, with a focus on the accuracy of the estimation and the
+    correctness of the output as well as catching many corner cases.
+
+This vignette provides a mathematical summary of each type of GARCH model
+used, general assumptions regarding initialization and other estimation
+details as well as the forecast equation. Separate vignettes are available
+with code demonstrations.
+
+\section{GARCH Estimation}\label{sec:estimation}
+
+The density function, based on the distributions available in the
+[tsdistributions](https://CRAN.R-project.org/package=tsdistributions) package,
+is expressed in terms of the location, scale, skew and shape parameters
+$\left\{\mu_t,\sigma_t,\zeta,\nu\right\}$, normalized to give zero mean
+and unit variance:
+
+\begin{equation}
+z_t = \frac{y_t - \mu_t}{\sigma_t}
+\label{eq:garch_estimation}
+\end{equation}
+
+
+where $\mu_t = E\left(y_t|x_t \right)$ and
+$\sigma^2_t = E\left((y_t - \mu_t)^2|x_t\right)$, with $x_t$ the
+information set available at the period immediately before time $t$ and
+may include both external regressors and lagged values of $y$. Assuming
+that the distribution of $z_t$ is independent of the conditioning
+information set^[In the case when this assumption is relaxed, this will give rise 
+to a non constant conditional distribution. See @Hansen1994.], then:
+
+\begin{equation}
+g\left(z_t|\zeta,\nu\right) = \frac{d}{dz}P\left(z_t<z|\zeta,\nu\right)
+\label{eq:garch_gfun}
+\end{equation}
+
+which is related to the distribution of $y_t$ by through the scale term:
+
+\begin{equation}
+f\left(y_t|\mu_t,\sigma_t,\zeta,\nu\right) = \frac{1}{\sigma_t}g\left(z_t|\zeta,\nu\right)
+\label{eq:garch_likelihood}
+\end{equation}
+
+The parameter set $\theta$, which includes the conditional mean,
+conditional variance and distributional skew and shape parameters is
+estimated by minimizing the negative of the log-likelihood:
+
+\begin{equation}
+\theta_{ML} = \underset{\theta}{\operatorname{arg\min}}\sum^T_{t=1}-\mathrm{log}\left(\frac{1}{\sigma_t}g\left(z_t|\zeta,\nu\right)\right)
+\label{eq:garch_max_lik}
+\end{equation}
+
+subject to upper and lower parameters bound constraints as well as the
+persistence constraint ($P<1$) and other non-negativity constraints. 
+Estimation is performed using the [nloptr](https://CRAN.R-project.org/package=nloptr)
+solver with analytic Gradient and Jacobian of the constraints^[For some of the problems, 
+the persistence has an easy closed form solution and therefore the Jacobian is 
+hardcoded instead of making use of autodiff.] provided through autodiff in **TMB**.
+
+\subsection{Recursion Initialization ($\sigma^\delta_0$)}\label{sec:estimation:recursion}
+
+When estimating a GARCH model, we need to initialize the variance to some value in order to 
+start the recursion. In the **tsgarch** package we set all values of $\sigma^2_t,\forall t\le0$ to 
+the sample variance or some other estimator which the user can choose from. Three options are available:
+
+1. **unconditional**: $\left(\frac{1}{T}\sum_{j=1}^T\varepsilon_j^2\right)^{(\delta/2)}$
+2. **sample**: $\left(\frac{1}{S}\sum_{j=1}^S\varepsilon_j^2\right)^{(\delta/2)}$, where *S* is the length
+of the sample to use.
+3. **backcasting**: $\left(\lambda^T\hat\sigma^2 + (1-\lambda)\sum_{j=0}^{T-1}\lambda^j \varepsilon^2{1+j}\right)^{\delta/2},\quad \lambda\in\{0,1\}$
+
+where :
+$\hat\sigma^2=\frac{1}{T-1}\sum_{j=1}^{T}\varepsilon^2_j$
+
+For the **backasting** method, setting $\lambda=1$ we obtain the sample variance, 
+else values of $\lambda$ less than one and greater than zero yields the exponential
+smoothing backcast estimator. The exponent $\delta$ is for the power ARCH type models, 
+otherwise it is set to 2 (variance). One popular commercial econometric software package
+defaults to backasting using a value of 0.7 for $\lambda$.
+
+In addition to the variance, we also need to initialize the value of the ARCH component 
+for $t\leq j$, by taking the sample average of the equation or part of the equation. Details
+of this initialization is provided for each model. Note that for all models, the initialization 
+values of the ARCH(q) components will follow the user choice for the variance initialization.
+
+
+\subsection{Model Persistence, Long Run Variance and Half-Life}\label{sec:estimation:persistence}
+
+The persistence ($P$) of a GARCH model is a measure which quantifies the degree 
+of volatility clustering and rate of decay. It also forms a bounding 
+constraint ($<1$) on the model dynamics in order to ensure stationarity. 
+Another way to think about persistence is by looking at the unconditional 
+variance of a GARCH model which is defined as
+
+\begin{equation}
+\hat\sigma^2 = \frac{\omega + \sum_{k=1}^m\xi_k\bar \chi_k}{1-P}
+\label{eq:persistence}
+\end{equation}
+
+where $\bar \chi_k$ is the sample mean of any external regressors.
+
+Equation \eqref{eq:persistence} illustrates that positivity of the unconditional variance 
+requires $P<=1$, whilst existence of this value requires $P<1$, which is not the
+case for the integrated GARCH model where $P=1$ by design. The form that
+$P$ takes will depend on the type of model, with the formulas provided
+in Section \ref{sec:estimation:flavors}. Closely related to the persistence is the
+half-life measure which is defined as the number of periods it takes for a
+shock to revert half way back to the long run variance, and defined as
+$-\textrm{log}_e(2)/\mathrm{log}_e(P)$.
+
+A special note is warranted for the half-life of the Component GARCH
+(`cgarch`) model which is composed of a permanent and transitory
+component, each of which have a persistence (see \eqref{eq:cgarch_persistence}). The permanent
+component half-life, based on the estimate of $\rho$, measures the time
+taken for the long-run influence of a shock in volatility to revert by
+half towards it's long run unconditional value, whereas the transitory
+component half-life accounts for the time taken for a shock's influence
+to revert to its long-run rate.
+
+\subsection{Variance Targeting ($\bar\omega$)}\label{sec:estimation:targeting}
+
+Variance targeting sets the value of the GARCH intercept ($\omega$) to
+it's long run estimate as :
+
+\begin{equation}
+\bar\omega = \hat\sigma^2\left(1 - P\right) - \sum^m_{k=1}\xi_k \bar \chi_k 
+\label{eq:variance_target}
+\end{equation}
+
+where $\hat\sigma^2$ is the unconditional variance of $\varepsilon^2$,
+consistently estimated by its sample counterpart, $P$ is the model
+persistence and $\bar\chi_k$ the mean of the external variance regressors
+(if present). A review of variance targeting can be found in
+@Francq2011. In this author's experience, more than 90% of model
+estimation problems come from trying to estimate $\omega$ as a result of
+parameter scaling issues. In **tsgarch**, despite attempts to apply some
+scaling rules during optimization, failure to converge will sometimes
+happen, in which case the model will be automatically re-estimated with
+variance targeting (the output will indicate when this has happened).
+
+Unlike initialization estimators for $\sigma^2_0$ and $\varepsilon^2_0$,
+the value of $\hat\sigma^2$ and $\hat v_j$ is based on the full sample.
+
+
+\subsection{External Regressors ($\chi$)}\label{sec:estimation:regressors}
+
+Inclusion of additive external regressors has always been a little
+tricky when it comes to variance modelling due to the non-negativity
+constraint. This is an issue in all GARCH flavors with the exception of
+the exponential model. One way to deal with this is to constrain
+coefficients and regressors to be strictly positive which is not ideal.
+Another option, which is now offered in **tsgarch** is to have
+multiplicative regressors where the intercept is now calculated as
+follows:
+
+\begin{equation}
+\omega_t = \mathrm{exp}\left(\omega + \sum^m_{k=1}\xi_k \chi_{k,t}\right)
+\label{eq:regressors}
+\end{equation}
+
+
+which does not require any bound constraints on either the constant
+$\omega$ or the regressors.
+
+\subsection{News Impact Curve (NIC)}\label{sec:estimation:newsimpact}
+
+@Engleng1993 defined the news impact curve as a way to analyze the
+effect of news on the conditional variance by keeping constant the
+information dated $t-2$ and earlier. Therefore, the long run variance of
+the model is used in place of $\sigma_{t-1}$ and a range of values for
+$\varepsilon_t$ are chosen to show how news of different sign and size
+impact the current conditional variance. A most interesting example of
+this found in the Family GARCH model of @Hentschel1995 which
+accommodates both shifts and rotations in the news impact curve, with
+the shift factor being the the main source of asymmetry for small
+shocks, and rotation driving larger shocks. A more detailed exposition,
+and compact representation of the news impact can be found in @Caporin2019
+who define asymmetry of a GARCH model, for all shocks $\theta$, as the 
+case where:
+
+\begin{equation}
+\mathrm{NIC}\left(\theta\right) \neq \mathrm{NIC}\left(-\theta\right)
+\label{eq:news_impact}
+\end{equation}
+
+
+\subsection{Standard Errors}\label{sec:estimation:stderrors}
+
+The **tsgarch** package makes use of the methods available in the
+[sandwich](https://CRAN.R-project.org/package=sandwich)
+package to deliver a number of different estimators for the parameter
+covariance matrix (S).
+
+Define the objective function ($\Psi$) as the log-likelihood of the
+GARCH model with respect to the data and parameters:
+
+\begin{equation}
+\Psi\left(y,x,\theta\right) = \sum^T_{t=1}\mathrm{log}\left(\frac{1}{\sigma_t}g\left(z_t|\zeta,\nu\right)\right)
+\label{eq:garch_psi}
+\end{equation}
+
+
+where $\frac{1}{\sigma_t}g\left(z_t|\zeta,\nu\right)$ is defined in
+Section \ref{sec:estimation}. The estimating (or score) function of the objective
+function is then:
+
+\begin{equation}
+\psi\left(y,x,\theta\right) =  \frac{\partial\Psi\left(y,x,\theta\right)}{\partial\theta}
+\label{eq:garch_estfun}
+\end{equation}
+
+Inference about the parameter set $\theta$ relies on a central limit
+theorem (CLT) with $\sqrt{n}$ consistency:
+
+\begin{equation}
+\sqrt{n}\left(\hat\theta - \theta\right) \overset{d}{\to} N\left(0, S(\theta)\right)
+\label{eq:garch_clt}
+\end{equation}
+
+where $\overset{d}{\to}$ indicates convergence in distribution. The
+**sandwich** package defines the sandwich estimator
+$S\left(\theta\right)$ as:
+
+\begin{equation}
+S\left(\theta\right) = B\left(\theta\right) M\left(\theta\right) B\left(\theta\right)
+\label{eq:garch_vcov}
+\end{equation}
+
+where the meat (**M**) of the sandwich is the variance of the estimating
+function:
+
+\begin{equation}
+M\left(\theta\right) = \textrm{VAR}\left[\psi\left(y,x,\theta\right)\right]
+\label{eq:garch_meat}
+\end{equation}
+
+and the bread (**B**) is the inverse of the expectation of its first
+derivative ($\psi^{'}$):
+
+\begin{equation}
+B\left(\theta\right) = \left(E\left[-\psi^{'}\left(y,x,\theta\right)\right]\right)^{-1}
+\label{eq:garch_bread}
+\end{equation}
+
+In **tsgarch**, the following 4 estimators for the covariance matrix are
+defined:
+
+\subsubsection{Direct (H)}
+
+\begin{equation}
+S\left(\theta\right) = B\left(\theta\right) = -H^{-1} 
+\label{eq:garch_vcov_h}
+\end{equation}
+
+This makes use of the analytic hessian ($H$) at the optimal solution.
+
+\subsubsection{Outer product of the gradient (OP)}
+
+\begin{equation}
+\begin{aligned}
+S\left(\theta\right) &= M\left(\theta\right) \\
+&= \frac{1}{T}\sum^T_{t=1}\psi\left(y_t,x_t,\hat\theta\right)\psi\left(y_t,x_t,\hat\theta\right)^{'}
+\end{aligned}
+\label{eq:garch_vcov_opg}
+\end{equation}
+
+The estimating function is essentially the Jacobian of the likelihood at
+each time step with respect to the parameters. Currently, this is based
+on the `jacobian` function from [numDeriv](https://CRAN.R-project.org/package=numDeriv),
+but will be replaced in a future version by the analytic solution from
+TMB once I figure out how to do this.
+
+\subsubsection{Quasi-Maximum Likelihood (QML)}
+
+\begin{equation}
+\begin{aligned}
+S\left(\theta\right) &=  B\left(\theta\right) M\left(\theta\right) B\left(\theta\right) \\
+& = H^{-1}\left(\psi\left(y_t,x_t,\hat\theta\right)\psi\left(y_t,x_t,\hat\theta\right)^{'}\right)H^{-1}
+\end{aligned}
+\label{eq:garch_vcov_qmle}
+\end{equation}
+
+
+\subsubsection{HAC (NW)}
+
+In the presence of residual autocorrelation, the HAC estimator is based
+on the weighted empirical autocorrelations of the empirical estimating
+functions:
+
+\begin{equation}
+\begin{aligned}
+M_{HAC} & = \frac{1}{T}\sum^T_{i,j=1}w_{|i-j|}\psi\left(y_t,x_t,\hat\theta\right)\psi\left(y_t,x_t,\hat\theta\right)^{'} \\
+S\left(\theta\right) &=  B\left(\theta\right) M_{HAC}\left(\theta\right) B\left(\theta\right)
+\end{aligned}
+\label{eq:garch_vcov_nw}
+\end{equation}
+
+
+where the weights $w$ can either be fixed or estimated using an
+appropriate choice of strategies. In the **tsgarch** package, the
+bandwidth of @Newey1994 is used to automatically calculate the lag and
+then the weights, based on the `bwNeweyWest` function from the
+**sandwich** package.
+
+\subsection{Parameter Scaling}\label{sec:estimation:scaling}
+
+The estimation strategy involves 2 passes through the optimizer. During
+the first pass, the parameters are first estimated using no-scaling. In
+the second pass, the problem is reformulated based on re-scaling the n
+parameters and their bounds by the vector
+$s = \sqrt{\{s^{-1}_{1,1},s^{-1}_{2,2},\ldots,s^{-1}_{n,n}\}}$, where
+$s_{i,i}$ are the diagonals of the hessian at the previous solution.
+
+The rescaled parameters and their bounds are passed to the optimizer,
+whilst the underlying C++ TMB code scales them back in order to perform
+the likelihood calculations and correctly adjust the analytic
+derivatives in the presence of this scaling vector.
+
+The reason for performing this extra step, is to avoid some bad
+solutions as a result of large differences in scaling (particularly with
+respect to the constant $\omega$), and to avoid issues with the
+derivatives. The optimal hessian and scores (the estimating function) in
+the output object are based on the scaled versions from the second pass
+which are then re-scaled back. This approach was found to offer
+substantial stability at a relatively low cost. Some justification for this
+method can be found in @Yang2010 and @Rao2019.
+
+\subsection{GARCH Flavors}\label{sec:estimation:flavors}
+
+The **tsgarch** package implements a number of different flavors of
+GARCH, including the option of 10 different distributions. The next
+subsections provide details of each model's formulation. For each model,
+the dynamics of the conditional mean take the following form:
+
+\begin{equation}
+\begin{aligned}
+\mu_t &= \mu \\
+y_t &= \mu_t + \varepsilon_t,\quad \varepsilon_t\sim D\left(0, \sigma_t,\zeta,\nu, \lambda\right)
+\end{aligned}
+\label{eq:garch_mean_dynamics}
+\end{equation}
+
+
+where D is one of the available distributions from **tsdistributions**,
+$\zeta$ the skew parameter, $\nu$ the shape parameter and $\lambda$ an
+additional shape parameter used in the Generalized Hyperbolic
+distribution. These additional distributional parameters may be present
+in some combination or not at all depending on the distribution. It is
+also possible to set $\mu$ to zero and pass a series of pre-filtered
+residual values from some other model as discussed in Section \ref{sec:introduction}.
+
+Note that the parameter symbols for the model equations presented in the
+following subsections will be exactly the same as those output by the
+package, with the `summary` method on estimated objects having the
+option to replace the names of parameters with symbols when transforming
+to a **flextable** object (`as_flextable` method on summary object).
+
+\subsubsection{Vanilla GARCH (\textit{garch})}\label{sec:garch}
+
+The vanilla GARCH model of @Bollerslev1986 extended the ARCH model of
+@Engle1982 to include a moving average term making it more closely
+aligned with the literature on ARMA processes, and allowing for a wider
+range of behavior and more persistent volatility.
+
+\paragraph{Equation}
+
+\begin{equation}
+\begin{aligned}
+\omega_t &= \omega + \sum^{m}_{k=1}\xi_k \chi_{k,t}\\
+\sigma^2_t &= \omega_t + \sum^q_{j=1}\alpha_j\varepsilon^2_{t-j} + \sum^p_{j=1}\beta_j\sigma^2_{t-j}
+\end{aligned}
+\label{eq:garch_equation}
+\end{equation}
+
+In the presence of variance regressors, the choice to use **multiplicative** type intercept
+means that:
+
+\begin{equation}
+\omega_t = \exp{\left(\omega + \sum^{m}_{k=1}\xi_k \chi_{k,t}\right)}
+\end{equation}
+
+in which case the bounds on $\omega$ and $\xi_k$ are mostly free and we don't have to
+worry about the positivity of the variance.
+
+\paragraph{Initialization}
+\begin{equation}
+\begin{aligned}
+\sigma_{t-j}^2 &= \frac{1}{T}\sum_{t=1}^{T}\varepsilon^2_t,\quad (t-j)\le 0\\
+\varepsilon_{t-j}^2 & = \frac{1}{T}\sum_{t=1}^{T}\varepsilon^2_t,\quad (t-j) \le 0
+\end{aligned}
+\label{eq:garch_init}
+\end{equation}
+
+where the first equation is used to initialize the GARCH recursion and the second
+one (identical to the first) is used for the ARCH recursion initialization.
+
+This is the default choice, but other choices such as less than full *sample* 
+and *backcasting* are also available and described in 
+Section \ref{sec:estimation:recursion}.
+
+\paragraph{Persistence}
+
+\begin{equation}
+\begin{aligned}
+P &= \sum^q_{j=1}\alpha_j + \sum^p_{j=1}\beta_j
+\end{aligned}
+\label{eq:garch_persistence}
+\end{equation}
+
+
+\paragraph{News Impact}
+
+\begin{equation}
+\begin{aligned}
+\sigma^2_{t} &= \omega + \alpha \varepsilon^2_t + \beta\bar\sigma^2
+\end{aligned}
+\label{eq:garch_newsimpact}
+\end{equation}
+
+where $\bar\sigma^2 = \frac{\omega + \sum_{k=1}^n\xi_k\bar\chi_k}{1 - P}$^[If using a multiplicative intercept choice, then
+$\bar\sigma^2 = \frac{\exp\left(\omega + \sum_{k=1}^n\xi_k\bar\chi_k\right)}{1 - P}$.] and represents the long run
+unconditional variance in the (optional) presence of **m** variance regressors $\chi$ with coefficients
+$\xi$ (see Section \ref{sec:estimation:targeting}).
+
+\paragraph{Model Constraints}
+
+-   $1>\alpha_j>0$
+-   $1>\beta_j>0$
+-   $\omega>0$
+-   $P < 1$
+
+For higher order models, it is suggested that the constraints on $\alpha_j$
+be relaxed to allow for non positive values This can be achieved by changing 
+the `lower` value in the `parmatrix` slot of the specification.
+
+
+\paragraph{Forecast}
+
+\begin{equation}
+\sigma_{t+h}^{2}=\left({\omega+\sum\limits_{k=1}^{m}{\xi_k\chi_{k,t+h}}}\right)+\sum\limits_{j=1}^{q}{\alpha_{j}}\sigma_{t+h-j}^{2}+\sum\limits_{j=1}^{p}{\beta_{j}}\sigma_{t+h-j}^{2},\quad \left({h-j}\right)>0
+\label{eq:garch_forecast}
+\end{equation}
+
+
+\subsubsection{Integrated GARCH (\textit{igarch})}\label{sec:igarch}
+
+The integrated GARCH model of @Engle1986 assumes that the persistence
+$P = 1$, hence shocks are permanent and the unconditional variance infinite. 
+The motivation behind this model was to capture the long memory behavior observed 
+in some financial time series.^[Though many times it is also possible that this is 
+the result of omitted structural breaks] However,
+@Nelson1990 showed that the IGARCH process with no drift ($\omega=0$)
+would converge to zero with probability one. In the presence of a drift
+term ($\omega>0$) the process is neither covariance stationary nor does
+it have well-defined unconditional variance, though it still remains
+strictly stationary and ergodic. For truly long memory processes, other
+GARCH models should be considered such as the Fractionally Integrated
+GARCH (FIGARCH) or Hyperbolic GARCH (HYGARCH) which may be included 
+at a later time.
+
+
+
+\paragraph{Equation}
+
+\begin{equation}
+\begin{aligned}
+\omega_t &= \omega + \sum^{m}_{j=1}\xi_j v_{j,t}\\
+\sigma^2_t &= \omega_t + \sum^q_{j=1}\alpha_j\varepsilon^2_{t-j} + \sum^p_{j=1}\beta_j\sigma^2_{t-j}
+\end{aligned}
+\label{eq:igarch_equation}
+\end{equation}
+
+
+\paragraph{Persistence}
+
+The persistence in the `igarch` model is set to 1 and forms a binding
+constraint on the parameters.
+
+\begin{equation}
+\begin{aligned}
+P = \sum^q_{j=1}\alpha_j + \sum^p_{j=1}\beta_j = 1
+\end{aligned}
+\label{eq:igarch_persistence}
+\end{equation}
+
+\paragraph{News Impact}
+
+Not defined.
+
+\paragraph{Model Constraints}
+
+-   $1>\alpha_j>0$
+-   $1>\beta_j>0$
+-   $\omega>0$
+-   $P = 1$
+
+\paragraph{Forecast}
+
+Same as the the vanilla GARCH forecast in Section \ref{sec:garch}.
+
+\subsubsection{Exponentially Weighted Moving Average (\textit{ewma})}\label{sec:ewma}
+
+The Exponentially Weighted Moving Average (`ewma`) model is a restricted
+`igarch` model where the drift term ($\omega$) is set to zero. It has
+proven popular among some practitioners for it's simplicity and speed,
+with coefficients most often hard coded rather than estimated, based on
+prior knowledge. However, as mentioned in Section \ref{sec:igarch} the variance will
+converge to zero in a finite number of steps so it is unlikely to be a
+good model for anything but very short term forecasting.
+
+\paragraph{Equation}
+
+The `ewma` equation is usually written as
+$\sigma^2_t = \left(1 - \lambda\right)\varepsilon^2_{t-1} + \lambda\sigma^2_{t-1}$,
+but we present below the more general model which shows that it is a
+restricted `igarch` model with no drift (although it is always possible
+to include regressors).
+
+\begin{equation}
+\begin{aligned}
+\omega_t &= \sum^{m}_{j=1}\xi_j v_{j,t}\\
+\sigma^2_t &= \omega_t + \sum^q_{j=1}\alpha_j\varepsilon^2_{t-j} + \sum^p_{j=1}\beta_j\sigma^2_{t-j}
+\end{aligned}
+\label{eq:ewma_equation}
+\end{equation}
+
+
+\paragraph{Persistence}
+
+Since this is simply a restricted `igarch` model, the persistence is set
+to 1 and forms a binding constraint on the parameters as in \eqref{eq:igarch_persistence}.
+
+\paragraph{News Impact}
+
+Not defined.
+
+\paragraph{Forecast}
+
+Same as the the vanilla GARCH forecast in Section \ref{sec:garch} with $\omega$ set to zero.
+
+\subsubsection{Exponential GARCH (\textit{egarch})}\label{sec:egarch}
+
+The exponential GARCH model of @Nelson1991 allows for asymmetric
+effects between positive and negative returns, and does not require
+specific parameter restrictions to ensure positivity of the variance
+since the modelling is performed on the log variance.
+
+\paragraph{Equation}
+
+\begin{equation}
+\begin{aligned}
+\omega_t &= \omega + \sum^{m}_{k=1}\xi_k \chi_{k,t}\\
+{\log_e}\left(\sigma^2_t\right) &= \omega_t + \sum\limits_{j = 1}^q \left(\alpha_j z_{t - j} + \gamma_j\left(\left|z_{t - j}\right| - E\left|z_{t - j}\right|\right)\right) + \sum\limits_{j = 1}^p \beta_j\log_e\left(\sigma^2_{t - j}\right)
+\end{aligned}
+\label{eq:egarch_equation}
+\end{equation}
+
+
+where $z_t = \frac{\varepsilon_t}{\sigma_t}$, with expectation of the
+absolute moment given by:
+
+\begin{equation}
+E\left|z_{t - j}\right| = \int\limits_{-\infty}^\infty{\left|z\right|} D\left(z, 0,1,\zeta,\nu,\lambda\right) dz
+\label{eq:egarch_kappa}
+\end{equation}
+
+For symmetric distributions, the absolute moment is usually available in
+closed form (such as in the Gaussian case where it is
+$\sqrt{\frac{2}{\pi}}$). For other distributions this is calculated
+using Gauss-Kronrod quadrature in the C++ TMB code so that it is forms
+part of the autodiff tape.
+
+\paragraph{Initialization}
+\begin{equation}
+\begin{aligned}
+\log_e\sigma_{t-j}^2 &= \log_e\left(\frac{1}{T}\sum_{t=1}^{T}\varepsilon^2_t\right),\quad (t-j)\le 0\\
+z_{t-j}^2 & = 0,\quad (t-j)\le 0\\
+\left(|z_{t-j}| - E|z_{t-j}|\right) &= 0,\quad (t-j)\le 0
+\end{aligned}
+\label{eq:egarch_init}
+\end{equation}
+
+where the first equation is used in the initialization of the GARCH recursion, whilst the second
+and third equations are for the ARCH initialization.
+
+This is the default choice, but other choices such as less than full *sample* 
+and *backcasting* are also available and described in 
+Section \ref{sec:estimation:recursion}.
+
+\paragraph{Persistence}
+
+The persistence has a rather simple form based on the sum of the moving average coefficients.
+
+\begin{equation}
+P = \sum\limits_{j = 1}^p \beta_j
+\label{eq:egarch_persistence}
+\end{equation}
+
+\paragraph{Unconditional Variance}
+The unconditional variance of an EGARCH(1,1) model, is given by the following equation:
+
+\begin{equation}
+\bar \sigma^2 = \exp{\left(\frac{\omega + \sum\limits_{k=1}^{m}{\xi_{k}\bar\chi_k}}{1 - \beta}\right)}\prod_{i=1}^\infty E\left[\exp{\left(\beta^{i-1}g\left(z_t\right)\right)}\right]
+\label{eq:egarch_unconditional}
+\end{equation}
+
+where $g\left(z_t\right) = \alpha z_t + \gamma \left(|z_t| - E|z_t|\right)$ (see @He2002),
+and $E\left[\exp{\left(\beta^{i-1}g\left(z_t\right)\right)}\right]$ is calculated by numerical 
+quadrature:
+
+\begin{equation}
+\mathop{\int}\limits_{{-}\infty}\limits^{\infty}{\exp\left({{\mathit{\beta}}_{1}^{{i}{-}{1}}{g}\left({x}\right)}\right)}{D}\left({{x}{,}{0}{,}{1}{,}\mathit{\zeta}{,}\mathit{\nu}{,}\mathit{\lambda}}\right){dx}
+\label{eq:egarch_quadrature}
+\end{equation}
+
+We approximate the infinite product by truncating i to 1000 which we found is 
+more than sufficient for convergence.
+
+For higher order GARCH model, i.e. $p,q>1$, the unconditional variance is approximated
+via simulation, averaging the variance over 100 simulations of length 25000.
+
+\paragraph{News Impact}
+
+\begin{equation}
+\sigma^2_i = {\exp}\left(\omega +  \sum\limits_{k=1}^{m}{\xi_{k}\bar\chi_k} + \alpha z_i + \gamma \left(\left|z_i\right| - E\left|z_i\right|\right) + \beta {\log_e}\left(\sigma^2\right)\right)
+\label{eq:egarch_news_impact}
+\end{equation}
+
+
+where $\bar\sigma^2$, represents the unconditional variance as given in Equation \eqref{eq:egarch_unconditional}.
+
+\paragraph{Model Constraints}
+
+-   $P < 1$
+
+
+\paragraph{Forecast}
+For the $max(p,q)<=1$, the forecast for $t+h, h>1$ is:
+
+\begin{equation}
+{\mathit{\sigma}}_{{t}{+}{h}}^{2}{=}{\left({{\mathit{\sigma}}_{{t}{+}{1}}^{2}}\right)}^{{\mathit{\beta}}^{{h}{-}{1}}}\exp\left({\frac{{1}{-}{\mathit{\beta}}^{{h}{-}{1}}}{{1}{-}\mathit{\beta}}\left({\mathit{\omega}{+}\mathop{\sum}\limits_{{k}{=}{1}}\limits^{m}{{\mathit{\xi}}_{k}{\mathit{\chi}}_{{k}{,}{t}{+}{h}}}}\right)}\right)\mathop{\prod}\limits_{{i}{=}{1}}\limits^{\infty}{{E}\left[{\exp\left({{\mathit{\beta}}^{{i}{-}{1}}{g}\left({{z}_{t}}\right)}\right)}\right]}
+\label{eq:egarch_forecast}
+\end{equation}
+
+where $g\left(x\right) = \left(\alpha_1 x + \gamma_1  \left(\left|x\right| - \kappa\right)\right)$, 
+and $\kappa$ as in \eqref{eq:egarch_kappa}. We approximate the infinite product in the equation by truncating
+it to 1000 terms. For higher order models, the forecast is approximated via simulation.
+
+
+\subsubsection{GJR GARCH (\textit{gjrgarch})}\label{sec:gjrgarch}
+
+The GJR GARCH model of @Glosten1993 models positive and negative
+shocks on the conditional variance asymmetrically using a leverage term
+for past squared, negative innovations via the indicator function $I$.
+
+\paragraph{Equation}
+
+\begin{equation}
+\begin{aligned}
+\omega_t &= \omega + \sum^{m}_{j=1}\xi_j v_{j,t}\\
+\sigma^2_t & = \omega_t + \sum\limits_{j = 1}^q \left(\alpha_j\varepsilon^2_{t - j} + \gamma_j {I}_{[\varepsilon_{t-j}\le 0]}\varepsilon^2_{t - j}\right) + \sum\limits_{j = 1}^p \beta_j\sigma^2_{t-j}
+\end{aligned}
+\label{eq:gjr_equation}
+\end{equation}
+
+where $\gamma_j$ now represents the *leverage* term. The indicator function $I$ takes 
+on value 1 for $\varepsilon \le 0$ and 0 otherwise. Because of the presence of the 
+indicator function, the persistence of the model now crucially depends on the 
+asymmetry of the conditional distribution.
+
+
+\paragraph{Initialization}
+\begin{equation}
+\begin{aligned}
+\sigma_{t-j}^2 &= \frac{1}{T}\sum_{t=1}^{T}\varepsilon^2_t,\quad (t-j)\le 0\\
+\varepsilon_{t-j}^2 & = \frac{1}{T}\sum_{t=1}^{T}\varepsilon^2_t,\quad (t-j) \le 0\\
+{I}_{[\varepsilon_{t-j}\le 0]}\varepsilon^2_{t - j} & = \frac{1}{T}\sum_{t=i}^{T} I_{[\varepsilon_{t}\le 0]} \varepsilon^2_t,\quad (t-j) \le 0
+\end{aligned}
+\label{eq:gjr_init}
+\end{equation}
+
+
+\paragraph{Persistence}
+
+\begin{equation}
+\begin{aligned}
+P &= \sum\limits_{j = 1}^q \alpha_j  + \sum\limits_{j = 1}^p \beta_j + \sum\limits_{j = 1}^q \gamma _j\kappa
+\end{aligned}
+\label{eq:gjr_persistence}
+\end{equation}
+
+where $\kappa$ is the expected value of $\varepsilon_t \le 0$. Since this represents 
+the probability of being less than zero, we can work directly with the 
+standardized innovations when using the location scale distributions^[for details 
+see the [tsdistributions](https://CRAN.R-project.org/package=tsdistributions) package.], $z_t$:
+
+\begin{equation}
+\begin{aligned}
+\kappa &= E\left[I_{[z_{t-j}\le 0]}\right] \\
+&= \int\limits_{-\infty}^0 D\left(z, 0,1,\zeta,\nu,\lambda\right) dz
+\end{aligned}
+\label{eq:gjr_kappa}
+\end{equation}
+
+For symmetric distributions this value is always 0.5, but for skewed distributions 
+this is calculated using Gauss-Kronrod quadrature in the C++ TMB code so that it 
+is forms part of the autodiff tape allowing to also extract the Jacobian of this 
+function for use with the inequality constraint in the **nloptr** solver.
+
+\paragraph{News Impact}
+
+\begin{equation}
+\sigma^2_i = \omega + \sum\limits_{k=1}^{m}{\xi_{k}\bar\chi_k} + \alpha \varepsilon^2_i + \gamma {I}_{[\varepsilon_i\le 0]}\varepsilon^2_i + \beta \bar\sigma^2
+\label{eq:gjr_news_impact}
+\end{equation}
+
+where $\bar\sigma^2 = \frac{\omega + \sum\limits_{k=1}^{m}{\xi_{k}\bar\chi_k}}{1 - P}$, represents the long run
+unconditional variance.
+
+\paragraph{Model Constraints}
+
+-   $1>\alpha_j>0$
+-   $1>\beta_j>0$
+-   $\alpha_j + \gamma_j>0$
+-   $\omega>0$
+-   $P < 1$
+
+Note that we also constrain $\gamma_j > -1$. The Jacobian of the inequality 
+constraints is calculated either analytically or using autodiff.
+For higher order models, it is suggested that the constraints on $\alpha_j$
+and $\gamma_j$ be relaxed to allow for non positive values. This can be achieved by
+changing the `lower` value in the `parmatrix` slot of the specification.
+
+
+\paragraph{Forecast}
+
+
+\begin{equation}
+\sigma_{t+h}^{2}=\omega+\sum\limits_{k=1}^{m}{\xi_{k}\chi_{k,t+h}}+\sum\limits_{j=1}^{q}{\alpha_{j}\sigma_{t+h-j}^{2}}+\gamma_{j}\kappa\sigma_{t+h-j}^{2}+\sum\limits_{j=1}^{p}{\beta_{j}}\sigma_{t+h-j}^{2},\quad \left({h-j}\right)>0
+\label{eq:gjr_forecast}
+\end{equation}
+
+where $\kappa$ is the expected value of $\varepsilon_t \le 0$, see \eqref{eq:gjr_kappa}.
+
+
+\subsubsection{Asymmetric Power ARCH (\textit{aparch})}\label{sec:aparch}
+
+The asymmetric power ARCH model of @Ding1993 allows for both leverage
+and the Taylor effect, named after @Taylor1986 who observed that the
+sample autocorrelation of absolute returns was usually larger than that
+of squared returns.
+
+\paragraph{Equation}
+
+\begin{equation}
+\begin{aligned}
+\omega_t &= \omega + \sum^{m}_{k=1}\xi_k \chi_{k,t}\\
+\sigma^{\delta}_t  &= \omega_t + \sum\limits_{j = 1}^q \alpha_j\left(\left|\varepsilon_{t - j}\right| - \gamma_j\varepsilon_{t - j}\right)^{\delta} + \sum\limits_{j = 1}^p \beta_j\sigma^{\delta}_{t - j}
+\end{aligned}
+\label{eq:aparch_equation}
+\end{equation}
+
+where $\delta \in {\mathbb{R}^ + }$, being a Box-Cox transformation of
+$\sigma_t$, and $\gamma_j$ the coefficient in the leverage term.
+
+\paragraph{Initialization}
+
+See @Laurent2004 page 52:
+
+\begin{equation}
+\begin{aligned}
+\sigma_{t-j}^\delta &= \left(\frac{1}{T}\sum_{t=1}^{T}\varepsilon^2_t\right)^{(\delta/2)},\quad (t-j)\le 0\\
+\left(\left|\varepsilon_{t - j}\right| - \gamma_j\varepsilon_{t - j}\right)^{\delta} &= 
+\frac{1}{T}\sum_{t=i}^{T}\left(|\varepsilon_t| - \gamma_j\varepsilon_t\right)^\delta,\quad (t-j) \le 0\\
+\end{aligned}
+\label{eq:aparch_init}
+\end{equation}
+
+
+\paragraph{Persistence}
+
+\begin{equation}
+\begin{aligned}
+P = \sum\limits_{j = 1}^p \beta_j  + \sum\limits_{j = 1}^q \alpha_j \kappa_j
+\end{aligned}
+\label{eq:aparch_persistence}
+\end{equation}
+
+where $\kappa_j$ is the expected value of the standardized residuals
+$z_t$ under the Box-Cox transformation of the term which includes the
+leverage coefficient:
+
+\begin{equation}
+\begin{aligned}
+\kappa_j  & = E\left(\left|z_{t-j}\right| - \gamma_j z_{t-j}\right)^\delta \\
+&= \int\limits_{- \infty}^\infty \left(\left|z\right| - \gamma_j z\right)^{\delta} D\left(z, 0,1,\zeta,\nu,\lambda\right) dz
+\end{aligned}
+\label{eq:aparch_kappa}
+\end{equation}
+
+For symmetric distributions there are closed form solutions for this
+expression, but for skewed distributions this is calculated using
+Gauss-Kronrod quadrature in the C++ TMB code so that it is forms part of
+the autodiff tape allowing to also extract the Jacobian of this function
+for use with the inequality constraint in the **nloptr** solver.
+
+\paragraph{News Impact}
+
+\begin{equation}
+\sigma^2_i = \left(\omega + \sum\limits_{k=1}^{m}{\xi_{k}\bar\chi_k} + \alpha\left(\left|\varepsilon_i\right| - \gamma\varepsilon_i\right)^{\delta}  + \beta\bar\sigma^{\delta}\right)^{\frac{2}{\delta}}
+\label{eq:aparch_newsimpact}
+\end{equation}
+
+
+where $\bar\sigma^{\delta} = \frac{\omega + \sum\limits_{k=1}^{m}{\xi_{k}\bar\chi_k}}{1 - P}$, represents the long
+run unconditional volatility raised to the power of $\delta$.
+
+\paragraph{Model Constraints}
+
+-   $1>\alpha_j>0$
+-   $1>\beta_j>0$
+-   $|\gamma_j|<1$
+-   $\delta>0$
+-   $\omega>0$
+-   $P < 1$
+
+Non-negativity constraints on $\alpha_j$ may be relaxed for higher order models by changing
+the `lower` parameter in the `parmatrix` of the specification object prior to estimation.
+
+\paragraph{Forecast}
+
+
+\begin{equation}
+\sigma_{t+h}^{2}={\left({\omega+\sum\limits_{k=1}^{m}{\xi_{k}\chi_{k,t+h}}+\sum\limits_{j=1}^{q}{\alpha_{j}\kappa_{j}\sigma_{t+h-j}^{\delta}}+\sum\limits_{j=1}^{p}{\beta_{j}}\sigma_{t+h-j}^{\delta}}\right)}^{2/\delta},\quad \left({h-j}\right)>0
+\label{eq:aparch_forecast}
+\end{equation}
+
+where $\kappa_j = E\left(\left|z_{t-j}\right| - \gamma_j z_{t-j}\right)^\delta$, see \eqref{eq:aparch_kappa}.
+
+
+
+\subsubsection{Family GARCH (\textit{fgarch})}\label{sec:fgarch}
+
+The family GARCH model of @Hentschel1995 is a large omnibus model
+which subsumes some of the most popular GARCH models. It allows for both
+shifts and rotations in the news impact curve, where the shift is the
+main source of asymmetry for small shocks while rotation drives larger
+shocks. The following restrictions in the parameters leads to specific
+models:
+
+-   GARCH: $\delta = 2$, $\eta_j = \gamma_j = 0$
+-   Absolute Value GARCH: $\delta = 1$, $|\gamma_j|\le1$
+-   GJR GARCH: $\delta=2$,$\eta_j=0$
+-   Threshold GARCH: $\delta=1$,$\eta_j=0$,$|\gamma_j|\le1$
+-   Nonlinear GARCH: $\gamma_j = \eta_j = 0$
+-   Nonlinear Asymmetric GARCH: $\delta=2$,$\gamma_j=0$
+-   APARCH: $\eta_j=0$, $|\gamma_j|\le1$
+
+\paragraph{Equation}
+
+\begin{equation}
+\begin{aligned}
+\omega_t &= \omega + \sum^{m}_{j=1}\xi_j v_{j,t}\\
+\sigma^{\delta}_t & = \omega_t + \sum\limits_{j = 1}^q \alpha_j\sigma^{\delta}_{t - j}\left(\left|z_{t - j} - \eta_j\right| - 
+\gamma_j\left(z_{t - j} - \eta_j\right)\right)^{\delta} + \sum\limits_{j = 1}^p \beta_j\sigma^{\delta}_{t - j}
+\end{aligned}
+\label{eq:fgarch_equation}
+\end{equation}
+
+The original formulation, takes a slightly different form:
+
+\begin{equation}
+\begin{aligned}
+\omega_t &= \omega + \sum^{m}_{j=1}\xi_j v_{j,t}\\
+\sigma^{\delta}_t & = \omega_t + \sum\limits_{j = 1}^q \alpha_j\sigma^{\delta}_{t - j}\left(\left|z_{t - j} - \eta_j\right| - 
+\gamma_j\left(z_{t - j} - \eta_j\right)\right)^{\lambda} + \sum\limits_{j = 1}^p \beta_j\sigma^{\delta}_{t - j}
+\end{aligned}
+\label{eq:fgarch_original_equation}
+\end{equation}
+
+which accommodates the exponential GARCH model as well as a more flexible transformation, albeit more computationally
+demanding. The **tsgarch** package does not adopt this more general formulation, instead setting $\lambda = \delta$.
+
+
+
+\paragraph{Initialization}
+
+\begin{equation}
+\begin{aligned}
+\sigma_{t-j}^\delta &= \left(\frac{1}{T}\sum_{t=1}^{T}\varepsilon^2_t\right)^{(\delta/2)},\quad (t-j)\le 0\\
+\left(\left|z_{t - j} - \eta_j\right| - \gamma_j\left(z_{t - j} - \eta_j\right)\right)^{\delta} &= 
+\frac{1}{T}\sum_{t=i}^{T}\left(|z_t - \eta_j| - \gamma_j(z_t - \eta_j)\right)^\delta,\quad (t-j) \le 0\\
+\end{aligned}
+\label{eq:fgarch_init}
+\end{equation}
+
+
+
+\paragraph{Persistence}
+
+\begin{equation}
+\begin{aligned}
+P = \sum\limits_{j = 1}^p \beta_j + \sum\limits_{j = 1}^q \alpha_j\kappa_j
+\end{aligned}
+\label{eq:fgarch_persistence}
+\end{equation}
+
+
+where $\kappa_j$ is the expected value of the standardized residuals
+$z_t$ under the Box-Cox transformation of the absolute value asymmetry
+term
+
+\begin{equation}
+\begin{aligned}
+\kappa_j &= E\left(\left|z_{t - j} - \eta_j\right| - \gamma_j\left(z_{t - j} - \eta_j\right)\right)^{\delta} \\
+& = \int\limits_{-\infty}^\infty \left(\left|z - \eta_j\right| - \gamma_j\left(z -\eta _j\right)\right)^{\delta} D\left(z, 0,1,\zeta,\nu,\lambda\right) dz
+\end{aligned}
+\label{eq:fgarch_kappa}
+\end{equation}
+
+There are no simple closed form solutions for this expression so it is
+calculated using Gauss-Kronrod quadrature in the C++ TMB code so that it
+is forms part of the autodiff tape allowing to also extract the Jacobian
+of this function for use with the inequality constraint in the
+**nloptr** solver.
+
+\paragraph{News Impact}
+
+\begin{equation}
+\sigma^2_i = \left(\omega +  \sum\limits_{k=1}^{m}{\xi_{k}\bar\chi_k} + \alpha\bar\sigma^{\delta}\left(\left|z_i - \eta\right| - \gamma\left(z_i - \eta\right)\right)^{\delta}  + 
+\beta \bar\sigma^{\delta}\right)^{\frac{2}{\delta}}
+\label{eq:fgarch_news_impact}
+\end{equation}
+
+
+where $\bar\sigma^{\delta} = \frac{\omega +  \sum\limits_{k=1}^{m}{\xi_{k}\bar\chi_k}}{1 - P}$, represents the long
+run unconditional volatility raised to the power of $\delta$.
+
+\paragraph{Model Constraints}
+
+-   $1>\alpha_j>0$
+-   $1>\beta_j>0$
+-   $|\gamma_j|<1$
+-   $-10<|\eta_j|<10$
+-   $\delta>0$
+-   $\omega>0$
+-   $P < 1$
+
+Non-negativity constraints on $\alpha_j$ may be relaxed for higher order models by changing
+the `lower` parameter in the `parmatrix` of the specification object prior to estimation.
+
+\paragraph{Forecast}
+
+
+\begin{equation}
+\sigma_{t+h}^{2}={\left({\omega+\sum\limits_{k=1}^{m}{\xi_{k}\chi_{k,t+h}}+\sum\limits_{j=1}^{q}{\alpha_{j}\kappa_{j}\sigma_{t+h-j}^{\delta}}+\sum\limits_{j=1}^{p}{\beta_{j}}\sigma_{t+h-j}^{\delta}}\right)}^{2/\delta},\quad \left({h-j}\right)>0
+\label{eq:fgarch_forecast}
+\end{equation}
+
+where $\kappa_j$ is the expected value of the standardized residuals
+$z_t$ under the Box-Cox transformation of the absolute value asymmetry
+term, see \eqref{eq:fgarch_kappa}.
+
+
+\subsubsection{Component GARCH (\textit{cgarch})}\label{sec:cgarch}
+
+The model of @Lee1999 decomposes the conditional variance into a
+permanent and transitory component so as to investigate the long- and
+short-run movements of volatility affecting securities.
+
+\paragraph{Equation}
+
+\begin{equation}
+\begin{aligned}
+q_t &= \omega + \sum^{m}_{k=1}\xi_k \chi_{k,t} + \rho q_{t-1} + \phi\left(\varepsilon^2_{t-1}-\sigma^2_{t-1}\right)\\
+\sigma^2_t &= q_t + \sum^q_{j=1}\alpha_j\left(\varepsilon^2_{t-j} - q_{t-j}\right) + 
+\sum^p_{j=1}\beta_j\left(\sigma^2_{t-j} - q_{t-j}\right)
+\end{aligned}
+\label{eq:cgarch_equation}
+\end{equation}
+
+
+The process can be re-written in an alternative form to better highlight
+the decomposition of the permanent and transitory components, shown
+below for the Component GARCH(1,1) model:
+
+\begin{equation}
+\begin{aligned}
+&\textrm{Permanent: } &q_t &= \omega + \sum^{m}_{k=1}\xi_k \chi_{k,t} + \rho q_{t-1} + \phi\left(\varepsilon^2_{t-1}-\sigma^2_{t-1}\right) \\
+&\textrm{Transitory: } &s_t &= \left(\alpha + \beta\right) s_{t-1} + \alpha\left(\varepsilon^2_{t-1} - \sigma^2_{t-1}\right) \\
+&\textrm{Total: } &\sigma^2_t &= q_t + s_t
+\end{aligned}
+\label{eq:cgarch_decomposition}
+\end{equation}
+
+The parameters $\alpha$ and $\phi$ correspond to immediate impacts of
+volatility shocks $\left(\varepsilon^2_{t-j} - \sigma^2_{t-j}\right)$ on
+the transitory and permanent components, whereas
+$\left(\alpha + \beta\right)$ and $\rho$ measure the persistence of the
+transitory and permanent components, respectively. The model as currently
+implemented allows for higher order in the transitory component but no
+higher orders in the permanent component. The regressors only enter through
+the permanent component equation.^[Some implementations in other software packages
+allow for more flexibility, allowing regressors to enter into both components.]
+
+\paragraph{Initialization}
+
+The transitory component is initialized to 0, whilst the squared residuals, variance 
+and permanent component are initialized to the sample variance. As a result, the 
+initial squared residuals and variance cancel out during initialization.
+
+\begin{equation}
+\begin{aligned}
+\varepsilon_{t-j}^{2},\sigma_{t-j}^{2},q_{t-j} & =\frac{1}{T}\sum_{t=1}^{T}\varepsilon^2_t,\quad (t-j)\le 0\\
+s_{t-j} & =0,\quad (t-j)\le 0
+\end{aligned}
+\label{eq:cgarch_init}
+\end{equation}
+
+
+\paragraph{Persistence}
+
+\begin{equation}
+\begin{aligned}
+&\textrm{Transitory: } & P^T &= \sum^q_{j=1}\alpha_j + \sum^p_{j=1}\beta_j\\
+&\textrm{Permanent: } & P^P &= \rho
+\end{aligned}
+\label{eq:cgarch_persistence}
+\end{equation}
+
+\paragraph{News Impact}
+
+Since the component GARCH model can be represented as a restricted
+GARCH(2,2) model, we derive the news impact curve using this
+representation to arrive at the following equation:
+
+\begin{equation}
+\sigma^2_t = \omega + \sum\limits_{k=1}^{m}{\xi_{k}\bar\chi_k} + \rho\bar\sigma^2 + \phi\left(\varepsilon^2_t - \bar\sigma^2\right)+\alpha\left(\varepsilon^2_t - \bar\sigma^2\right)
+\label{eq:cgarch_news_impact}
+\end{equation}
+
+where the unconditional variance $\bar\sigma^2 = \frac{\omega + \sum\limits_{k=1}^{m}{\xi_{k}\bar\chi_k}}{1-\rho}$.
+
+\paragraph{Constraints}
+
+-   $1>\alpha_j>0$
+-   $1>\beta_j>0$
+-   $1>\phi>0$
+-   $1>\rho>0$
+-   $\omega>0$
+-   $1>P^P>P^T>0$
+-   $\beta>\phi$
+
+
+\paragraph{Forecast}
+
+\begin{equation}
+\begin{aligned}
+q_{t+h} &= \left(\frac{\omega+\sum\limits_{k=1}^{m}{\xi_{k}\chi_{k,t+h}}}{1-\rho}\right) + \rho^k\left(q_t - \frac{\omega+\sum\limits_{k=1}^{m}{\xi_{k}\chi_{k,t+h}}}{1-\rho}\right)\\
+s_{t+h} &= P_T^h\left(\sigma_t^2 - q_t\right)\\
+\sigma_{t+h}^2 &= q_{t+h} + s_{t+h}
+\end{aligned}
+\label{eq:cgarch_forecast}
+\end{equation}
+
+where $P_T$ is the transitory persistence as defined in \eqref{eq:cgarch_persistence}.
+As h grows larger, the forecast converges to $\frac{\omega+\sum\limits_{k=1}^{m}{\xi_{k}\chi_{k,t+h}}}{1-\rho}$.
+
+
+\section{Package Methods}\label{sec:methods}
+
+The **tsgarch** package includes a number of methods which can be used with either
+the `tsgarch.spec` or `tsgarch.estimate` objects. These include standard methods
+from the **stats** package such `residuals`, `fitted`, `sigma`, `logLik`, `AIC`,
+`BIC`, `confint`, `vcov`, `coef`, `predict` and `simulate`. Additionally, the 
+following methods from the **tsmethods** package are included:
+
+- `tsfilter`: online filtering
+- `tsbacktest`: backtesting
+- `tsprofile`: parameter profiling through simulation/estimation
+- `unconditional`: unconditional variance
+- `tsequation`: model equations (used mainly by the `as_flextable` method)
+- `pit`: probability integral transform
+- `persistence`: model persistence
+
+Also included from the **sandwich** package are methods for `estfun` and `bread`.
+
+
+\section{Conclusion}\label{sec:conclusion}
+
+The package is still in active development. Additional models may be
+added, porting some of the remaining **rugarch** models, but the focus
+is likely to be on models for high frequency data and porting the 
+multivariate models from **rmgarch**.
+
+A separate package called [tstests](https://github.com/tsmodels/tstests)
+includes a number of tests which were previously part of **rugarch** and
+will be released to CRAN soon.
+
+
+\section{References}

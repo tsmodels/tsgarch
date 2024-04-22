@@ -3,7 +3,7 @@
 \name{nobs.tsgarch.estimate}
 \alias{nobs.tsgarch.estimate}
 \alias{nobs}
-\title{Extract the Number of Observations from a Fit.}
+\title{Extract the Number of Observations}
 \usage{
 \method{nobs}{tsgarch.estimate}(object, ...)
 }
@@ -16,7 +16,7 @@
 A numeric value.
 }
 \description{
-Extract the number of ‘observations’ from an estimated model.
+Extract the number of observations from an estimated model.
 This is principally intended to be used in computing BIC and used in other
 tidy methods
 }

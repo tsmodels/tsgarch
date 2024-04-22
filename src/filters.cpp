@@ -2,7 +2,10 @@
 using namespace Rcpp;
 
 // [[Rcpp::export(.garchfilter)]]
-NumericVector garchfilter(NumericVector residuals, NumericVector v, NumericVector initstate, NumericVector omega, NumericVector alpha, NumericVector beta, IntegerVector model) {
+NumericVector garchfilter(const NumericVector residuals, const NumericVector v,
+                          const NumericVector initstate, const double omega,
+                          const NumericVector alpha, const NumericVector beta,
+                          const IntegerVector model) {
     int timesteps = residuals.size();
     // omega [ init_variance, omega]
     // v is the external regressor V x \kappa (already premultiplied in the R code)
@@ -13,15 +16,15 @@ NumericVector garchfilter(NumericVector residuals, NumericVector v, NumericVecto
         sigma_squared(j) = initstate(j);
     }
     for(int i = model(0);i<timesteps;i++) {
-        sigma_squared(i) = omega(0) + v(i);
-        if (model(1) > 0.5) sigma_squared(i) = exp(sigma_squared(i));
-        if (model(2) > 0) {
-            for(int j = 0;j<model(2);j++) {
+        sigma_squared(i) = omega + v(i);
+        if (model(3) > 0.5) sigma_squared(i) = exp(sigma_squared(i));
+        if (model(1) > 0) {
+            for(int j = 0;j<model(1);j++) {
                 sigma_squared(i) += alpha(j) * std::pow(residuals(i - j - 1), 2);
             }
         }
-        if (model(3) > 0) {
-            for(int j = 0;j<model(3);j++) {
+        if (model(2) > 0) {
+            for(int j = 0;j<model(2);j++) {
                 sigma_squared(i) += beta(j) * sigma_squared(i - j - 1);
             }
         }
@@ -31,9 +34,11 @@ NumericVector garchfilter(NumericVector residuals, NumericVector v, NumericVecto
 }
 
 // [[Rcpp::export(.egarchfilter)]]
-NumericVector egarchfilter(NumericVector residuals, NumericVector v, NumericVector initstate,
-                           NumericVector omega, NumericVector alpha, NumericVector gamma,
-                           NumericVector beta, NumericVector kappa, IntegerVector model) {
+NumericVector egarchfilter(const NumericVector residuals, const NumericVector v,
+                           const NumericVector initstate, const double omega,
+                           const NumericVector alpha, const NumericVector gamma,
+                           const NumericVector beta, const double kappa,
+                           const IntegerVector model) {
     int timesteps = residuals.size();
     // omega [ init_variance, omega]
     // v is the external regressor V x \kappa (already premultiplied in the R code)
@@ -42,21 +47,20 @@ NumericVector egarchfilter(NumericVector residuals, NumericVector v, NumericVect
     NumericVector log_sigma_squared(timesteps);
     NumericVector sigma(timesteps);
     NumericVector std_residuals(timesteps);
-
     for(int j=0;j<model(0);j++){
         sigma_squared(j) = initstate(j);
         log_sigma_squared(j) = log(sigma_squared(j));
-        std_residuals(j) = 0.0;
+        std_residuals(j) = residuals(j)/sqrt(sigma_squared(j));
     }
     for(int i = model(0);i<timesteps;i++) {
-        log_sigma_squared(i) = omega(0) + v(i);
-        if (model(2) > 0) {
-            for(int j = 0;j<model(2);j++) {
-                log_sigma_squared(i) += alpha(j) * std_residuals(i - j - 1) + gamma(j) * (abs(std_residuals(i - j - 1)) - kappa(0));
+        log_sigma_squared(i) = omega + v(i);
+        if (model(1) > 0) {
+            for(int j = 0;j<model(1);j++) {
+                log_sigma_squared(i) += alpha(j) * std_residuals(i - j - 1) + gamma(j) * (abs(std_residuals(i - j - 1)) - kappa);
             }
         }
-        if (model(3) > 0) {
-            for(int j = 0;j<model(3);j++) {
+        if (model(2) > 0) {
+            for(int j = 0;j<model(2);j++) {
                 log_sigma_squared(i) += beta(j) * log_sigma_squared(i - j - 1);
             }
         }
@@ -69,9 +73,11 @@ NumericVector egarchfilter(NumericVector residuals, NumericVector v, NumericVect
 
 
 // [[Rcpp::export(.aparchfilter)]]
-NumericVector aparchfilter(NumericVector residuals, NumericVector v, NumericVector initstate,
-                           NumericVector omega, NumericVector alpha, NumericVector gamma,
-                           NumericVector beta,  NumericVector delta, IntegerVector model) {
+NumericVector aparchfilter(const NumericVector residuals, const NumericVector v,
+                           const NumericVector initstate, const double omega,
+                           const NumericVector alpha, const NumericVector gamma,
+                           const NumericVector beta,  const double delta,
+                           const IntegerVector model) {
     int timesteps = residuals.size();
     // omega [ init_variance, omega]
     // v is the external regressor V x \kappa (already premultiplied in the R code)
@@ -81,30 +87,32 @@ NumericVector aparchfilter(NumericVector residuals, NumericVector v, NumericVect
 
     for(int j=0;j<model(0);j++){
         sigma(j) = sqrt(initstate(j));
-        power_sigma(j) = pow(sigma(j), delta(0));
+        power_sigma(j) = pow(sigma(j), delta);
     }
     for(int i = model(0);i<timesteps;i++) {
-        power_sigma(i) += omega(0) + v(i);
-        if (model(1) > 0.5) power_sigma(i) = exp(power_sigma(i));
-        if (model(2) > 0) {
-            for(int j = 0;j<model(2);j++) {
-                power_sigma(i) += alpha(j) * pow(fabs(residuals(i - j - 1)) - gamma(j) * residuals(i - j - 1), delta(0));
+        power_sigma(i) += omega + v(i);
+        if (model(3) > 0.5) power_sigma(i) = exp(power_sigma(i));
+        if (model(1) > 0) {
+            for(int j = 0;j<model(1);j++) {
+                power_sigma(i) += alpha(j) * pow(fabs(residuals(i - j - 1)) - gamma(j) * residuals(i - j - 1), delta);
             }
         }
-        if (model(3) > 0) {
-            for(int j = 0;j<model(3);j++) {
+        if (model(2) > 0) {
+            for(int j = 0;j<model(2);j++) {
                 power_sigma(i) += beta(j) * power_sigma(i - j - 1);
             }
         }
-        sigma(i) = pow(power_sigma(i), 1.0/delta(0));
+        sigma(i) = pow(power_sigma(i), 1.0/delta);
     }
     return sigma;
 }
 
 // [[Rcpp::export(.gjrgarchfilter)]]
-NumericVector gjrgarchfilter(NumericVector residuals, NumericVector negative_indicator, NumericVector v,
-                             NumericVector initstate, NumericVector omega, NumericVector alpha, NumericVector gamma,
-                             NumericVector beta, IntegerVector model) {
+NumericVector gjrgarchfilter(const NumericVector residuals, const NumericVector negative_indicator,
+                             const NumericVector v, const NumericVector initstate,
+                             const double omega, const NumericVector alpha,
+                             const NumericVector gamma, const NumericVector beta,
+                             const IntegerVector model) {
     int timesteps = residuals.size();
     // omega [ init_variance, omega]
     // v is the external regressor V x \kappa (already premultiplied in the R code)
@@ -115,19 +123,18 @@ NumericVector gjrgarchfilter(NumericVector residuals, NumericVector negative_ind
     for(int j=0;j<model(0);j++){
         sigma(j) = sqrt(initstate(j));
         sigma_squared(j) = initstate(j);
-
     }
     for(int i = model(0);i<timesteps;i++) {
-        sigma_squared(i) += omega(0) + v(i);
-        if (model(1) > 0.5) sigma_squared(i) = exp(sigma_squared(i));
+        sigma_squared(i) += omega + v(i);
+        if (model(3) > 0.5) sigma_squared(i) = exp(sigma_squared(i));
 
-        if (model(2) > 0) {
-            for(int j = 0;j<model(2);j++) {
+        if (model(1) > 0) {
+            for(int j = 0;j<model(1);j++) {
                 sigma_squared(i) += alpha(j) * pow(residuals(i - j - 1), 2.0) + gamma(j) * (pow(residuals(i - j - 1), 2.0) * negative_indicator(i - j - 1));
             }
         }
-        if (model(3) > 0) {
-            for(int j = 0;j<model(3);j++) {
+        if (model(2) > 0) {
+            for(int j = 0;j<model(2);j++) {
                 sigma_squared(i) += beta(j) * sigma_squared(i - j - 1);
             }
         }
@@ -137,10 +144,11 @@ NumericVector gjrgarchfilter(NumericVector residuals, NumericVector negative_ind
 }
 
 // [[Rcpp::export(.fgarchfilter)]]
-NumericVector fgarchfilter(NumericVector residuals, NumericVector v, NumericVector initstate,
-                           NumericVector omega, NumericVector alpha, NumericVector gamma,
-                           NumericVector eta, NumericVector beta,  NumericVector delta,
-                           IntegerVector model) {
+NumericVector fgarchfilter(const NumericVector residuals, const NumericVector v,
+                           const NumericVector initstate, const double omega,
+                           const NumericVector alpha, const NumericVector gamma,
+                           const NumericVector eta, const NumericVector beta,
+                           const double delta, const IntegerVector model) {
     int timesteps = residuals.size();
     // omega [ init_variance, omega]
     // v is the external regressor V x \kappa (already premultiplied in the R code)
@@ -151,33 +159,34 @@ NumericVector fgarchfilter(NumericVector residuals, NumericVector v, NumericVect
 
     for(int j=0;j<model(0);j++){
         sigma(j) = sqrt(initstate(j));
-        power_sigma(j) = pow(sigma(j), delta(0));
-        std_residuals(j) = 0.0;
+        power_sigma(j) = pow(sigma(j), delta);
+        std_residuals(j) = residuals(j)/sigma(j);
     }
     for(int i = model(0);i<timesteps;i++) {
-        power_sigma(i) += omega(0) + v(i);
-        if (model(1) > 0.5) power_sigma(i) = exp(power_sigma(i));
-
-        if (model(2) > 0) {
-            for(int j = 0;j<model(2);j++) {
-                power_sigma(i) += alpha(j) * power_sigma(i - j - 1) * pow(fabs(std_residuals(i - j - 1) - eta(j)) - gamma(j) * (std_residuals(i - j - 1) - eta(j)), delta(0));
+        power_sigma(i) += omega + v(i);
+        if (model(3) > 0.5) power_sigma(i) = exp(power_sigma(i));
+        if (model(1) > 0) {
+            for(int j = 0;j<model(1);j++) {
+                power_sigma(i) += alpha(j) * power_sigma(i - j - 1) * pow(fabs(std_residuals(i - j - 1) - eta(j)) - gamma(j) * (std_residuals(i - j - 1) - eta(j)), delta);
             }
         }
-        if (model(3) > 0) {
-            for(int j = 0;j<model(3);j++) {
+        if (model(2) > 0) {
+            for(int j = 0;j<model(2);j++) {
                 power_sigma(i) += beta(j) * power_sigma(i - j - 1);
             }
         }
-        sigma(i) = pow(power_sigma(i), 1.0/delta(0));
+        sigma(i) = pow(power_sigma(i), 1.0/delta);
         std_residuals(i) = residuals(i)/sigma(i);
     }
     return sigma;
 }
 
 // [[Rcpp::export(.cgarchfilter)]]
-Rcpp::List cgarchfilter(NumericVector residuals, NumericVector v, NumericMatrix initstate,
-                           NumericVector omega, NumericVector alpha, NumericVector rho,
-                           NumericVector phi, NumericVector beta, IntegerVector model) {
+Rcpp::List cgarchfilter(const NumericVector residuals, const NumericVector v,
+                        const NumericMatrix initstate, const double omega,
+                        const NumericVector alpha, const NumericVector rho,
+                        const NumericVector phi, const NumericVector beta,
+                        const IntegerVector model) {
     int timesteps = residuals.size();
     // omega [ omega]
     // v is the external regressor V x \kappa (already premultiplied in the R code)
@@ -185,37 +194,36 @@ Rcpp::List cgarchfilter(NumericVector residuals, NumericVector v, NumericMatrix 
     NumericVector sigma(timesteps);
     NumericVector sigma_squared(timesteps);
     NumericVector permanent_component(timesteps);
+    NumericVector transitory_component(timesteps);
     NumericVector residuals_squared = pow(residuals, 2.0);
     int j,i;
     for(j=0;j<model(0);j++){
+        double sinit = initstate(j,0);
         double pinit = initstate(j,1);
-        double vinit = initstate(j,0);
-        if (model(1) > 0.5) {
-            pinit = exp(pinit);
-        }
         permanent_component(j) = pinit;
-        sigma_squared(j) += vinit + permanent_component(j);
-        sigma(j) += sqrt(sigma_squared(j));
-        residuals_squared(j) = 0.0;
+        transitory_component(j) = sinit;
+        sigma_squared(j) = pinit + sinit;
+        sigma(j) = sqrt(sigma_squared(j));
     }
     for(i = model(0);i<timesteps;i++) {
-        permanent_component(i) += omega(0) + v(i);
-        if (model(1) > 0.5) permanent_component(i) = exp(permanent_component(i));
+        permanent_component(i) += omega + v(i);
+        if (model(3) > 0.5) permanent_component(i) = exp(permanent_component(i));
         permanent_component(i) += rho(0) * permanent_component(i - 1) + phi(0) * (residuals_squared(i - 1) - sigma_squared(i - 1));
-        sigma_squared(i) += permanent_component(i);
+        if (model(1) > 0) {
+            for(j = 0;j<model(1);j++) {
+                transitory_component(i) += alpha(j) * transitory_component(i - j - 1) + alpha(j) *  (residuals_squared(i - j - 1) - sigma_squared(i - j - 1));
+            }
+        }
         if (model(2) > 0) {
             for(j = 0;j<model(2);j++) {
-                sigma_squared(i) += alpha(j) * (residuals_squared(i - j - 1) - permanent_component(i - j - 1));
+                transitory_component(i) += beta(j) *  transitory_component(i - j - 1);
             }
         }
-        if (model(3) > 0) {
-            for(j = 0;j<model(3);j++) {
-                sigma_squared(i) += beta(j) * (sigma_squared(i - j - 1) - permanent_component(i - j - 1));
-            }
-        }
+        sigma_squared(i) = permanent_component(i) + transitory_component(i);
         sigma(i) += sqrt(sigma_squared(i));
     }
     Rcpp::List output = Rcpp::List::create(Rcpp::Named("sigma") = wrap(sigma),
+                                           Rcpp::Named("transitory_component") = wrap(transitory_component),
                                            Rcpp::Named("permanent_component") = wrap(permanent_component));
     return output;
 }

@@ -1,586 +1,230 @@
-.filter_garch <- function(object, y = NULL, newxreg = NULL, newvreg = NULL, object_type = "estimate", ...)
+.filter.tsgarch.spec <- function(object, y = NULL, newxreg = NULL, newvreg = NULL, ...)
+{
+    if (!is.null(y)) {
+        valid_data <- .check_y_filter(object, y = y, newvreg = newvreg)
+    }
+    parameter <- group <- value <- NULL
+    newspec <- .spec2newspec(object, y = NULL, newxreg = NULL, newvreg = NULL)
+    newspec$parmatrix$value <- copy(object$parmatrix$value)
+    model <- newspec$model$model
+    model_init <- .tmb_initialize_model(spec = newspec)
+    tmb <- MakeADFun(data = model_init$data, parameters = model_init$parameters, atomic = TRUE, map = model_init$map, silent = TRUE, DLL = "tsgarch_TMBExports")
+    env <- new.env()
+    env$fun <- model_init$fun
+    env$grad <- model_init$grad
+    env$hess <- model_init$hess
+    env$tmb <- tmb
+    env$llh <- 1
+    env$model <- model
+    env$distribution <- newspec$distribution
+    env$parmatrix <- copy(newspec$parmatrix)
+    pars <- tmb$par
+    hessian <- tmb$he()
+    scores <- jacobian(score_function, pars, env = env)
+    m <- newspec$model_options[1]
+    sig <- env$tmb$report(pars)$sigma
+    if (m > 0) sig <- sig[-seq_len(m)]
+    var_initial <- env$tmb$report(pars)$initial_variance
+    arch_initial <- env$tmb$report(pars)$initial_arch
+    target_omega <- env$tmb$report(pars)$target_omega
+    rr <- suppressWarnings(summary(sdreport(tmb, par.fixed = pars, getReportCovariance = T), p.value = TRUE))
+    persistence_table <- rr["persistence", ]
+    variance_target_table <- rr["target_omega", ]
+    parmatrix <- copy(newspec$parmatrix)
+    spec <- newspec
+    spec$parmatrix <- NULL
+    spec$model$var_initial <- var_initial
+    constant_variance <- mean((newspec$target$y_orig - (parmatrix[parameter == "mu"]$value * parmatrix[parameter == "mu"]$scale))^2)
+    parmatrix[parameter == "omega", value := target_omega]
+    out <- list(parmatrix = parmatrix, scaled_hessian = hessian,
+                scaled_scores = scores,
+                parameter_scale = rep(1, length(pars)),
+                conditions = NULL,
+                var_initial = var_initial,
+                arch_initial = arch_initial,
+                constant_variance = constant_variance,
+                target_omega = target_omega,
+                sigma = sig,
+                loglik = tmb$fn(pars),
+                nobs = NROW(spec$target$y),
+                persistence_summary = persistence_table,
+                variance_target_summary = variance_target_table,
+                # extra degree of freedom for the init_variance
+                npars = NROW(parmatrix[estimate == 1]) + 1,
+                spec = spec)
+    if (object$model$model == "cgarch") {
+        permanent_component <- env$tmb$report(pars)$permanent_component
+        transitory_component <- env$tmb$report(pars)$transitory_component
+        if (m > 0) {
+            permanent_component <- permanent_component[-seq_len(m)]
+            transitory_component <- transitory_component[-seq_len(m)]
+        }
+        out$permanent_component <- permanent_component
+        out$transitory_component <- transitory_component
+    }
+    out$kappa <- NULL
+    if (object$model$model %in% c("egarch","aparch","fgarch","gjrgarch")) {
+        out$kappa <- env$tmb$report(pars)$kappa
+    }
+
+    class(out) <- "tsgarch.estimate"
+    if (!is.null(y)) out <- tsfilter(out, y = y, newxreg = newxreg, newvreg = newvreg)
+    return(out)
+}
+
+.filter_model_values <- function(object) {
+    model <- object$spec$model$model
+    v_orig <- extract_model_values(object, object_type = "estimate", value_name = "vreg")
+    mu <- extract_model_values(object, object_type = "estimate", value_name = "mu")
+    alpha <- extract_model_values(object, object_type = "estimate", value_name = "alpha")
+    beta <- extract_model_values(object, object_type = "estimate", value_name = "beta")
+    xi <- extract_model_values(object, object_type = "estimate", value_name = "xi")
+    dpars <- extract_model_values(object, object_type = "estimate", value_name = "distribution")
+    omega <- omega(object)
+    L <- list(v_orig = v_orig, mu = mu, alpha = alpha, beta = beta, xi = xi, dpars = dpars, omega = omega)
+    if (model == "egarch" | model == "gjrgarch") {
+        gamma <- extract_model_values(object, object_type = "estimate", value_name = "gamma")
+        L$gamma <- gamma
+    } else if (model == "aparch") {
+        gamma <- extract_model_values(object, object_type = "estimate", value_name = "gamma")
+        delta <- extract_model_values(object, object_type = "estimate", value_name = "delta")
+        L$gamma <- gamma
+        L$delta <- delta
+    } else if (model == "fgarch") {
+        gamma <- extract_model_values(object, object_type = "estimate", value_name = "gamma")
+        delta <- extract_model_values(object, object_type = "estimate", value_name = "delta")
+        eta <- extract_model_values(object, object_type = "estimate", value_name = "eta")
+        L$gamma <- gamma
+        L$delta <- delta
+        L$eta <- eta
+    } else if (model == "cgarch") {
+        rho <- extract_model_values(object, object_type = "estimate", value_name = "rho")
+        phi <- extract_model_values(object, object_type = "estimate", value_name = "phi")
+        L$rho <- rho
+        L$phi <- phi
+    } else {
+        return(L)
+    }
+    return(L)
+}
+
+.check_y_filter <- function(object, y = NULL, newvreg = NULL)
+{
+    if (!is.null(y)) {
+        index_new_y <- index(y)
+        index_old_y <- object$target$index
+        check <- max(index_old_y) < min(index_new_y)
+        if (!check) {
+            stop("\none of more timestamps in y is before the timestamps in the object data.")
+        }
+        if (!is.null(newvreg)) {
+            if (object$vreg$include_vreg) {
+                newvreg <- as.matrix(newvreg)
+                if (NROW(newvreg) != NROW(y)) stop('\nnewvreg must have the same number of rows as y.')
+            } else {
+                newvreg <- NULL
+            }
+        } else {
+            if (object$vreg$include_vreg) {
+                newvreg <- as.matrix(0, ncol = ncol(object$vreg$vreg), nrow = NROW(y))
+                warning('\nnewvreg is NULL but model object uses variance regressors...setting to zero.')
+            } else {
+                newvreg <- NULL
+            }
+        }
+    } else {
+        newvreg <- NULL
+    }
+    return(list(y = y, newvreg = newvreg))
+}
+
+.filter.tsgarch.estimate <- function(object, y = NULL, newxreg = NULL, newvreg = NULL, ...)
 {
     # omega [init_variance, omega]
     # v is the external regressor V x \xi (already pre-multiplied in the R code)
     # model [max(p,q) multiplicative ARCH(p) GARCH(q)]
+    object_type <- "estimate"
     parameter <- group <- NULL
     if (is.null(y)) {
-        if (object_type == "estimate") {
-            return(object)
-        } else {
-            y <- object$target$y
-            newvreg <- object$vreg$vreg
-        }
+        return(object)
     }
     if (!is.xts(y)) stop("\ny must be an xts vector")
-    if (object_type == "estimate") {
-        spec <- object$spec
-        init_var <- object$var_initial
-    } else {
-        spec <- object
-        init_var <- initialize_variance(y = spec$target$y_orig, mu = spec$parmatrix[parameter == "mu"]$value,
-                                        init = spec$model$init, backcast_lambda = spec$model$backcast_lambda,
-                                        sample_n = spec$model$sample_n)
+    if (!is.null(y)) {
+        # this provides stricter checks than .merge_data
+        valid_data <- .check_y_filter(object$spec, y = y, newvreg = newvreg)
+        y <- valid_data$y
+        newvreg <- valid_data$newvreg
     }
+    maxpq <- max(object$spec$model$order)
+    spec <- object$spec
+    init_var <- tail(object$sigma^2, maxpq)
     y_new <- .merge_data(spec$target$y, y)
     new_n <- NROW(y_new) - NROW(spec$target$y)
     n <- NROW(y)
     maxpq <- max(spec$model$order)
-    model <- c(maxpq, as.integer(spec$vreg$multiplicative), spec$model$order)
-    v_orig <- extract_model_values(object, object_type = object_type, value_name = "vreg")
-    mu <- extract_model_values(object, object_type = object_type, value_name = "mu")
-    alpha <- extract_model_values(object, object_type = object_type, value_name = "alpha")
-    beta <- extract_model_values(object, object_type = object_type, value_name = "beta")
-    xi <- extract_model_values(object, object_type = object_type, value_name = "xi")
-    dpars <- extract_model_values(object, object_type = object_type, value_name = "distribution")
-
-    v_new <- .process_filter_regressors(old_regressors = v_orig, new_regressors = newvreg, new_index = index(y), new_n = new_n,
+    # [maxpq arch_order garch_order multiplicative]
+    model <- c(maxpq, spec$model$order, as.integer(spec$vreg$multiplicative))
+    L <- .filter_model_values(object)
+    v_new <- .process_filter_regressors(old_regressors = L$v_orig, new_regressors = newvreg, new_index = index(y), new_n = new_n,
                                         include_regressors = spec$vreg$include_vreg)
-    omega <- omega(object)
-    # create var_initial functions in R for spec object
-    initstate <- rep(init_var, maxpq)
-    v <- as.numeric(v_new %*% xi)
-    residuals <- as.numeric(y_new) - mu
-    residuals <- c(rep(0, maxpq), residuals)
-    v <- c(rep(0, maxpq), v)
+    initstate <- init_var
+    # special initialization for 2 component
+    if (object$spec$model$model == "cgarch") {
+        initstate <- cbind(tail(object$transitory_component, maxpq), tail(object$permanent_component, maxpq))
+    }
+    v <- as.numeric(v_new %*% L$xi)
+    residuals <- as.numeric(y_new) - L$mu
+    residuals <- tail(residuals, n + maxpq)
+    v <- tail(v, n + maxpq)
     # Rcpp code
-    sigma <- .garchfilter(residuals, v, initstate, omega, alpha, beta, model)
-    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
+    negative_indicator <- 1 * (residuals <= 0)
+
+    filtered_sigma <- switch(object$spec$model$model,
+                    "garch"  = .garchfilter(residuals = residuals, v = v, initstate = initstate, omega = L$omega, alpha = L$alpha, beta = L$beta, model = model),
+                    "egarch" = .egarchfilter(residuals = residuals, v = v, initstate = initstate, omega = L$omega, alpha = L$alpha, gamma = L$gamma, beta = L$beta,
+                                             kappa = object$kappa, model = model),
+                    "aparch" = .aparchfilter(residuals = residuals, v = v, initstate = initstate, omega = L$omega, alpha = L$alpha, gamma = L$gamma, beta = L$beta,
+                                             delta = L$delta, model = model),
+                    "fgarch" = .fgarchfilter(residuals = residuals, v = v, initstate = initstate, omega = L$omega, alpha = L$alpha, gamma = L$gamma, eta = L$eta,
+                                             beta = L$beta, delta = L$delta, model = model),
+                    "gjrgarch" = .gjrgarchfilter(residuals = residuals, negative_indicator = negative_indicator, v = v, initstate = initstate, omega = L$omega,
+                                                 alpha = L$alpha, gamma = L$gamma, beta = L$beta, model = model),
+                    "cgarch" = .cgarchfilter(residuals = residuals, v = v, initstate = initstate, omega = L$omega, alpha = L$alpha, rho = L$rho, phi = L$phi,
+                                             beta = L$beta, model = model))
+    if (object$spec$model$model == "cgarch") {
+        sigma <- filtered_sigma$sigma
+        permanent_component <- filtered_sigma$permanent_component
+        transitory_component <- filtered_sigma$transitory_component
+        if (maxpq > 0) {
+            sigma <- sigma[-seq_len(maxpq)]
+            permanent_component <- permanent_component[-seq_len(maxpq)]
+            transitory_component <- transitory_component[-seq_len(maxpq)]
+        }
+        object$permanent_component <- c(object$permanent_component, permanent_component)
+        object$transitory_component <- c(object$transitory_component, transitory_component)
+    } else {
+        sigma <- filtered_sigma
+        if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
+    }
+    object$sigma <- c(object$sigma, sigma)
     # create filter object for spec input
     good <- rep(1, NROW(y_new))
     if (any(is.na(y_new))) {
         good[which(is.na(y_new))] <- 0
     }
-    if (object_type == "estimate") {
-        object$sigma <- sigma
-        object$spec$target$y_orig <- as.numeric(y_new)
-        object$spec$target$y <- y_new
-        object$spec$target$index <- index(y_new)
-        object$spec$target$good <- good
-        object$spec$vreg$vreg <- v_new
-        object$nobs <- length(residuals) - maxpq
-        return(object)
+    logl <- -sum(ddist(object$spec$distribution, (as.numeric(y_new) - L$mu)/object$sigma, 0, 1, skew = L$dpars[1], shape = L$dpars[2], lambda = L$dpars[3], log = TRUE) - log(object$sigma))
+    object$loglik <- logl
+    object$spec$target$y_orig <- as.numeric(y_new)
+    # add filtered dates (increment)
+    if (is.null(object$spec$target$filtered_index)) {
+        object$spec$target$filtered_index <- index(y)
     } else {
-        spec$target$y_orig <- as.numeric(y_new)
-        spec$target$index <- index(y_new)
-        spec$target$y <- y_new
-        spec$target$good <- good
-        spec$vreg$vreg <- v_new
-        L <- list()
-        L$parmatrix <- spec$parmatrix
-        L$scaled_hessian <- NULL
-        L$scaled_scores <- NULL
-        L$parameter_scale <- L$parmatrix[estimate == 1]$scale
-        L$conditions <- NULL
-        L$var_initial <- init_var
-        L$constant_variance <- mean((L$target$y_orig - (L$parmatrix[parameter == "mu"]$value * L$parmatrix[parameter == "mu"]$scale))^2)
-        L$target_omega <- omega
-        L$sigma <- sigma
-        L$loglik <- -1 * likelihood_fun(spec$target$y_orig, distribution = spec$distribution, mu = mu, sigma = sigma, skew = dpars[1], shape = dpars[2], lambda = dpars[3])
-        L$nobs <- length(y_new)
-        L$persistence_summary <- NULL
-        L$variance_target_summary <- NULL
-        L$npars <- NROW(L$parmatrix[estimate == 1]) + 1
-        L$spec <- spec
-        L$spec$parmatrix <- NULL
-        class(L) <- "tsgarch.estimate"
-        return(L)
+        object$spec$target$filtered_index <- c(object$spec$target$filtered_index, index(y))
     }
-}
-
-
-.filter_egarch <- function(object, y, newxreg = NULL, newvreg = NULL, object_type = "estimate", ...)
-{
-    parameter <- group <- NULL
-    if (is.null(y)) {
-        if (object_type == "estimate") {
-            return(object)
-        } else {
-            y <- object$target$y
-            newvreg <- object$vreg$vreg
-        }
-    }
-    if (!is.xts(y)) stop("\ny must be an xts vector")
-    if (object_type == "estimate") {
-        spec <- object$spec
-        init_var <- object$var_initial
-        kappa <- object$kappa
-    } else {
-        spec <- object
-        init_var <- initialize_variance(y = spec$target$y_orig, mu = spec$parmatrix[parameter == "mu"]$value,
-                                        init = spec$model$init, backcast_lambda = spec$model$backcast_lambda,
-                                        sample_n = spec$model$sample_n)
-        kappa <- egarch_moment(spec$distribution, skew = spec$parmatrix[parameter == "skew"]$value,
-                               shape = spec$parmatrix[parameter == "shape"]$value,
-                               lambda = spec$parmatrix[parameter == "lambda"]$value)
-    }
-    y_new <- .merge_data(spec$target$y, y)
-    new_n <- NROW(y_new) - NROW(spec$target$y)
-    n <- NROW(y)
-    maxpq <- max(spec$model$order)
-    model <- c(maxpq, as.integer(spec$vreg$multiplicative), spec$model$order)
-    v_orig <- extract_model_values(spec, object_type = object_type, value_name = "vreg")
-    mu <- extract_model_values(spec, object_type = object_type, value_name = "mu")
-    alpha <- extract_model_values(spec, object_type = object_type, value_name = "alpha")
-    gamma <- extract_model_values(spec, object_type = object_type, value_name = "gamma")
-    beta <- extract_model_values(spec, object_type = object_type, value_name = "beta")
-    xi <- extract_model_values(spec, object_type = object_type, value_name = "xi")
-    dpars <- extract_model_values(object, object_type = object_type, value_name = "distribution")
-    v_new <- .process_filter_regressors(old_regressors = v_orig, new_regressors = newvreg, new_index = index(y), new_n = new_n,
-                                        include_regressors = spec$vreg$include_vreg)
-    omega <- omega(object)
-    initstate <- rep(init_var, maxpq)
-    v <- as.numeric(v_new %*% xi)
-    residuals <- as.numeric(y_new) - mu
-    residuals <- c(rep(0, maxpq), residuals)
-    v <- c(rep(0, maxpq), v)
-    # Rcpp code
-    sigma <- .egarchfilter(residuals = residuals, v = v, initstate = initstate, omega = omega,
-                           alpha = alpha, gamma = gamma, beta = beta,
-                           kappa = kappa, model = model)
-
-    good <- rep(1, NROW(y_new))
-    if (any(is.na(y_new))) {
-        good[which(is.na(y_new))] <- 0
-    }
-    if (object_type == "estimate") {
-        object$sigma <- sigma
-        object$spec$target$y_orig <- as.numeric(y_new)
-        object$spec$target$y <- y_new
-        object$spec$target$index <- index(y_new)
-        object$spec$target$good <- good
-        object$spec$vreg$vreg <- v_new
-        object$nobs <- length(residuals) - maxpq
-        return(object)
-    } else {
-        spec$target$y_orig <- as.numeric(y_new)
-        spec$target$index <- index(y_new)
-        spec$target$y <- y_new
-        spec$target$good <- good
-        spec$vreg$vreg <- v_new
-        L <- list()
-        L$parmatrix <- spec$parmatrix
-        L$scaled_hessian <- NULL
-        L$scaled_scores <- NULL
-        L$parameter_scale <- L$parmatrix[estimate == 1]$scale
-        L$conditions <- NULL
-        L$var_initial <- init_var
-        L$constant_variance <- mean((L$target$y_orig - (L$parmatrix[parameter == "mu"]$value * L$parmatrix[parameter == "mu"]$scale))^2)
-        L$target_omega <- omega
-        L$kappa <- kappa
-        L$sigma <- sigma
-        L$loglik <- -1 * likelihood_fun(spec$target$y_orig, distribution = spec$distribution, mu = mu, sigma = sigma, skew = dpars[1], shape = dpars[2], lambda = dpars[3])
-        L$nobs <- length(y_new)
-        L$persistence_summary <- NULL
-        L$variance_target_summary <- NULL
-        L$kappa_summary <- NULL
-        L$npars <- NROW(L$parmatrix[estimate == 1]) + 1
-        L$spec <- spec
-        L$spec$parmatrix <- NULL
-        class(L) <- "tsgarch.estimate"
-        return(L)
-    }
-}
-
-
-.filter_aparch <- function(object, y, newxreg = NULL, newvreg = NULL, object_type = "estimate", ...)
-{
-    parameter <- group <- NULL
-    if (is.null(y)) {
-        if (object_type == "estimate") {
-            return(object)
-        } else {
-            y <- object$target$y
-            newvreg <- object$vreg$vreg
-        }
-    }
-    if (!is.xts(y)) stop("\ny must be an xts vector")
-    if (object_type == "estimate") {
-        spec <- object$spec
-        init_var <- object$var_initial
-        kappa <- object$kappa
-    } else {
-        spec <- object
-        init_var <- initialize_variance(y = spec$target$y_orig, mu = spec$parmatrix[parameter == "mu"]$value,
-                                        init = spec$model$init, backcast_lambda = spec$model$backcast_lambda,
-                                        sample_n = spec$model$sample_n, delta = spec$parmatrix[parameter == "delta"]$value)
-        kappa <- aparch_moment_v(distribution = spec$distribution, gamma = spec$parmatrix[group == "gamma"]$value,
-                                 delta = spec$parmatrix[group == "delta"]$value,
-                                 skew = spec$parmatrix[parameter == "skew"]$value,
-                                 shape = spec$parmatrix[parameter == "shape"]$value,
-                                 lambda = spec$parmatrix[parameter == "lambda"]$value)
-    }
-    y_new <- .merge_data(spec$target$y, y)
-    new_n <- NROW(y_new) - NROW(spec$target$y)
-    n <- NROW(y)
-    maxpq <- max(spec$model$order)
-    model <- c(maxpq, as.integer(spec$vreg$multiplicative), spec$model$order)
-
-    v_orig <- extract_model_values(object, object_type = object_type, value_name = "vreg")
-    mu <- extract_model_values(object, object_type = object_type, value_name = "mu")
-    alpha <- extract_model_values(object, object_type = object_type, value_name = "alpha")
-    gamma <- extract_model_values(object, object_type = object_type, value_name = "gamma")
-    beta <- extract_model_values(object, object_type = object_type, value_name = "beta")
-    delta <- extract_model_values(object, object_type = object_type, value_name = "delta")
-    xi <- extract_model_values(object, object_type = object_type, value_name = "xi")
-    dpars <- extract_model_values(object, object_type = object_type, value_name = "distribution")
-    v_new <- .process_filter_regressors(old_regressors = v_orig, new_regressors = newvreg,
-                                        new_index = index(y), new_n = new_n,
-                                        include_regressors = spec$vreg$include_vreg)
-    omega <- omega(object)
-    initstate <- rep(init_var, maxpq)
-    v <- as.numeric(v_new %*% xi)
-    residuals <- as.numeric(y_new) - mu
-    residuals <- c(rep(0, maxpq), residuals)
-    v <- c(rep(0, maxpq), v)
-    # Rcpp code
-    sigma <- .aparchfilter(residuals = residuals, v = v, initstate = initstate,
-                           omega = omega, alpha = alpha, gamma = gamma, beta = beta,
-                           delta = delta, model = model)
-    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    good <- rep(1, NROW(y_new))
-    if (any(is.na(y_new))) {
-        good[which(is.na(y_new))] <- 0
-    }
-    if (object_type == "estimate") {
-        object$sigma <- sigma
-        object$spec$target$y_orig <- as.numeric(y_new)
-        object$spec$target$y <- y_new
-        object$spec$target$index <- index(y_new)
-        object$spec$target$good <- good
-        object$spec$vreg$vreg <- v_new
-        object$nobs <- length(residuals) - maxpq
-        return(object)
-    } else {
-        spec$target$y_orig <- as.numeric(y_new)
-        spec$target$index <- index(y_new)
-        spec$target$y <- y_new
-        spec$target$good <- good
-        spec$vreg$vreg <- v_new
-        L <- list()
-        L$parmatrix <- spec$parmatrix
-        L$scaled_hessian <- NULL
-        L$scaled_scores <- NULL
-        L$parameter_scale <- L$parmatrix[estimate == 1]$scale
-        L$conditions <- NULL
-        L$var_initial <- init_var
-        L$constant_variance <- mean((L$target$y_orig - (L$parmatrix[parameter == "mu"]$value * L$parmatrix[parameter == "mu"]$scale))^2)
-        L$target_omega <- omega
-        L$kappa <- kappa
-        L$sigma <- sigma
-        L$loglik <- -1 * likelihood_fun(spec$target$y_orig, distribution = spec$distribution, mu = mu, sigma = sigma, skew = dpars[1], shape = dpars[2], lambda = dpars[3])
-        L$nobs <- length(y_new)
-        L$persistence_summary <- NULL
-        L$variance_target_summary <- NULL
-        L$kappa_summary <- NULL
-        L$npars <- NROW(L$parmatrix[estimate == 1]) + 1
-        L$spec <- spec
-        L$spec$parmatrix <- NULL
-        class(L) <- "tsgarch.estimate"
-        return(L)
-    }
-}
-
-.filter_gjrgarch <- function(object, y, newxreg = NULL, newvreg = NULL, object_type = "estimate", ...)
-{
-    parameter <- group <- NULL
-    if (is.null(y)) {
-        if (object_type == "estimate") {
-            return(object)
-        } else {
-            y <- object$target$y
-            newvreg <- object$vreg$vreg
-        }
-    }
-    if (!is.xts(y)) stop("\ny must be an xts vector")
-    if (object_type == "estimate") {
-        spec <- object$spec
-        init_var <- object$var_initial
-        kappa <- object$kappa
-    } else {
-        spec <- object
-        init_var <- initialize_variance(y = spec$target$y_orig, mu = spec$parmatrix[parameter == "mu"]$value,
-                                        init = spec$model$init, backcast_lambda = spec$model$backcast_lambda,
-                                        sample_n = spec$model$sample_n, delta = 2)
-        kappa <- gjrgarch_moment(distribution = spec$distribution, skew = spec$parmatrix[parameter == "skew"]$value,
-                                 shape = spec$parmatrix[parameter == "shape"]$value,
-                                 lambda = spec$parmatrix[parameter == "lambda"]$value)
-    }
-    y_new <- .merge_data(spec$target$y, y)
-    new_n <- NROW(y_new) - NROW(spec$target$y)
-    n <- NROW(y)
-    maxpq <- max(spec$model$order)
-    model <- c(maxpq, as.integer(spec$vreg$multiplicative), spec$model$order)
-
-    v_orig <- extract_model_values(spec, object_type = object_type, value_name = "vreg")
-    mu <- extract_model_values(spec, object_type = object_type, value_name = "mu")
-    alpha <- extract_model_values(spec, object_type = object_type, value_name = "alpha")
-    gamma <- extract_model_values(spec, object_type = object_type, value_name = "gamma")
-    beta <- extract_model_values(spec, object_type = object_type, value_name = "beta")
-    xi <- extract_model_values(spec, object_type = object_type, value_name = "xi")
-    dpars <- extract_model_values(object, object_type = object_type, value_name = "distribution")
-
-    v_new <- .process_filter_regressors(old_regressors = v_orig, new_regressors = newvreg, new_index = index(y), new_n = new_n,
-                                        include_regressors = spec$vreg$include_vreg)
-    omega <- omega(object)
-    initstate <- rep(init_var, maxpq)
-    v <- as.numeric(v_new %*% xi)
-    residuals <- as.numeric(y_new) - mu
-    residuals <- c(rep(0, maxpq), residuals)
-    negative_indicator <- 1 * (residuals <= 0)
-    if (maxpq > 0) negative_indicator[seq_len(maxpq)] <- 1
-    v <- c(rep(0, maxpq), v)
-    # Rcpp code
-    sigma <- .gjrgarchfilter(residuals = residuals, negative_indicator, v = v, initstate = initstate,
-                             omega = omega, alpha = alpha, gamma = gamma, beta = beta, model = model)
-    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    good <- rep(1, NROW(y_new))
-    if (any(is.na(y_new))) {
-        good[which(is.na(y_new))] <- 0
-    }
-    if (object_type == "estimate") {
-        object$sigma <- sigma
-        object$spec$target$y_orig <- as.numeric(y_new)
-        object$spec$target$y <- y_new
-        object$spec$target$index <- index(y_new)
-        object$spec$target$good <- good
-        object$spec$vreg$vreg <- v_new
-        object$nobs <- length(residuals) - maxpq
-        return(object)
-    } else {
-        spec$target$y_orig <- as.numeric(y_new)
-        spec$target$index <- index(y_new)
-        spec$target$y <- y_new
-        spec$target$good <- good
-        spec$vreg$vreg <- v_new
-        L <- list()
-        L$parmatrix <- spec$parmatrix
-        L$scaled_hessian <- NULL
-        L$scaled_scores <- NULL
-        L$parameter_scale <- L$parmatrix[estimate == 1]$scale
-        L$conditions <- NULL
-        L$var_initial <- init_var
-        L$constant_variance <- mean((L$target$y_orig - (L$parmatrix[parameter == "mu"]$value * L$parmatrix[parameter == "mu"]$scale))^2)
-        L$target_omega <- omega
-        L$kappa <- kappa
-        L$sigma <- sigma
-        L$loglik <- -1 * likelihood_fun(spec$target$y_orig, distribution = spec$distribution, mu = mu, sigma = sigma, skew = dpars[1], shape = dpars[2], lambda = dpars[3])
-        L$nobs <- length(y_new)
-        L$persistence_summary <- NULL
-        L$variance_target_summary <- NULL
-        L$kappa_summary <- NULL
-        L$npars <- NROW(L$parmatrix[estimate == 1]) + 1
-        L$spec <- spec
-        L$spec$parmatrix <- NULL
-        class(L) <- "tsgarch.estimate"
-        return(L)
-    }
+    object$spec$target$y <- y_new
+    object$spec$target$index <- index(y_new)
+    object$spec$target$good <- good
+    object$spec$vreg$vreg <- v_new
+    object$nobs <- length(y_new)
     return(object)
 }
-
-
-.filter_fgarch <- function(object, y, newxreg = NULL, newvreg = NULL, object_type = "estimate", ...)
-{
-    parameter <- group <- NULL
-    if (is.null(y)) {
-        if (object_type == "estimate") {
-            return(object)
-        } else {
-            y <- object$target$y
-            newvreg <- object$vreg$vreg
-        }
-    }
-    if (!is.xts(y)) stop("\ny must be an xts vector")
-    if (object_type == "estimate") {
-        spec <- object$spec
-        init_var <- object$var_initial
-        kappa <- object$kappa
-    } else {
-        spec <- object
-        init_var <- initialize_variance(y = spec$target$y_orig, mu = spec$parmatrix[parameter == "mu"]$value,
-                                        init = spec$model$init, backcast_lambda = spec$model$backcast_lambda,
-                                        sample_n = spec$model$sample_n, delta = spec$parmatrix[parameter == "delta"]$value)
-        kappa <- fgarch_moment_v(distribution = spec$distribution, gamma = spec$parmatrix[group == "gamma"]$value,
-                                 delta = spec$parmatrix[group == "delta"]$value,
-                                 eta = spec$parmatrix[group == "eta"]$value,
-                                 skew = spec$parmatrix[parameter == "skew"]$value,
-                                 shape = spec$parmatrix[parameter == "shape"]$value,
-                                 lambda = spec$parmatrix[parameter == "lambda"]$value)
-    }
-    y_new <- .merge_data(spec$target$y, y)
-    new_n <- NROW(y_new) - NROW(spec$target$y)
-    n <- NROW(y)
-    maxpq <- max(spec$model$order)
-    model <- c(maxpq, as.integer(spec$vreg$multiplicative), spec$model$order)
-
-    v_orig <- extract_model_values(spec, object_type = object_type, value_name = "vreg")
-    mu <- extract_model_values(spec, object_type = object_type, value_name = "mu")
-    alpha <- extract_model_values(spec, object_type = object_type, value_name = "alpha")
-    gamma <- extract_model_values(spec, object_type = object_type, value_name = "gamma")
-    eta <- extract_model_values(spec, object_type = object_type, value_name = "eta")
-    beta <- extract_model_values(spec, object_type = object_type, value_name = "beta")
-    delta <- extract_model_values(spec, object_type = object_type, value_name = "delta")
-    xi <- extract_model_values(spec, object_type = object_type, value_name = "xi")
-    dpars <- extract_model_values(object, object_type = object_type, value_name = "distribution")
-
-    v_new <- .process_filter_regressors(old_regressors = v_orig, new_regressors = newvreg, new_index = index(y), new_n = new_n,
-                                        include_regressors = spec$vreg$include_vreg)
-    omega <- omega(object)
-    initstate <- rep(init_var, maxpq)
-    v <- as.numeric(v_new %*% xi)
-    residuals <- as.numeric(y_new) - mu
-    residuals <- c(rep(0, maxpq), residuals)
-    v <- c(rep(0, maxpq), v)
-    # Rcpp code
-    sigma <- .fgarchfilter(residuals = residuals, v = v, initstate = initstate, omega = omega,
-                           alpha = alpha, gamma = gamma, eta = eta, beta = beta,
-                           delta = delta, model = model)
-    if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    good <- rep(1, NROW(y_new))
-    if (any(is.na(y_new))) {
-        good[which(is.na(y_new))] <- 0
-    }
-    if (object_type == "estimate") {
-        object$sigma <- sigma
-        object$spec$target$y_orig <- as.numeric(y_new)
-        object$spec$target$y <- y_new
-        object$spec$target$index <- index(y_new)
-        object$spec$target$good <- good
-        object$spec$vreg$vreg <- v_new
-        object$nobs <- length(residuals) - maxpq
-        return(object)
-    } else {
-        spec$target$y_orig <- as.numeric(y_new)
-        spec$target$index <- index(y_new)
-        spec$target$y <- y_new
-        spec$target$good <- good
-        spec$vreg$vreg <- v_new
-        L <- list()
-        L$parmatrix <- spec$parmatrix
-        L$scaled_hessian <- NULL
-        L$scaled_scores <- NULL
-        L$parameter_scale <- L$parmatrix[estimate == 1]$scale
-        L$conditions <- NULL
-        L$var_initial <- init_var
-        L$constant_variance <- mean((L$target$y_orig - (L$parmatrix[parameter == "mu"]$value * L$parmatrix[parameter == "mu"]$scale))^2)
-        L$target_omega <- omega
-        L$kappa <- kappa
-        L$sigma <- sigma
-        L$loglik <- -1 * likelihood_fun(spec$target$y_orig, distribution = spec$distribution, mu = mu, sigma = sigma, skew = dpars[1], shape = dpars[2], lambda = dpars[3])
-        L$nobs <- length(y_new)
-        L$persistence_summary <- NULL
-        L$variance_target_summary <- NULL
-        L$kappa_summary <- NULL
-        L$npars <- NROW(L$parmatrix[estimate == 1]) + 1
-        L$spec <- spec
-        L$spec$parmatrix <- NULL
-        class(L) <- "tsgarch.estimate"
-        return(L)
-    }
-}
-
-.filter_cgarch <- function(object, y, newxreg = NULL, newvreg = NULL, object_type = "estimate", ...)
-{
-    # omega [init_variance, omega]
-    # v is the external regressor V x \xi (already pre-multiplied in the R code)
-    # model [max(p,q) multiplicative ARCH(p) GARCH(q)]
-    parameter <- group <- NULL
-    if (is.null(y)) {
-        if (object_type == "estimate") {
-            return(object)
-        } else {
-            y <- object$target$y
-            newvreg <- object$vreg$vreg
-        }
-    }
-    if (!is.xts(y)) stop("\ny must be an xts vector")
-    if (object_type == "estimate") {
-        spec <- object$spec
-        init_var <- object$var_initial
-    } else {
-        spec <- object
-        init_var <- initialize_variance(y = spec$target$y_orig, mu = spec$parmatrix[parameter == "mu"]$value,
-                                        init = spec$model$init, backcast_lambda = spec$model$backcast_lambda,
-                                        sample_n = spec$model$sample_n, delta = 2)
-    }
-    y_new <- .merge_data(spec$target$y, y)
-    new_n <- NROW(y_new) - NROW(spec$target$y)
-    n <- NROW(y)
-    maxpq <- max(spec$model$order)
-    model <- c(maxpq, as.integer(spec$vreg$multiplicative), spec$model$order)
-
-    v_orig <- extract_model_values(spec, object_type = object_type, value_name = "vreg")
-    mu <- extract_model_values(spec, object_type = object_type, value_name = "mu")
-    rho <- extract_model_values(spec, object_type = object_type, value_name = "rho")
-    phi <- extract_model_values(spec, object_type = object_type, value_name = "phi")
-    alpha <- extract_model_values(spec, object_type = object_type, value_name = "alpha")
-    beta <- extract_model_values(spec, object_type = object_type, value_name = "beta")
-    xi <- extract_model_values(spec, object_type = object_type, value_name = "xi")
-    dpars <- extract_model_values(object, object_type = object_type, value_name = "distribution")
-
-    v_new <- .process_filter_regressors(old_regressors = v_orig, new_regressors = newvreg, new_index = index(y), new_n = new_n,
-                                        include_regressors = spec$vreg$include_vreg)
-    omega <- omega(object)
-    initstate <- as.matrix(cbind(rep(init_var, maxpq), rep(omega/(1.0 - rho), maxpq)))
-    v <- as.numeric(v_new %*% xi)
-    residuals <- as.numeric(y_new) - mu
-    residuals <- c(rep(0, maxpq), residuals)
-    v <- c(rep(0, maxpq), v)
-    # Rcpp code
-    out <- .cgarchfilter(residuals = residuals, v = v, initstate = initstate,
-                          omega = omega, alpha = alpha, rho = rho, phi = phi,
-                          beta = beta, model = as.integer(model))
-    sigma <- out$sigma
-    permanent_component <- out$permanent_component
-    if (maxpq > 0) {
-        sigma <- sigma[-seq_len(maxpq)]
-        permanent_component <- permanent_component[-seq_len(maxpq)]
-    }
-    transitory_component <- sigma - permanent_component
-    good <- rep(1, NROW(y_new))
-    if (any(is.na(y_new))) {
-        good[which(is.na(y_new))] <- 0
-    }
-    if (object_type == "estimate") {
-        object$sigma <- sigma
-        object$permanent_component <- permanent_component
-        object$transitory_component <- transitory_component
-        object$spec$target$y_orig <- as.numeric(y_new)
-        object$spec$target$y <- y_new
-        object$spec$target$index <- index(y_new)
-        object$spec$vreg$vreg <- v_new
-        object$nobs <- length(residuals) - maxpq
-        return(object)
-    } else {
-        spec$target$y_orig <- as.numeric(y_new)
-        spec$target$index <- index(y_new)
-        spec$target$y <- y_new
-        spec$target$good <- good
-        spec$vreg$vreg <- v_new
-        L <- list()
-        L$parmatrix <- spec$parmatrix
-        L$scaled_hessian <- NULL
-        L$scaled_scores <- NULL
-        L$parameter_scale <- L$parmatrix[estimate == 1]$scale
-        L$conditions <- NULL
-        L$var_initial <- init_var
-        L$constant_variance <- mean((L$target$y_orig - (L$parmatrix[parameter == "mu"]$value * L$parmatrix[parameter == "mu"]$scale))^2)
-        L$target_omega <- omega
-        L$kappa <- kappa
-        L$sigma <- sigma
-        L$permanent_component <- permanent_component
-        L$transitory_component <- transitory_component
-        L$loglik <- -1 * likelihood_fun(spec$target$y_orig, distribution = spec$distribution, mu = mu, sigma = sigma, skew = dpars[1], shape = dpars[2], lambda = dpars[3])
-        L$nobs <- length(y_new)
-        L$persistence_summary <- NULL
-        L$variance_target_summary <- NULL
-        L$kappa_summary <- NULL
-        L$npars <- NROW(L$parmatrix[estimate == 1]) + 1
-        L$spec <- spec
-        L$spec$parmatrix <- NULL
-        class(L) <- "tsgarch.estimate"
-        return(L)
-    }
-}
-
-

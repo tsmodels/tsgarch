@@ -16,7 +16,7 @@
 
 .persistence_garch <- function(pars, env)
 {
-    parameter <- group <- value <- NULL
+    estimate <- parameter <- group <- value <- NULL
     parmatrix <- env$parmatrix
     parmatrix[estimate == 1, value := pars]
     p <- sum(parmatrix[group == "alpha"]$value * parmatrix[group == "alpha"]$scale) + sum(parmatrix[group == "beta"]$value * parmatrix[group == "beta"]$scale)
@@ -25,7 +25,7 @@
 
 .persistence_egarch <- function(pars, env)
 {
-    parameter <- group <- value <- NULL
+    estimate <- parameter <- group <- value <- NULL
     parmatrix <- env$parmatrix
     parmatrix[estimate == 1, value := pars]
     p <- sum(parmatrix[group == "beta"]$value * parmatrix[group == "beta"]$scale)
@@ -34,7 +34,7 @@
 
 .persistence_aparch <- function(pars, env)
 {
-    parameter <- group <- value <- NULL
+    estimate <- parameter <- group <- value <- NULL
     parmatrix <- copy(env$parmatrix)
     parmatrix[estimate == 1, value := pars]
     beta <- sum(parmatrix[group == "beta"]$value * parmatrix[group == "beta"]$scale)
@@ -53,7 +53,7 @@
 
 .persistence_fgarch <- function(pars, env)
 {
-    parameter <- group <- value <- NULL
+    estimate <- parameter <- group <- value <- NULL
     parmatrix <- copy(env$parmatrix)
     parmatrix[estimate == 1, value := pars]
     beta <- sum(parmatrix[group == "beta"]$value * parmatrix[group == "beta"]$scale)
@@ -74,7 +74,7 @@
 
 .persistence_gjrgarch <- function(pars, env)
 {
-    parameter <- group <- value <- NULL
+    estimate <- parameter <- group <- value <- NULL
     parmatrix <- env$parmatrix
     parmatrix[estimate == 1, value := pars]
     alpha <- sum(parmatrix[group == "alpha"]$value * parmatrix[group == "alpha"]$scale)
@@ -91,7 +91,7 @@
 
 .persistence_cgarch <- function(pars, env)
 {
-    parameter <- group <- value <- NULL
+    estimate <- parameter <- group <- value <- NULL
     parmatrix <- env$parmatrix
     parmatrix[estimate == 1, value := pars]
     alpha <- parmatrix[group == "alpha"]$value * parmatrix[group == "alpha"]$scale

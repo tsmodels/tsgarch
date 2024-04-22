@@ -217,8 +217,10 @@
     rho <- object$parmatrix[group == "rho"]$value
     phi <- object$parmatrix[group == "phi"]$value
     long_run_variance <- rep(as.numeric(unconditional(object)), length(epsilon))
+
     permanent_component <- omega + rho * long_run_variance + phi * (epsilon^2 - long_run_variance)
-    news_impact_curve <- permanent_component + beta * (long_run_variance - omega) + alpha*(epsilon^2 - omega)
+    transitory_component <- alpha * (epsilon^2 - long_run_variance)
+    news_impact_curve <- permanent_component + transitory_component
     yexpr <- expression(sigma[t]^2)
     xexpr <- expression(epsilon[t - 1])
     out <- list(y = as.numeric(news_impact_curve), x = epsilon, yexpr = yexpr, xexpr = xexpr, model = toupper(object$spec$model$model))

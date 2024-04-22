@@ -1,3 +1,25 @@
+.spec2newspec <- function(object, y = NULL, newxreg = NULL, newvreg = NULL, ...)
+{
+    if (is.null(y)) {
+        y <- xts(object$target$y_orig, object$target$index)
+    } else {
+        y <- y
+    }
+    if (object$vreg$include_vreg) {
+        if (is.null(newvreg)) {
+            newvreg <- xts(object$vreg$vreg, object$target$index)
+        } else {
+            newvreg <- newvreg
+        }
+    } else {
+        newvreg <- NULL
+    }
+    new_spec <- garch_modelspec(y = y, model = object$model$model, constant = object$model$constant, order = object$model$order, variance_targeting = object$model$variance_targeting,
+                                vreg = newvreg, multiplicative = object$vreg$multiplicative, init = object$model$init, backcast_lambda = object$model$backcast_lambda,
+                                sample_n = object$model$sample_n, distribution = object$distribution)
+    return(new_spec)
+}
+
 # validation function for currently implemented models
 valid_garch_models <- function()
 {
@@ -82,12 +104,10 @@ initialize_variance <- function(y, mu = 0.0, init = c("unconditional","sample","
 {
     y_demeaned <- y - mu
     v <- switch(init,
-                "unconditional" = mean(abs(y_demeaned)^delta),
-                "sample" = mean(abs(y_demeaned[1:sample_n])^delta),
-                "backcast" = backcast_variance(y_demeaned, backcast_lambda, delta))
-    if (delta != 2) {
-        v <- v^(2/delta)
-    }
+                "unconditional" = mean(abs(y_demeaned)^2),
+                "sample" = mean(abs(y_demeaned[1:sample_n])^2.0),
+                "backcast" = backcast_variance(y_demeaned, backcast_lambda, 2.0))
+    v <- v^(delta/2)
     return(v)
 }
 
@@ -315,4 +335,121 @@ variance_target <- function(object, ...)
         vreg <- 0
     }
     return(vreg)
+}
+
+calendar_eom <- function(date, ...)
+{
+    if (!is(date, "Date")) date <- as.Date(date)
+    # Add a month, then subtract a day:
+    date.lt <- as.POSIXlt(date, format = "%Y-%m-%d", tz = tz(date))
+    mon <- date.lt$mon + 2
+    year <- date.lt$year
+    # If month was December add a year
+    year <- year + as.integer(mon == 13)
+    mon[mon == 13] <- 1
+    iso <- ISOdate(1900 + year, mon, 1, hour = 0, tz = tz(date))
+    result <- as.POSIXct(iso) - 86400 # subtract one day
+    result <- result + (as.POSIXlt(iso)$isdst - as.POSIXlt(result)$isdst)*3600
+    result <- as.Date(result)
+    return(result)
+}
+
+future_dates <- function(start, frequency, n = 1)
+{
+    if (frequency %in% c("days", "weeks", "months","years")) {
+        switch(frequency,
+               "days"   = as.Date(start) %m+% days(1:n),
+               "weeks"  = as.Date(start) %m+% weeks(1:n),
+               "months" = calendar_eom(as.Date(start) %m+% months(1:n)),
+               "years"  = as.Date(start) %m+% years(1:n))
+    } else if (grepl("secs|mins|hours|",frequency)) {
+        # Add one extra point and eliminate first one
+        seq(as.POSIXct(start), length.out = n + 1, by = frequency)[-1]
+    } else{
+        as.Date(start) + (1:n)
+    }
+}
+
+sampling_frequency <- function(x)
+{
+    if (is(x, "Date") || length(grep("POSIX", class(x))) > 0) {
+        dates <- x
+    } else {
+        dates <- index(x)
+    }
+    u <- min(diff(dates))
+    count <- attr(u, 'units')
+    if (count == 'days') {
+        u <- round(u)
+        daily   <- c(1, 2, 3)
+        weekly  <- c(4, 5, 6, 7)
+        monthly <- c(27, 28, 29, 30, 31, 32)
+        yearly  <-  355:370
+        if (u %in% daily) {
+            period <- "days"
+            attr(period,"date_class") <- "Date"
+        } else if (u %in% weekly) {
+            period <- "weeks"
+            attr(period,"date_class") <- "Date"
+        } else if (u %in% monthly) {
+            period <- "months"
+            attr(period,"date_class") <- "Date"
+        } else if (u %in% yearly) {
+            period <- "years"
+            attr(period,"date_class") <- "Date"
+        } else {
+            period <- "unknown"
+            attr(period,"date_class") <- "POSIXct"
+        }
+    } else if (count == "hours") {
+        period <- paste0(u, " hours")
+        attr(period,"date_class") <- "POSIXct"
+    } else if (count == "mins") {
+        period <- paste0(u, " mins")
+        attr(period,"date_class") <- "POSIXct"
+    } else if (count == "secs") {
+        period <- paste0(u," secs")
+        attr(period,"date_class") <- "POSIXct"
+    } else {
+        period <- "unknown"
+        attr(period,"date_class") <- "POSIXct"
+    }
+    if (period == "unknown") warning("\ncould not determine sampling frequency")
+    return(period)
+}
+
+check_xreg <- function(xreg, valid_index)
+{
+    if (is.null(xreg)) return(xreg)
+    n <- length(valid_index)
+    if (NROW(xreg) != n) {
+        stop("\nxreg does not have the same number of rows as y")
+    }
+    if (!all.equal(index(xreg),valid_index)) {
+        stop("\nxreg time index does not match that of y")
+    }
+    if (any(is.na(xreg))) {
+        stop("\nNAs found in xreg object")
+    }
+    if (is.null(colnames(xreg))) {
+        colnames(xreg) <- paste0("x",1:ncol(xreg))
+    }
+    return(xreg)
+}
+
+check_newxreg <- function(newdata, xnames, h = 1, forc_dates = NULL)
+{
+    if (!is.null(xnames)) {
+        if (any(!colnames(newdata) %in% xnames)) {
+            stop("\nexpected colnames for newdata are missing")
+        } else {
+            newdata <- newdata[,xnames]
+        }
+    }
+    if (!is.xts(newdata)) {
+        if (!is.null(forc_dates) & length(forc_dates) == NROW(newdata)) {
+            newdata <- xts(newdata, forc_dates)
+        }
+    }
+    return(newdata)
 }
