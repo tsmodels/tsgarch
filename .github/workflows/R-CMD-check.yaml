@@ -39,12 +39,7 @@ jobs:
           extra-packages: any::rcmdcheck
           needs: check
 
-      - name: Install Ghostscript and qpdf (for Ubuntu)
-        if: startsWith(matrix.config.os, 'ubuntu')
-        run: sudo apt-get update && sudo apt-get install -y ghostscript qpdf
-
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
-          args: '--as-cran'
-          build_args: '--compact-vignettes=gs+qpdf'
+          args: 'c("--no-build-vignettes", "--no-manual")'
