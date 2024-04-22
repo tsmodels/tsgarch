@@ -2,12 +2,12 @@
 #'
 #' @description Generates an expanding window walk forward backtest with option
 #' for rolling the forecast by filtering (see details).
-#' @param object an object of class \\dQuote{tsgarch.spec}.
+#' @param object an object of class \dQuote{tsgarch.spec}.
 #' @param start numeric data index from which to start the backtest.
 #' @param end numeric data index on which to end the backtest. The backtest will
 #' end 1 period before that date in order to have at least 1 out of sample value
 #' to compare against.
-#' @param h forecast horizon. As the expanding window approaches the \\dQuote{end},
+#' @param h forecast horizon. As the expanding window approaches the \dQuote{end},
 #' the horizon will automatically shrink to the number of available out of sample
 #' periods.
 #' @param estimate_every number of periods at which the model is re-estimated
@@ -16,7 +16,7 @@
 #' date (FALSE) or whether to filter the data 1 period at a time and forecast
 #' from the filtered data (TRUE).
 #' @param trace whether to show the progress bar. The user is expected to have
-#' set up appropriate handlers for this using the \\dQuote{progressr} package.
+#' set up appropriate handlers for this using the \dQuote{progressr} package.
 #' @param ... not currently used.
 #' @returns A list which includes a data.table having the following columns:
 #' \itemize{
@@ -42,7 +42,7 @@
 #' Additional slots in the list include the distribution used and other information
 #' relating to the backtest setup.
 #' @note The function can use parallel functionality as long as the user has
-#' set up a \\code{\\link[future]{plan}} using the future package.
+#' set up a \code{\link[future]{plan}} using the future package.
 #' @details The rolling option allows to re-estimate the data every n periods
 #' whilst filtering the data 1-step ahead between re-estimation dates so that overlapping
 #' forecasts are generated.

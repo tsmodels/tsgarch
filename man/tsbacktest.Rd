@@ -17,7 +17,7 @@
 )
 }
 \arguments{
-\item{object}{an object of class \\dQuote{tsgarch.spec}.}
+\item{object}{an object of class \dQuote{tsgarch.spec}.}
 
 \item{start}{numeric data index from which to start the backtest.}
 
@@ -25,7 +25,7 @@
 end 1 period before that date in order to have at least 1 out of sample value
 to compare against.}
 
-\item{h}{forecast horizon. As the expanding window approaches the \\dQuote{end},
+\item{h}{forecast horizon. As the expanding window approaches the \dQuote{end},
 the horizon will automatically shrink to the number of available out of sample
 periods.}
 
@@ -37,7 +37,7 @@ date (FALSE) or whether to filter the data 1 period at a time and forecast
 from the filtered data (TRUE).}
 
 \item{trace}{whether to show the progress bar. The user is expected to have
-set up appropriate handlers for this using the \\dQuote{progressr} package.}
+set up appropriate handlers for this using the \dQuote{progressr} package.}
 
 \item{...}{not currently used.}
 }
@@ -77,5 +77,5 @@ forecasts are generated.
 }
 \note{
 The function can use parallel functionality as long as the user has
-set up a \\code{\\link[future]{plan}} using the future package.
+set up a \code{\link[future]{plan}} using the future package.
 }

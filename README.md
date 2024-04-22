@@ -1,15 +1,10 @@
 
+[![R-CMD-check](https://github.com/tsmodels/tsgarch/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/tsmodels/tsgarch/actions/workflows/R-CMD-check.yaml)
 [![Last-changedate](https://img.shields.io/badge/last%20change-2024--04--21-yellowgreen.svg)](/commits/master)
 [![packageversion](https://img.shields.io/badge/Package%20version-1.0.0-orange.svg?style=flat-square)](commits/master)
 [![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/tsgarch)](https://cran.r-project.org/package=tsgarch)
 
 # tsgarch
-
-[A new version for CRAN submission is under development with many fixes and more accurate benchmarks]
-
-The **tsgarch** package is a partial re-implementation of
-[rugarch](https://CRAN.R-project.org/package=rugarch), by the same
-author, with key differences summarized below:
 
 - it does not (yet) implement all GARCH models in rugarch. FIGARCH,
   Multiplicative Component GARCH and Realized GARCH are not currently
