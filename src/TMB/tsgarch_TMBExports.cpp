@@ -43,7 +43,7 @@ Type objective_function<Type>::operator() () {
   } else if(model == "fgarchjacobian"){
       return fgarchjac(this);
   } else {
-    error("Unknown model.");
+     Rf_error("Unknown model.");
   }
   return 0;
 }
