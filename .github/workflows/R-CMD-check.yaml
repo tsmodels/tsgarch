@@ -48,3 +48,5 @@ jobs:
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
+          args: '--as-cran'
+          build_args: '--compact-vignettes=gs+qpdf'
