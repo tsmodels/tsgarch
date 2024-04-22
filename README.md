@@ -5,6 +5,8 @@
 
 # tsgarch
 
+[A new version for CRAN submission is under development with many fixes and more accurate benchmarks]
+
 The **tsgarch** package is a partial re-implementation of
 [rugarch](https://CRAN.R-project.org/package=rugarch), by the same
 author, with key differences summarized below:
