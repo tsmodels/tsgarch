@@ -89,6 +89,7 @@ coef.tsgarch.estimate <- function(object, ...)
 sigma.tsgarch.estimate <- function(object, ...)
 {
     out <- xts(object$sigma, object$spec$target$index)
+    colnames(out) <- ".sigma"
     return(out)
 }
 
@@ -112,6 +113,7 @@ fitted.tsgarch.estimate <- function(object, ...)
     mu <- object$parmatrix[parameter == "mu"]$value
     idx <- object$spec$target$index
     f <- xts(rep(mu, length(idx)), idx)
+    colnames(f) <- ".fitted"
     return(f)
 }
 
@@ -139,6 +141,7 @@ residuals.tsgarch.estimate <- function(object, standardize = FALSE, ...)
     if (standardize) {
         res <- res/sigma(object)
     }
+    colnames(res) <- ".residuals"
     return(res)
 }
 
@@ -834,6 +837,7 @@ pit.tsgarch.estimate <- function(object, ...)
     r <- object$spec$target$y_orig
     p <- pdist(distribution, q = r, mu = mu, sigma = sigma, skew = skew, shape = shape, lambda = lambda)
     p <- xts(p, object$spec$target$index)
+    colnames(p) <- ".pit"
     return(p)
 }
 

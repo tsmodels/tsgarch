@@ -56,7 +56,7 @@ NumericVector egarchfilter(const NumericVector residuals, const NumericVector v,
         log_sigma_squared(i) = omega + v(i);
         if (model(1) > 0) {
             for(int j = 0;j<model(1);j++) {
-                log_sigma_squared(i) += alpha(j) * std_residuals(i - j - 1) + gamma(j) * (abs(std_residuals(i - j - 1)) - kappa);
+                log_sigma_squared(i) += alpha(j) * std_residuals(i - j - 1) + gamma(j) * (fabs(std_residuals(i - j - 1)) - kappa);
             }
         }
         if (model(2) > 0) {
