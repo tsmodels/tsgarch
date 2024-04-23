@@ -500,7 +500,7 @@ sample_block <- function(x, h, nsim, block) {
             .sample_rows(ematrix, no_samples + 3, h = h)
         }))
     }
-    return(nsim)
+    return(zsim)
 }
 
 
