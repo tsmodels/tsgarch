@@ -107,8 +107,8 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1, sim_method = 
     }
     series_sim <- sigma_sim <- NULL
     if (nsim > 0 & h > 1) {
-        if (sim_method == "boostrap") {
-            out <- garch_boostrap(object, h = h, nsim = nsim, block = block, vreg = tail(vreg, h), seed = seed)
+        if (sim_method == "bootstrap") {
+            out <- garch_bootstrap(object, h = h, nsim = nsim, block = block, vreg = tail(vreg, h), seed = seed)
             sigma_sim <- out$sigma
             colnames(sigma_sim) <- as.character(forc_dates)
             class(sigma_sim) <- "tsmodel.distribution"
@@ -470,7 +470,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1, sim_method = 
 }
 
 
-garch_boostrap <- function(object, h = 2, nsim = 1, block = 1, vreg = NULL, seed = seed)
+garch_bootstrap <- function(object, h = 2, nsim = 1, block = 1, vreg = NULL, seed = seed)
 {
     z <- as.numeric(residuals(object, standardize = TRUE))
     zsim <- sample_block(x = z, h = h, nsim = nsim, block = block)

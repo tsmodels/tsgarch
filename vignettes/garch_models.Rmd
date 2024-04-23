@@ -580,7 +580,7 @@ at a later time.
 
 \begin{equation}
 \begin{aligned}
-\omega_t &= \omega + \sum^{m}_{j=1}\xi_j v_{j,t}\\
+\omega_t &= \omega + \sum^{m}_{k=1}\xi_k \chi_{k,t}\\
 \sigma^2_t &= \omega_t + \sum^q_{j=1}\alpha_j\varepsilon^2_{t-j} + \sum^p_{j=1}\beta_j\sigma^2_{t-j}
 \end{aligned}
 \label{eq:igarch_equation}
@@ -634,7 +634,7 @@ to include regressors).
 
 \begin{equation}
 \begin{aligned}
-\omega_t &= \sum^{m}_{j=1}\xi_j v_{j,t}\\
+\omega_t &= \sum^{m}_{k=1}\xi_k \chi_{k,t}\\
 \sigma^2_t &= \omega_t + \sum^q_{j=1}\alpha_j\varepsilon^2_{t-j} + \sum^p_{j=1}\beta_j\sigma^2_{t-j}
 \end{aligned}
 \label{eq:ewma_equation}
@@ -773,7 +773,7 @@ for past squared, negative innovations via the indicator function $I$.
 
 \begin{equation}
 \begin{aligned}
-\omega_t &= \omega + \sum^{m}_{j=1}\xi_j v_{j,t}\\
+\omega_t &= \omega + \sum^{m}_{k=1}\xi_k \chi_{k,t}\\
 \sigma^2_t & = \omega_t + \sum\limits_{j = 1}^q \left(\alpha_j\varepsilon^2_{t - j} + \gamma_j {I}_{[\varepsilon_{t-j}\le 0]}\varepsilon^2_{t - j}\right) + \sum\limits_{j = 1}^p \beta_j\sigma^2_{t-j}
 \end{aligned}
 \label{eq:gjr_equation}
@@ -976,7 +976,7 @@ models:
 
 \begin{equation}
 \begin{aligned}
-\omega_t &= \omega + \sum^{m}_{j=1}\xi_j v_{j,t}\\
+\omega_t &= \omega + \sum^{m}_{k=1}\xi_k \chi_{k,t}\\
 \sigma^{\delta}_t & = \omega_t + \sum\limits_{j = 1}^q \alpha_j\sigma^{\delta}_{t - j}\left(\left|z_{t - j} - \eta_j\right| - 
 \gamma_j\left(z_{t - j} - \eta_j\right)\right)^{\delta} + \sum\limits_{j = 1}^p \beta_j\sigma^{\delta}_{t - j}
 \end{aligned}
@@ -987,7 +987,7 @@ The original formulation, takes a slightly different form:
 
 \begin{equation}
 \begin{aligned}
-\omega_t &= \omega + \sum^{m}_{j=1}\xi_j v_{j,t}\\
+\omega_t &= \omega + \sum^{m}_{k=1}\xi_j \chi_{k,t}\\
 \sigma^{\delta}_t & = \omega_t + \sum\limits_{j = 1}^q \alpha_j\sigma^{\delta}_{t - j}\left(\left|z_{t - j} - \eta_j\right| - 
 \gamma_j\left(z_{t - j} - \eta_j\right)\right)^{\lambda} + \sum\limits_{j = 1}^p \beta_j\sigma^{\delta}_{t - j}
 \end{aligned}
