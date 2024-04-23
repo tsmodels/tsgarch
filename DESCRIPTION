@@ -7,7 +7,7 @@ Maintainer: Alexios Galanos <alexios@4dscape.com>
 Depends: R (>= 3.5.0), methods, tsmethods
 LinkingTo: Rcpp (>= 0.10.6), RcppArmadillo, TMB(>= 1.7.20), RcppEigen
 Imports: TMB (>= 1.7.20), Rcpp, nloptr, Rdpack, numDeriv, xts, zoo, future.apply, future, progressr, flextable, stats, utils, data.table, tsdistributions, lubridate, sandwich
-Description: Multiple flavors of GARCH with a large choice of conditional distributions. Methods for specification, estimation, prediction, filtering, statistical testing and much more. Represents a partial re-write and re-think of 'rugarch', making use of automatic differentiation for estimation.
+Description: Multiple flavors of the Generalized Autoregressive Conditional Heteroscedascity (GARCH) model with a large choice of conditional distributions. Methods for specification, estimation, prediction, filtering, statistical testing and much more. Represents a partial re-write and re-think of 'rugarch', making use of automatic differentiation for estimation.
 License: GPL-2
 Encoding: UTF-8
 LazyData: true

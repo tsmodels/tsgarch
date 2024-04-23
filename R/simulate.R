@@ -1,16 +1,7 @@
 .simulate_garch <- function(object, h = 1000, seed  = NULL, nsim = 1, var_init = NULL, innov = NULL, innov_init = NULL,
                             vreg = NULL, burn = 0, ...)
 {
-    if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
-        runif(1)
-    if (is.null(seed))
-        RNGstate <- get(".Random.seed", envir = .GlobalEnv)
-    else {
-        R.seed <- get(".Random.seed", envir = .GlobalEnv)
-        set.seed(seed)
-        RNGstate <- structure(seed, kind = as.list(RNGkind()))
-        on.exit(assign(".Random.seed", R.seed, envir = .GlobalEnv))
-    }
+    if (!is.null(seed)) set.seed(seed)
     extra_args <- list(...)
     h <- h + burn
     parameter <- group <- NULL
@@ -97,16 +88,7 @@
 .simulate_egarch <- function(object, h = 1000, seed  = NULL, nsim = 1, var_init = NULL, innov = NULL, innov_init = NULL,
                              vreg = NULL, burn = 0, ...)
 {
-    if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
-        runif(1)
-    if (is.null(seed))
-        RNGstate <- get(".Random.seed", envir = .GlobalEnv)
-    else {
-        R.seed <- get(".Random.seed", envir = .GlobalEnv)
-        set.seed(seed)
-        RNGstate <- structure(seed, kind = as.list(RNGkind()))
-        on.exit(assign(".Random.seed", R.seed, envir = .GlobalEnv))
-    }
+    if (!is.null(seed)) set.seed(seed)
     h <- h + burn
     extra_args <- list(...)
     parameter <- group <- NULL
@@ -189,16 +171,7 @@
                             vreg = NULL, burn = 0, ...)
 {
     h <- h + burn
-    if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
-        runif(1)
-    if (is.null(seed))
-        RNGstate <- get(".Random.seed", envir = .GlobalEnv)
-    else {
-        R.seed <- get(".Random.seed", envir = .GlobalEnv)
-        set.seed(seed)
-        RNGstate <- structure(seed, kind = as.list(RNGkind()))
-        on.exit(assign(".Random.seed", R.seed, envir = .GlobalEnv))
-    }
+    if (!is.null(seed)) set.seed(seed)
     extra_args <- list(...)
     parameter <- group <- NULL
     maxpq <- max(object$model$order)
@@ -296,15 +269,7 @@
                              vreg = NULL, burn = 0, ...)
 {
     h <- h + burn
-    if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) runif(1)
-    if (is.null(seed))
-        RNGstate <- get(".Random.seed", envir = .GlobalEnv)
-    else {
-        R.seed <- get(".Random.seed", envir = .GlobalEnv)
-        set.seed(seed)
-        RNGstate <- structure(seed, kind = as.list(RNGkind()))
-        on.exit(assign(".Random.seed", R.seed, envir = .GlobalEnv))
-    }
+    if (!is.null(seed)) set.seed(seed)
     extra_args <- list(...)
     parameter <- group <- NULL
     maxpq <- max(object$model$order)
@@ -394,16 +359,7 @@
                              vreg = NULL, burn = 0, ...)
 {
     h <- h + burn
-    if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
-        runif(1)
-    if (is.null(seed))
-        RNGstate <- get(".Random.seed", envir = .GlobalEnv)
-    else {
-        R.seed <- get(".Random.seed", envir = .GlobalEnv)
-        set.seed(seed)
-        RNGstate <- structure(seed, kind = as.list(RNGkind()))
-        on.exit(assign(".Random.seed", R.seed, envir = .GlobalEnv))
-    }
+    if (!is.null(seed)) set.seed(seed)
     extra_args <- list(...)
     parameter <- group <- NULL
     maxpq <- max(object$model$order)
@@ -503,16 +459,7 @@
                              vreg = NULL, burn = 0, ...)
 {
     h <- h + burn
-    if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
-        runif(1)
-    if (is.null(seed))
-        RNGstate <- get(".Random.seed", envir = .GlobalEnv)
-    else {
-        R.seed <- get(".Random.seed", envir = .GlobalEnv)
-        set.seed(seed)
-        RNGstate <- structure(seed, kind = as.list(RNGkind()))
-        on.exit(assign(".Random.seed", R.seed, envir = .GlobalEnv))
-    }
+    if (!is.null(seed)) set.seed(seed)
     parameter <- group <- NULL
     maxpq <- max(object$model$order)
     mu <- object$parmatrix[parameter == "mu"]$value
@@ -628,18 +575,9 @@
 .simulate_igarch <- function(object, h = 1000, seed  = NULL, nsim = 1, var_init = NULL, innov = NULL, innov_init = NULL,
                              vreg = NULL, burn = 0, ...)
 {
-    if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
-        runif(1)
-    if (is.null(seed))
-        RNGstate <- get(".Random.seed", envir = .GlobalEnv)
-    else {
-        R.seed <- get(".Random.seed", envir = .GlobalEnv)
-        set.seed(seed)
-        RNGstate <- structure(seed, kind = as.list(RNGkind()))
-        on.exit(assign(".Random.seed", R.seed, envir = .GlobalEnv))
-    }
-    extra_args <- list(...)
     h <- h + burn
+    if (!is.null(seed)) set.seed(seed)
+    extra_args <- list(...)
     parameter <- group <- NULL
     maxpq <- max(object$model$order)
     mu <- object$parmatrix[parameter == "mu"]$value

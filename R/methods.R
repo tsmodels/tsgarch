@@ -642,6 +642,7 @@ newsimpact.tsgarch.estimate <- function(object, epsilon = NULL, ...)
 #' @param y not used.
 #' @param ... additional arguments pass to \code{\link[graphics]{plot.xy}} other
 #' than \dQuote{xlab}, \dQuote{ylab} and \dQuote{main}.
+#' @returns a plot of the newsimpact curve
 #' @method plot tsgarch.newsimpact
 #' @rdname plot
 #' @export
@@ -660,6 +661,8 @@ plot.tsgarch.newsimpact <- function(x, y = NULL, ...)
 #' @param x an object of class \dQuote{tsgarch.estimate}.
 #' @param y not used.
 #' @param ... not used.
+#' @returns a panel with plots for the estimated sigma value, the news impact curve
+#' and a \dQuote{QQ} plot of the standardized residuals.
 #' @method plot tsgarch.estimate
 #' @rdname plot.tsgarch.estimate
 #' @export
@@ -667,7 +670,8 @@ plot.tsgarch.newsimpact <- function(x, y = NULL, ...)
 #
 plot.tsgarch.estimate <- function(x, y = NULL, ...)
 {
-    op <- par(no.readonly = TRUE)
+    oldpar <- par(no.readonly = TRUE)
+    on.exit(par(oldpar))
     par(mgp = c(2,1,0))
     dpars <- extract_model_values(x, object_type = "estimate", "distribution")
     distribution <- x$spec$distribution
@@ -690,7 +694,6 @@ plot.tsgarch.estimate <- function(x, y = NULL, ...)
            main = paste0("Standardized Residuals (z)\n Sampling Distribution : ",dist_print), col = "snow3", cex.main = 0.8)
     qqline(as.numeric(residuals(x, standardize = T)), col = "gray5", lty = 2)
     grid()
-    par(op)
     return(invisible(x))
 }
 
