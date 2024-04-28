@@ -14,6 +14,9 @@
 \item{...}{additional arguments pass to \code{\link[graphics]{plot.xy}} other
 than \dQuote{xlab}, \dQuote{ylab} and \dQuote{main}.}
 }
+\value{
+a plot of the newsimpact curve
+}
 \description{
 Plot method for newsimpact class.
 }

@@ -13,6 +13,10 @@
 
 \item{...}{not used.}
 }
+\value{
+a panel with plots for the estimated sigma value, the news impact curve
+and a \dQuote{QQ} plot of the standardized residuals.
+}
 \description{
 Plot method for \dQuote{tsgarch.estimate} class.
 }
