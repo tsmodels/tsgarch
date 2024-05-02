@@ -1,3 +1,8 @@
+# tsgarch 1.0.2
+
+* Moved a unit tests back to original folder and added a tolerance
+to the expectation per CRAN maintainers directions.
+
 # tsgarch 1.0.1
 
 * Moved a couple of unit tests to other folder to avoid checking on CRAN
