@@ -67,7 +67,7 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     return(list(fun = garch_fun, grad = garch_grad, hess = garch_hess, data = data, parameters = parameters, map = map))
 }
 
-.estimate_garch_model <- function(object, solver, control, stationarity_constraint = 0.999, ...)
+.estimate_garch_model <- function(object, solver, control, stationarity_constraint = 0.999, keep_tmb = FALSE, ...)
 {
     estimate <- parameter <- value <- NULL
     solver <- match.arg(solver, choices = "nloptr")
@@ -137,6 +137,7 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
                 permanent_component = permanent_component,
                 transitory_component = transitory_component,
                 loglik = scaled_solution$solution$objective,
+                lik_vector = scaled_solution$ll_vector,
                 nobs = NROW(spec$target$y),
                 persistence_summary = persistence_table,
                 variance_target_summary = variance_target_table,
@@ -145,9 +146,9 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
                 # extra degree of freedom for the init_variance
                 npars = NROW(parmatrix[estimate == 1]) + 1,
                 spec = spec)
+    if (keep_tmb) out$tmb <- tmb
     class(out) <- "tsgarch.estimate"
     return(out)
-
 }
 
 .estimate_garch_model_scaled <- function(pars, H, object, control, stationarity_constraint)
@@ -193,6 +194,7 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     rr <- summary(sdreport(scaled_tmb, par.fixed = scaled_sol$solution, getReportCovariance = T), p.value = TRUE)
     persistence_table <- rr["persistence", ]
     variance_target_table <- rr["target_omega", ]
+    ll_vector <- -1 * log(scaled_env$tmb$report(scaled_sol$solution)$ll_vector)
     if (object$model$model %in% c("gjrgarch","egarch","aparch","fgarch")) {
         kappa_table <- scaled_env$tmb$report(scaled_sol$solution)$kappa_table
         kappa_table <- rr["kappa",]
@@ -232,6 +234,7 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
                 kappa = kappa,
                 sigma = sig,
                 permanent_component = permanent_component,
-                transitory_component = transitory_component
+                transitory_component = transitory_component,
+                ll_vector = ll_vector
                 ))
 }

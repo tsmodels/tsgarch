@@ -5,6 +5,11 @@
 #' @param solver only \dQuote{nloptr} is currently supported (see \code{\link[nloptr]{nloptr}}).
 #' @param stationarity_constraint the bound on the inequality constraint for ensuring
 #' the stationary of the GARCH process (see details).
+#' @param keep_tmb whether to save and return the TMB object. This is can be used for
+#' example when passing different parameters to the model to extract a new output set
+#' given the same dataset (used in \dQuote{tsmarch} package for calculating partitioned standard
+#' errors). The downside is that it can increase the size of the returned object by a
+#' factor of 8.
 #' @param ... not currently used.
 #' @returns An object of class \dQuote{tsgarch.estimate}.
 #' @details The underlying code is written using the TMB framework which uses
@@ -29,7 +34,7 @@
 #' @author Alexios Galanos
 #' @export
 #'
-estimate.tsgarch.spec <- function(object, solver = "nloptr", control = NULL, stationarity_constraint = 0.999, ...)
+estimate.tsgarch.spec <- function(object, solver = "nloptr", control = NULL, stationarity_constraint = 0.999, keep_tmb = FALSE, ...)
 {
     # check for all fixed
     all_fixed_pars <- sum(object$parmatrix$estimate)
@@ -40,12 +45,12 @@ estimate.tsgarch.spec <- function(object, solver = "nloptr", control = NULL, sta
     }
     if (is.null(control)) control <- nloptr_fast_options(trace = FALSE)
     start_timer <- Sys.time()
-    out <- .estimate_garch_model(object, solver, control, stationarity_constraint, ...)
+    out <- .estimate_garch_model(object, solver, control, stationarity_constraint, keep_tmb = keep_tmb, ...)
     if (inherits(out, 'try-error')) {
         if (!object$model$variance_targeting) {
             warning("\ndefault model failed. Trying with variance targeting turned on.")
             new_spec <- .modelspec.tsgarch.spec(object, variance_targeting = TRUE)
-            out <- estimate(new_spec, solver = solver, control = control, stationarity_constraint = stationarity_constraint, ...)
+            out <- estimate(new_spec, solver = solver, control = control, stationarity_constraint = stationarity_constraint, keep_tmb = keep_tmb, ...)
         }
     }
     end_timer <- Sys.time()

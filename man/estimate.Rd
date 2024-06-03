@@ -10,6 +10,7 @@
   solver = "nloptr",
   control = NULL,
   stationarity_constraint = 0.999,
+  keep_tmb = FALSE,
   ...
 )
 }
@@ -22,6 +23,12 @@
 
 \item{stationarity_constraint}{the bound on the inequality constraint for ensuring
 the stationary of the GARCH process (see details).}
+
+\item{keep_tmb}{whether to save and return the TMB object. This is can be used for
+example when passing different parameters to the model to extract a new output set
+given the same dataset (used in \dQuote{tsmarch} package for calculating partitioned standard
+errors). The downside is that it can increase the size of the returned object by a
+factor of 8.}
 
 \item{...}{not currently used.}
 }

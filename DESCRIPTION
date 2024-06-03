@@ -1,7 +1,7 @@
 Package: tsgarch
 Type: Package
 Title: Univariate GARCH Models
-Version: 1.0.2
+Version: 1.0.3
 Authors@R: c(person("Alexios", "Galanos", role = c("aut", "cre","cph"), email = "alexios@4dscape.com"))
 Maintainer: Alexios Galanos <alexios@4dscape.com>
 Depends: R (>= 3.5.0), methods, tsmethods

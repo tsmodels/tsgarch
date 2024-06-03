@@ -36,6 +36,8 @@
     spec$model$var_initial <- var_initial
     constant_variance <- mean((newspec$target$y_orig - (parmatrix[parameter == "mu"]$value * parmatrix[parameter == "mu"]$scale))^2)
     parmatrix[parameter == "omega", value := target_omega]
+    # return the ll_vector
+    llvector <- -1.0 * log(tmb$report(pars)$ll_vector)
     out <- list(parmatrix = parmatrix, scaled_hessian = hessian,
                 scaled_scores = scores,
                 parameter_scale = rep(1, length(pars)),
@@ -46,6 +48,7 @@
                 target_omega = target_omega,
                 sigma = sig,
                 loglik = tmb$fn(pars),
+                lik_vector = llvector,
                 nobs = NROW(spec$target$y),
                 persistence_summary = persistence_table,
                 variance_target_summary = variance_target_table,
