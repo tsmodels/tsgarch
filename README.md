@@ -1,6 +1,6 @@
 
-[![R-CMD-check](https://github.com/tsmodels/tsgarch/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/tsmodels/tsgarch/actions/workflows/R-CMD-check.yaml)
-[![Last-changedate](https://img.shields.io/badge/last%20change-2024--06--27-yellowgreen.svg)](/commits/master)
+[![R-CMD-check](https://github.com/tsmodels/tsgarch/actions/workflows/R-hub.yaml/badge.svg)](https://github.com/tsmodels/tsgarch/actions/workflows/R-hub.yaml)
+[![Last-changedate](https://img.shields.io/badge/last%20change-2024--06--28-yellowgreen.svg)](/commits/master)
 [![packageversion](https://img.shields.io/badge/Package%20version-1.0.3-orange.svg?style=flat-square)](commits/master)
 [![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/tsgarch)](https://cran.r-project.org/package=tsgarch)
 
