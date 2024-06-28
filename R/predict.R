@@ -94,7 +94,11 @@ initialize_states <- function(object, init_states = list())
 }
 
 
-simulated_distribution <- function(object, sigma, h = 1, nsim = 1, sim_method = c("parametric","bootstrap"), block = 1, model_parameters, vreg = NULL, forc_dates = NULL, bootstrap = FALSE, seed = NULL)
+simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
+                                   sim_method = c("parametric","bootstrap"),
+                                   block = 1, model_parameters,
+                                   vreg = NULL, forc_dates = NULL,
+                                   bootstrap = FALSE, seed = NULL)
 {
     if (!is.null(seed)) set.seed(seed)
     series_sim <- sigma_sim <- NULL
@@ -110,10 +114,24 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1, sim_method = 
             class(series_sim) <- "tsmodel.distribution"
             attr(series_sim, "date_class") <- "Date"
         } else {
-            series_sim <- do.call(cbind, lapply(1:h, function(i){
-                rdist(distribution = object$spec$distribution, n = nsim, mu = model_parameters$mu, sigma = sigma[i], skew = model_parameters$distribution[1],
-                      shape = model_parameters$distribution[2], lambda = model_parameters$distribution[3])
-            }))
+            spec <- object$spec
+            spec$parmatrix <- copy(object$parmatrix)
+            zsim <- rdist(object$spec$distribution, h * nsim, 0, 1, skew = spec$parmatrix[parameter == "skew"]$value, shape = spec$parmatrix[parameter == "shape"]$value, lambda = spec$parmatrix[parameter == "lambda"]$value)
+            zsim <- matrix(zsim, ncol = h, nrow = nsim)
+            maxpq <- max(spec$model$order)
+            z <- as.numeric(residuals(object, standardize = TRUE))
+            init_v <- tail(as.numeric(object$sigma), maxpq)^2
+            init_z <- tail(z, maxpq)
+            # if model == cgarch must provide a matrix for var_init
+            if (object$spec$model$model == "cgarch") {
+                init_v <- cbind(init_v, tail(object$permanent_component, maxpq))
+            }
+            out <- simulate(spec, h = h, nsim = nsim, var_init = init_v, innov = zsim, innov_init = init_z, vreg = tail(vreg, h), seed = seed)
+            sigma_sim <- out$sigma
+            colnames(sigma_sim) <- as.character(forc_dates)
+            class(sigma_sim) <- "tsmodel.distribution"
+            attr(sigma_sim, "date_class") <- "Date"
+            series_sim <- out$series
             colnames(series_sim) <- as.character(forc_dates)
             class(series_sim) <- "tsmodel.distribution"
             attr(series_sim, "date_class") <- "Date"
@@ -492,6 +510,8 @@ sample_block <- function(x, h, nsim, block) {
             .sample_rows(ematrix, no_samples + 3, h = h)
         }))
     }
+    # scale to avoid bias
+    zsim <- scale(zsim)
     return(zsim)
 }
 

@@ -60,7 +60,7 @@
         sigma_sim[,seq_len(maxpq)] <- matrix(sqrt(initv), ncol = maxpq, nrow = nsim, byrow = TRUE)
         epsilon[,seq_len(maxpq)] <- matrix(z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)], ncol = maxpq, nrow = nsim, byrow = TRUE)
     }
-    order <- object$model$order
+    order <- as.integer(object$model$order)
 
     if (!is.null(extra_args$arch_initial)) {
         init <- extra_args$arch_initial
@@ -141,7 +141,7 @@
         epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
     }
 
-    order <- object$model$order
+    order <- as.integer(object$model$order)
 
     if (!is.null(extra_args$arch_initial)) {
         init <- extra_args$arch_initial
@@ -223,7 +223,7 @@
     } else {
         initv <- var_init^(delta/2)
     }
-    order <- object$model$order
+    order <- as.integer(object$model$order)
     sigma_sim <- sigma_power_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
@@ -336,8 +336,7 @@
         init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
     }
 
-    order <- object$model$order
-
+    order <- as.integer(object$model$order)
     simc <- .gjrsimvec(epsilon = epsilon, sigma_sqr_sim = sigma_squared_sim, z = z, variance_intercept = variance_intercept, order = order, init = init, alpha = alpha, gamma = gamma, beta = beta, mu = mu)
 
     sigma <- simc$sigma
@@ -437,7 +436,7 @@
         }
     }
 
-    order <- object$model$order
+    order <- as.integer(object$model$order)
 
     simc <- .fgarchsimvec(epsilon = epsilon, sigma_power_sim = sigma_power_sim, z = z, variance_intercept = variance_intercept, init = init,
                           alpha = alpha, gamma = gamma, eta = eta, beta = beta, delta = delta, mu = mu, order = order)
@@ -530,7 +529,7 @@
         sigma_sim[,seq_len(maxpq)] <- sqrt(initv)
         epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
     }
-    order <- object$model$order
+    order <- as.integer(object$model$order)
     for (i in (maxpq + 1):(h + maxpq)) {
         permanent_component_sim[,i] <- variance_intercept[i] + rho * permanent_component_sim[,i - 1] + phi * (epsilon[,i - 1]^2 - sigma_sqr_sim[,i - 1])
         if (order[1] > 0) {
@@ -634,7 +633,7 @@
         sigma_sim[,seq_len(maxpq)] <- matrix(sqrt(initv), ncol = maxpq, nrow = nsim, byrow = TRUE)
         epsilon[,seq_len(maxpq)] <- matrix(z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)], ncol = maxpq, nrow = nsim, byrow = TRUE)
     }
-    order <- object$model$order
+    order <- as.integer(object$model$order)
 
     if (!is.null(extra_args$arch_initial)) {
         init <- extra_args$arch_initial

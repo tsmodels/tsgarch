@@ -3,12 +3,25 @@
 * Added the log-likelihood vector to the returned fitted and filtered object
 as this will be needed in the calculation of the standard errors in the 
 multivariate GARCH package.
-* Added an extra option to the estimation method which adds the tmb object
+* Added an extra option to the estimation method which adds the TMB object
 to the returned estimation object. This can then be used to directly vary
 the parameters and quickly extract information from the filtration. This
 could be also achieved by the tsfilter method with a specification object
 but is much slower. Use case is for the multivariate GARCH partitioned 
 hessian calculation.
+* Added plus overload method to combine together GARCH specifications to generate a
+multi-specification object which can then be estimated in parallel. This
+is required for 2-stage multivariate GARCH models. A separate to_multi_estimate
+function is also added to instead convert a list of estimated objects to
+a validated multi_estimate class.
+* Removed RcppArmadillo dependency and converted code to RcppEigen since it 
+is already in use by TMB.
+* Switched to using simulate for the parametric simulation for the predict method.
+The bootstrap still remains the most valid approach as the out of sample distribution
+is best approximated by the bootstrapped residuals rather than the imposed
+parametric distribution with estimated parameters.
+* For the bootstrap simulated prediction, the re-sampled standardized innovations
+are now scaled to avoid bias.
 
 # tsgarch 1.0.2
 

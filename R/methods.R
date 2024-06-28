@@ -1,6 +1,6 @@
 #' Estimates an GARCH model given a specification object using maximum likelihood and autodiff
 #'
-#' @param object an object of class tsgarch.spec.
+#' @param object an object of class \dQuote{tsgarch.spec} or \dQuote{tsgarch.multispec}
 #' @param control solver control parameters.
 #' @param solver only \dQuote{nloptr} is currently supported (see \code{\link[nloptr]{nloptr}}).
 #' @param stationarity_constraint the bound on the inequality constraint for ensuring
@@ -11,22 +11,30 @@
 #' errors). The downside is that it can increase the size of the returned object by a
 #' factor of 8.
 #' @param ... not currently used.
-#' @returns An object of class \dQuote{tsgarch.estimate}.
-#' @details The underlying code is written using the TMB framework which uses
+#' @returns An object of class \dQuote{tsgarch.estimate} or \dQuote{tsgarch.multi_estimate}.
+#' @details
+#' The underlying code is written using the TMB framework which uses
 #' automatic differentiation and hence allows the generation of analytic
 #' derivatives.
+#'
 #' Stationarity is usually based on the condition that the persistence of the model
 #' is less than 1. The argument \dQuote{stationarity_constraint} allows to fine tune
 #' this. For example, setting it to a very high value will effectively render
 #' this constraint inactive. The default of 0.999 has been found to be a reasonable
 #' bound since values close to one may lead to problems.
+#'
 #' Since the nloptr solver make use of analytic Jacobians for the inequality constraint,
 #' these are either provided in closed form or calculated as part of the automatic
 #' differentiation algorithms implemented in the package.
+#'
 #' The estimation makes 2 passes to the solver. The first pass uses no parameter
 #' scaling, whilst in the second pass the parameters (as well as bounds) are scaled
 #' making use of the estimated hessian from the first pass in order to generate
 #' a hopefully more robust solution.
+#'
+#' For the multiple specification estimation, parallel functionality is available through
+#' the \code{\link[future.apply]{future_lapply}} function. The user needs to setup a
+#' \code{\link[future]{plan}} in order to make use of this.
 #' @export estimate.tsgarch.spec
 #' @aliases estimate
 #' @method estimate tsgarch.spec
