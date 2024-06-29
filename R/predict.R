@@ -100,6 +100,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
                                    vreg = NULL, forc_dates = NULL,
                                    bootstrap = FALSE, seed = NULL)
 {
+    parameter <- NULL
     if (!is.null(seed)) set.seed(seed)
     series_sim <- sigma_sim <- NULL
     if (nsim > 0 & h > 1) {
