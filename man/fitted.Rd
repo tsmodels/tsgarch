@@ -3,19 +3,24 @@
 \name{fitted.tsgarch.estimate}
 \alias{fitted.tsgarch.estimate}
 \alias{fitted}
+\alias{fitted.tsgarch.multi_estimate}
 \title{Extract Model Fitted Values}
 \usage{
 \method{fitted}{tsgarch.estimate}(object, ...)
+
+\method{fitted}{tsgarch.multi_estimate}(object, ...)
 }
 \arguments{
-\item{object}{an object of class \dQuote{tsgarch.estimate}.}
+\item{object}{an object of class \dQuote{tsgarch.estimate} or
+\dQuote{tsgarch.multi_estimate}.}
 
 \item{...}{not currently used.}
 }
 \value{
-An xts vector of the fitted values. Since only a constant is supported
-in the conditional mean equation this is either a vector with a constant else
-a vector with zeros.
+An xts vector of the fitted values for the univariate type
+objects. In the case of a multi-estimate object, a list of xts vectors is
+returned if the individual univariate objects have unequal indices, else an
+xts matrix is returned.
 }
 \description{
 Extract the fitted values of the estimated model.

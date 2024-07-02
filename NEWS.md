@@ -13,7 +13,7 @@ hessian calculation.
 multi-specification object which can then be estimated in parallel. This
 is required for 2-stage multivariate GARCH models. A separate to_multi_estimate
 function is also added to instead convert a list of estimated objects to
-a validated multi_estimate class.
+a validated multi_estimate class. Extractors include fitted, residuals and sigma.
 * Removed RcppArmadillo dependency and converted code to RcppEigen since it 
 is already in use by TMB.
 * Switched to using simulate for the parametric simulation for the predict method.

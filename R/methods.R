@@ -89,10 +89,13 @@ coef.tsgarch.estimate <- function(object, ...)
 #' Extract Volatility (Conditional Standard Deviation)
 #'
 #' @description Extract the conditional standard deviation from a GARCH model.
-#' @param object an object of class \dQuote{tsgarch.estimate}, \dQuote{tsgarch.predict}
-#' or \dQuote{tsgarch.simulate}.
+#' @param object an object of class \dQuote{tsgarch.estimate}, \dQuote{tsgarch.predict},
+#' \dQuote{tsgarch.simulate} or a \dQuote{tsgarch.multi_estimate}.
 #' @param ... not currently used.
-#' @returns An xts vector of the conditional volatility.
+#' @returns An xts vector of the conditional volatility for the univariate type
+#' objects. In the case of a multi-estimate object, a list of xts vectors is
+#' returned if the individual univariate objects have unequal indices, else an
+#' xts matrix is returned.
 #' @aliases sigma
 #' @method sigma tsgarch.estimate
 #' @rdname sigma
@@ -106,14 +109,32 @@ sigma.tsgarch.estimate <- function(object, ...)
     return(out)
 }
 
+#' @method sigma tsgarch.multi_estimate
+#' @rdname sigma
+#' @export
+#'
+sigma.tsgarch.multi_estimate <- function(object, ...)
+{
+    out <- lapply(object, sigma)
+    if (attr(object, "index_match") == TRUE) {
+        out <- do.call(cbind, out)
+        colnames(out) <- names(object)
+    } else {
+        names(out) <- names(object)
+    }
+    return(out)
+}
+
 #' Extract Model Fitted Values
 #'
 #' @description Extract the fitted values of the estimated model.
-#' @param object an object of class \dQuote{tsgarch.estimate}.
+#' @param object an object of class \dQuote{tsgarch.estimate} or
+#' \dQuote{tsgarch.multi_estimate}.
 #' @param ... not currently used.
-#' @returns An xts vector of the fitted values. Since only a constant is supported
-#' in the conditional mean equation this is either a vector with a constant else
-#' a vector with zeros.
+#' @returns An xts vector of the fitted values for the univariate type
+#' objects. In the case of a multi-estimate object, a list of xts vectors is
+#' returned if the individual univariate objects have unequal indices, else an
+#' xts matrix is returned.
 #' @aliases fitted
 #' @method fitted tsgarch.estimate
 #' @rdname fitted
@@ -130,16 +151,34 @@ fitted.tsgarch.estimate <- function(object, ...)
     return(f)
 }
 
+
+#' @method fitted tsgarch.multi_estimate
+#' @rdname fitted
+#' @export
+#'
+#'
+fitted.tsgarch.multi_estimate <- function(object, ...)
+{
+    out <- do.call(cbind, lapply(object, fitted))
+    colnames(out) <- names(object)
+    return(out)
+}
+
+
 #' Extract Model Residuals
 #'
 #' @description Extract the residuals of the estimated model.
-#' @param object an object of class \dQuote{tsgarch.estimate}.
+#' @param object an object of class \dQuote{tsgarch.estimate} or
+#' \dQuote{tsgarch.multi_estimate}.
 #' @param standardize logical. Whether to standardize the residuals by the
 #' conditional volatility.
 #' @param ... not currently used.
-#' @returns An xts vector of the residuals. If the model had no constant in
-#' the conditional mean equation then this just returns the original data (which
-#' is assumed to be zero mean noise).
+#' @returns An xts vector of the model residuals for the univariate type
+#' objects. In the case of a multi-estimate object, a list of xts vectors is
+#' returned if the individual univariate objects have unequal indices, else an
+#' xts matrix is returned.
+#' Note that If the model had no constant in the conditional mean equation then this
+#' just returns the original data (which is assumed to be zero mean noise).
 #' @aliases residuals
 #' @method residuals tsgarch.estimate
 #' @rdname residuals
@@ -157,6 +196,20 @@ residuals.tsgarch.estimate <- function(object, standardize = FALSE, ...)
     colnames(res) <- ".residuals"
     return(res)
 }
+
+
+#' @method residuals tsgarch.multi_estimate
+#' @rdname residuals
+#' @export
+#'
+#'
+residuals.tsgarch.multi_estimate <- function(object, standardize = FALSE, ...)
+{
+    out <- do.call(cbind, lapply(object, residuals, standardize = standardize))
+    colnames(out) <- names(object)
+    return(out)
+}
+
 
 #' The Covariance Matrix of the Estimated Parameters
 #'

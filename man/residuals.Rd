@@ -3,12 +3,16 @@
 \name{residuals.tsgarch.estimate}
 \alias{residuals.tsgarch.estimate}
 \alias{residuals}
+\alias{residuals.tsgarch.multi_estimate}
 \title{Extract Model Residuals}
 \usage{
 \method{residuals}{tsgarch.estimate}(object, standardize = FALSE, ...)
+
+\method{residuals}{tsgarch.multi_estimate}(object, standardize = FALSE, ...)
 }
 \arguments{
-\item{object}{an object of class \dQuote{tsgarch.estimate}.}
+\item{object}{an object of class \dQuote{tsgarch.estimate} or
+\dQuote{tsgarch.multi_estimate}.}
 
 \item{standardize}{logical. Whether to standardize the residuals by the
 conditional volatility.}
@@ -16,9 +20,12 @@ conditional volatility.}
 \item{...}{not currently used.}
 }
 \value{
-An xts vector of the residuals. If the model had no constant in
-the conditional mean equation then this just returns the original data (which
-is assumed to be zero mean noise).
+An xts vector of the model residuals for the univariate type
+objects. In the case of a multi-estimate object, a list of xts vectors is
+returned if the individual univariate objects have unequal indices, else an
+xts matrix is returned.
+Note that If the model had no constant in the conditional mean equation then this
+just returns the original data (which is assumed to be zero mean noise).
 }
 \description{
 Extract the residuals of the estimated model.

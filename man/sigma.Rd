@@ -3,18 +3,24 @@
 \name{sigma.tsgarch.estimate}
 \alias{sigma.tsgarch.estimate}
 \alias{sigma}
+\alias{sigma.tsgarch.multi_estimate}
 \title{Extract Volatility (Conditional Standard Deviation)}
 \usage{
 \method{sigma}{tsgarch.estimate}(object, ...)
+
+\method{sigma}{tsgarch.multi_estimate}(object, ...)
 }
 \arguments{
-\item{object}{an object of class \dQuote{tsgarch.estimate}, \dQuote{tsgarch.predict}
-or \dQuote{tsgarch.simulate}.}
+\item{object}{an object of class \dQuote{tsgarch.estimate}, \dQuote{tsgarch.predict},
+\dQuote{tsgarch.simulate} or a \dQuote{tsgarch.multi_estimate}.}
 
 \item{...}{not currently used.}
 }
 \value{
-An xts vector of the conditional volatility.
+An xts vector of the conditional volatility for the univariate type
+objects. In the case of a multi-estimate object, a list of xts vectors is
+returned if the individual univariate objects have unequal indices, else an
+xts matrix is returned.
 }
 \description{
 Extract the conditional standard deviation from a GARCH model.
