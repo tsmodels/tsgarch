@@ -861,7 +861,7 @@ predict.tsgarch.estimate <- function(object, h = 1, newxreg = NULL, newvreg = NU
     }
     sim_method <- match.arg(sim_method[1], c("parametric","bootstrap"))
     h <- max(1, as.integer(h[1]))
-    if (h == 1) nsim <- 0
+    #if (h == 1) nsim <- 0
     nsim <- max(0, as.integer(nsim[1]))
     block <- max(0, as.integer(block[1]))
     model <- object$spec$model$model

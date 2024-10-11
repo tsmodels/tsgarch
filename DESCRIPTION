@@ -2,9 +2,9 @@ Package: tsgarch
 Type: Package
 Title: Univariate GARCH Models
 Version: 1.0.3
-Authors@R: c(person("Alexios", "Galanos", role = c("aut", "cre","cph"), email = "alexios@4dscape.com"))
+Authors@R: c(person("Alexios", "Galanos", role = c("aut", "cre","cph"), email = "alexios@4dscape.com", comment = c(ORCID = "0009-0000-9308-0457")))
 Maintainer: Alexios Galanos <alexios@4dscape.com>
-Depends: R (>= 3.5.0), methods, tsmethods
+Depends: R (>= 3.5.0), methods, tsmethods (>= 1.0.2)
 LinkingTo: Rcpp (>= 0.10.6), TMB(>= 1.7.20), RcppEigen
 Imports: TMB (>= 1.7.20), Rcpp, nloptr, Rdpack, numDeriv, xts, zoo, future.apply, future, progressr, flextable, stats, utils, data.table, tsdistributions, lubridate, sandwich
 Description: Multiple flavors of the Generalized Autoregressive Conditional Heteroskedasticity (GARCH) model with a large choice of conditional distributions. Methods for specification, estimation, prediction, filtering, simulation, statistical testing and more. Represents a partial re-write and re-think of 'rugarch', making use of automatic differentiation for estimation.
@@ -13,7 +13,7 @@ Encoding: UTF-8
 LazyData: true
 BugReports: https://github.com/tsmodels/tsgarch/issues
 RdMacros: Rdpack
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.2
 Roxygen: list(markdown = TRUE)
 ByteCompile: true
 URL: https://github.com/tsmodels/tsgarch

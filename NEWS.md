@@ -1,7 +1,7 @@
 # tsgarch 1.0.3
 
 * Added the log-likelihood vector to the returned fitted and filtered object
-as this will be needed in the calculation of the standard errors in the 
+as this will be needed in the calculation of the standard errors in the upcoming
 multivariate GARCH package.
 * Added an extra option to the estimation method which adds the TMB object
 to the returned estimation object. This can then be used to directly vary
@@ -22,6 +22,7 @@ is best approximated by the bootstrapped residuals rather than the imposed
 parametric distribution with estimated parameters.
 * For the bootstrap simulated prediction, the re-sampled standardized innovations
 are now scaled to avoid bias.
+* Fix to h=1 and nsim. Previously when h=1, nsim was set to zero.
 
 # tsgarch 1.0.2
 

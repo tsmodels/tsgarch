@@ -103,7 +103,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     parameter <- NULL
     if (!is.null(seed)) set.seed(seed)
     series_sim <- sigma_sim <- NULL
-    if (nsim > 0 & h > 1) {
+    if (nsim > 0) {
         if (sim_method == "bootstrap") {
             out <- garch_bootstrap(object, h = h, nsim = nsim, block = block, vreg = tail(vreg, h), seed = seed)
             sigma_sim <- out$sigma
