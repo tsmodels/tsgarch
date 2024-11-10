@@ -97,8 +97,11 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     optimal_pars <- sol$solution
     # check hessian and use for scaling
     H <- tmb$he(optimal_pars)
+    if (any(is.na(H))) {
+        warning("\nunable to calculate hessian for parameter scaling in initial step. Reverting to numerical estimation.")
+        H <- hessian(env$fun, x = optimal_pars, env = env)
+    }
     object$parmatrix <- pmatrix
-
     scaled_solution <- .estimate_garch_model_scaled(optimal_pars, H, object, control, stationarity_constraint)
     D <- solve(diag(scaled_solution$par_scale, length(scaled_solution$par_scale), length(scaled_solution$par_scale)))
     pars <- scaled_solution$solution$solution * scaled_solution$solution$par_scale

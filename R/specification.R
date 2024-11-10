@@ -49,7 +49,12 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
     if  (!is.xts(y)) {
         stop("y must be an xts object")
     }
+    if (NCOL(y) > 1) {
+        stop("y must be a univariate time series")
+    }
+    series_name <- colnames(y)
     spec <- initialize_data(y)
+    spec$target$series_name <- series_name
     # 2. validate arguments
     model <- match.arg(model[1], choices = valid_garch_models())
     distribution <- match.arg(distribution[1], choices = valid_distributions())

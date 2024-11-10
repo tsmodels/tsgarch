@@ -1,3 +1,5 @@
+# estimate ---------------------------------------------------
+
 #' Estimates an GARCH model given a specification object using maximum likelihood and autodiff
 #'
 #' @param object an object of class \dQuote{tsgarch.spec} or \dQuote{tsgarch.multispec}
@@ -67,6 +69,8 @@ estimate.tsgarch.spec <- function(object, solver = "nloptr", control = NULL, sta
     return(out)
 }
 
+# coef ---------------------------------------------------
+
 #' Extract Model Coefficients
 #'
 #' @description Extract the estimated coefficients of a model.
@@ -85,6 +89,8 @@ coef.tsgarch.estimate <- function(object, ...)
     names(out) <- object$parmatrix[estimate == 1]$parameter
     return(out)
 }
+
+# sigma ---------------------------------------------------
 
 #' Extract Volatility (Conditional Standard Deviation)
 #'
@@ -125,6 +131,8 @@ sigma.tsgarch.multi_estimate <- function(object, ...)
     return(out)
 }
 
+# fitted ---------------------------------------------------
+
 #' Extract Model Fitted Values
 #'
 #' @description Extract the fitted values of the estimated model.
@@ -164,6 +172,7 @@ fitted.tsgarch.multi_estimate <- function(object, ...)
     return(out)
 }
 
+# residuals ---------------------------------------------------
 
 #' Extract Model Residuals
 #'
@@ -210,6 +219,7 @@ residuals.tsgarch.multi_estimate <- function(object, standardize = FALSE, ...)
     return(out)
 }
 
+# vcov ---------------------------------------------------
 
 #' The Covariance Matrix of the Estimated Parameters
 #'
@@ -251,6 +261,8 @@ vcov.tsgarch.estimate <- function(object, adjust = FALSE, type = c("H","OP","QML
     colnames(V) <- rownames(V) <- par_names
     return(V)
 }
+
+# confidence intervals ---------------------------------------------------
 
 #' Confidence Intervals for Model Parameters
 #'
@@ -298,6 +310,7 @@ confint.tsgarch.estimate <- function(object, parm, level = 0.95, vcov_type = "H"
     return(ci)
 }
 
+# log likelihood ---------------------------------------------------
 
 #' Extract Log-Likelihood
 #'
@@ -323,6 +336,7 @@ logLik.tsgarch.estimate <- function(object, ...)
     return(out)
 }
 
+# summary ---------------------------------------------------
 
 #' GARCH Model Estimation Summary
 #'
@@ -448,6 +462,8 @@ as_flextable.summary.tsgarch.estimate <- function(x, digits = max(3L, getOption(
     return(out)
 }
 
+# equation ---------------------------------------------------
+
 #' Model Equation (LaTeX)
 #'
 #' @description Generates a list of model equations in LaTeX.
@@ -502,6 +518,7 @@ tsequation.tsgarch.estimate <- function(object, ...)
     return(out)
 }
 
+# persistence ---------------------------------------------------
 
 #' Model Persistence
 #'
@@ -549,6 +566,9 @@ persistence.tsgarch.spec <- function(object, ...)
     env$model <- object$model$model
     return(.persistence(pars, env))
 }
+
+
+# unconditional ---------------------------------------------------
 
 #' Unconditional Value
 #'
@@ -603,6 +623,8 @@ unconditional.tsgarch.spec <- function(object, ...)
     return(out)
 }
 
+# information criteria ---------------------------------------------------
+
 #' Akaike's An Information Criterion
 #'
 #' @description Extract the AIC from an estimated model.
@@ -642,6 +664,8 @@ BIC.tsgarch.estimate <- function(object, ...)
 }
 
 
+# nobs ---------------------------------------------------
+
 #' Extract the Number of Observations
 #'
 #' @description Extract the number of observations from an estimated model.
@@ -661,6 +685,7 @@ nobs.tsgarch.estimate <- function(object, ...)
     return(object$nobs)
 }
 
+# news impact ---------------------------------------------------
 
 #' News Impact Curve
 #'
@@ -720,6 +745,7 @@ plot.tsgarch.newsimpact <- function(x, y = NULL, ...)
     return(invisible(x))
 }
 
+# plots ---------------------------------------------------
 
 #' Estimated Model Plots
 #'
@@ -763,6 +789,7 @@ plot.tsgarch.estimate <- function(x, y = NULL, ...)
     return(invisible(x))
 }
 
+# filtering ---------------------------------------------------
 
 #' Model Filtering
 #'
@@ -812,6 +839,7 @@ tsfilter.tsgarch.spec <- function(object, y = NULL, newxreg = NULL, newvreg = NU
     return(.filter.tsgarch.spec(object, y = y, newxreg = newxreg, newvreg = newvreg))
 }
 
+# predict ---------------------------------------------------
 
 #' Model Prediction
 #'
@@ -877,6 +905,7 @@ predict.tsgarch.estimate <- function(object, h = 1, newxreg = NULL, newvreg = NU
     return(p)
 }
 
+# probability integral transform ---------------------------------------------------
 
 #' Probability Integral Transform (PIT)
 #'
@@ -910,6 +939,7 @@ pit.tsgarch.estimate <- function(object, ...)
     return(p)
 }
 
+# half life ---------------------------------------------------
 
 #' Half Life
 #'
@@ -933,6 +963,9 @@ halflife.tsgarch.estimate <- function(object, ...)
     out <- abs(log(0.5)/log(p))
     return(out)
 }
+
+
+# omega ---------------------------------------------------
 
 #' Omega (Variance Equation Intercept)
 #'
@@ -977,6 +1010,8 @@ omega.tsgarch.spec <- function(object, ...)
     }
     return(target_omega)
 }
+
+# simulate ---------------------------------------------------
 
 #' Model Simulation
 #'

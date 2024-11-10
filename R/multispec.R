@@ -97,9 +97,6 @@ to_multi_estimate <- function(object, ...)
         invalid_class <- which(!check_class)
         stop(paste0("\nnot all objects in list of class `tsgarch.estimate` :", invalid_class))
     }
-    if (is.null(names(object))) {
-        names(object) <- paste0("series_",1:length(object))
-    }
     anchor_date <- index(fitted(object[[1]]))
     check_dates <- sapply(2:length(object), function(i) all.equal(anchor_date, index(fitted(object[[i]]))))
     attr(object, "index_match") <- TRUE

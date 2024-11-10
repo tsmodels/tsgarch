@@ -8,7 +8,7 @@
 #' @importFrom zoo na.fill coredata index is.zoo `coredata<-` as.zoo
 #' @importFrom xts xts as.xts is.xts merge.xts
 #' @importFrom sandwich estfun bwNeweyWest vcovHAC vcovOPG bread
-#' @importFrom numDeriv jacobian
+#' @importFrom numDeriv jacobian hessian
 #' @importFrom nloptr nloptr
 #' @importFrom flextable flextable as_flextable set_caption italic fontsize separate_header add_footer_row add_footer_lines append_chunks as_chunk as_equation as_paragraph compose colformat_double set_header_labels padding bold align autofit hline width
 #' @importFrom graphics grid layout lines par
