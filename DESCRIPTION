@@ -16,7 +16,7 @@ RdMacros: Rdpack
 RoxygenNote: 7.3.2
 Roxygen: list(markdown = TRUE)
 ByteCompile: true
-URL: https://github.com/tsmodels/tsgarch
+URL: https://github.com/tsmodels/tsgarch, https://www.nopredict.com
 Suggests: 
     knitr,
     rmarkdown,
