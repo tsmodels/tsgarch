@@ -163,12 +163,8 @@ namespace distfun{
     Type fwd_kappagh(Type x, Type lambda)
     {
         Type kappa = Type(0.0);
-        if(lambda == Type(-0.5)) {
-            kappa = Type(1.0)/x;
-        } else {
-            Type tmp = lambda + Type(1.0);
-            kappa = (fwd_scaled_besselK(x, tmp) /fwd_scaled_besselK(x, lambda)) / x;
-        }
+        Type tmp = lambda + Type(1.0);
+        kappa = (fwd_scaled_besselK(x, tmp) /fwd_scaled_besselK(x, lambda)) / x;
         return kappa;
     }
     VECTORIZE2_tt(fwd_kappagh)

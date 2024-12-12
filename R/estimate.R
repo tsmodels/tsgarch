@@ -188,6 +188,10 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     scaled_sol <- solve_model(init_pars = scaled_init_pars, env = scaled_env, const = scaled_const, lower = scaled_lower, upper = scaled_upper, control = control)
     scaled_sol$par_scale <- par_scale
     hessian <- scaled_tmb$he()
+    if (any(is.na(hessian))) {
+        warning("\nunable to calculate hessian for parameter scaling in scaling step. Reverting to numerical estimation.")
+        hessian <- hessian(scaled_env$fun, x = scaled_sol$solution, env = scaled_env)
+    }
     scores <- jacobian(score_function, scaled_sol$solution, env = scaled_env)
     m <- object$model_options[1]
     sig <- scaled_env$tmb$report(scaled_sol$solution)$sigma

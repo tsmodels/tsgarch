@@ -2,8 +2,7 @@
 
 * Now returning the series name of the data in the spec object for use in
 multivariate models.
-
-* If the hessian cannot be calculated in the first step for the scaling, then
+* If the hessian cannot be calculated in the first or second step for the scaling, then
 a numerical approximation is used instead. There seems to be some instability
 in the egarch-nig model for some datasets.
 
