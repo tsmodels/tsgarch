@@ -902,6 +902,7 @@ predict.tsgarch.estimate <- function(object, h = 1, newxreg = NULL, newvreg = NU
            "cgarch" = .predict_cgarch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, nsim = nsim, sim_method = sim_method, block = block, forc_dates = forc_dates, init_states = init_states, seed = seed, ...),
            "igarch" = .predict_garch(object = object, h = h, newxreg = newxreg, newvreg = newvreg, nsim = nsim, sim_method = sim_method, block = block, forc_dates = forc_dates, init_states = init_states, seed = seed, ...)
     )
+    p$spec$parmatrix <- copy(object$parmatrix)
     return(p)
 }
 
@@ -938,6 +939,7 @@ pit.tsgarch.estimate <- function(object, ...)
     colnames(p) <- ".pit"
     return(p)
 }
+
 
 # half life ---------------------------------------------------
 

@@ -5,6 +5,9 @@ multivariate models.
 * If the hessian cannot be calculated in the first or second step for the scaling, then
 a numerical approximation is used instead. There seems to be some instability
 in the egarch-nig model for some datasets.
+* Added R (>= 4.1.0) requirement for use of |> pipe.
+* Added additional documentation on expected index for y which must be Date or POSIXct
+(not yearmon or yearqtr).
 
 # tsgarch 1.0.3
 

@@ -3,7 +3,7 @@
 #' @description Specifies a GARCH model prior to estimation.
 #' @details The specification object holds the information and data which is
 #' then passed to the maximum likelihood estimation routines.
-#' @param y an xts vector.
+#' @param y an xts vector with either \dQuote{Date} or \dQuote{POSIXct} index.
 #' @param constant whether to estimate a constant (mean) for y,
 #' @param model the type of GARCH model. Valid choices are \dQuote{garch} for
 #' vanilla GARCH, \dQuote{gjr} for asymmetric GARCH, \dQuote{egarch} for

@@ -20,7 +20,7 @@ garch_modelspec(
 )
 }
 \arguments{
-\item{y}{an xts vector.}
+\item{y}{an xts vector with either \dQuote{Date} or \dQuote{POSIXct} index.}
 
 \item{model}{the type of GARCH model. Valid choices are \dQuote{garch} for
 vanilla GARCH, \dQuote{gjr} for asymmetric GARCH, \dQuote{egarch} for
