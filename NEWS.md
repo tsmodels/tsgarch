@@ -8,6 +8,7 @@ in the egarch-nig model for some datasets.
 * Added R (>= 4.1.0) requirement for use of |> pipe.
 * Added additional documentation on expected index for y which must be Date or POSIXct
 (not yearmon or yearqtr).
+* Replaced Rf_error with (Rf_error) per Rcpp team instructions.
 
 # tsgarch 1.0.3
 

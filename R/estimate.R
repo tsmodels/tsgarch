@@ -42,6 +42,22 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     return(sol)
 }
 
+
+# solve_solnp_model <- function(init_pars, env, const, lower, upper, control) {
+#     m <- length(const$inequality_constraint(init_pars, env))
+#     ineq_lower <- rep(-1000, m)
+#     ineq_upper <- rep(0, m)
+#     sol <- Rsolnp::csolnp(pars = init_pars, fn = env$fun, gr = env$grad,
+#                   ineq_fn = const$inequality_constraint,
+#                   ineq_lower = ineq_lower, ineq_upper = ineq_upper,
+#                   ineq_jac = const$inequality_jacobian,
+#                   eq_fn = const$equality_constraint,
+#                   eq_jac = const$equality_jacobian,
+#                   lower = lower, upper = upper, env = env, control = list(trace = 1))
+#     sol$solution <- sol$pars
+#     return(sol)
+# }
+
 # common functions
 
 
@@ -91,6 +107,7 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     lower <- object$parmatrix[estimate == 1]$lower * 1/object$parmatrix[estimate == 1]$scale
     upper <- object$parmatrix[estimate == 1]$upper * 1/object$parmatrix[estimate == 1]$scale
     sol <- solve_model(init_pars = init_pars, env = env, const = const, lower = lower, upper = upper, control = control)
+    #sol <- solve_solnp_model(init_pars = init_pars, env = env, const = const, lower = lower, upper = upper, control = control)
     pmatrix <- copy(env$parmatrix)
     pmatrix[estimate == 1, value := sol$solution]
 
@@ -186,6 +203,7 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     scaled_env$parmatrix <- scaled_object$parmatrix
     scaled_env$stationarity_constraint <- stationarity_constraint
     scaled_sol <- solve_model(init_pars = scaled_init_pars, env = scaled_env, const = scaled_const, lower = scaled_lower, upper = scaled_upper, control = control)
+    #scaled_sol <- solve_solnp_model(init_pars = scaled_init_pars, env = scaled_env, const = scaled_const, lower = scaled_lower, upper = scaled_upper, control = control)
     scaled_sol$par_scale <- par_scale
     hessian <- scaled_tmb$he()
     if (any(is.na(hessian))) {
