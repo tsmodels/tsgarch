@@ -9,6 +9,18 @@ in the egarch-nig model for some datasets.
 * Added additional documentation on expected index for y which must be Date or POSIXct
 (not yearmon or yearqtr).
 * Replaced Rf_error with (Rf_error) per Rcpp team instructions.
+* Fixed the macOS C++20/TMB build issue by redefining INFINITY as a double 
+infinity before including TMB.hpp in src/TMB/tsgarch_TMBExports.cpp.
+* Made test fixtures lazy in tests/testthat/helper-global.R with delayedAssign(), 
+so expensive model estimates are only computed when needed.
+* Reduced the heavy vignette simulation workload in vignettes/demonstration.Rmd 
+from 500 x 10000 to 100 x 1000.
+* Cleaned 1:nrow(...) usage in edited files by switching to seq_len(nrow(...)).
+
+
+
+
+
 
 # tsgarch 1.0.3
 

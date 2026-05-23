@@ -13,7 +13,6 @@ Encoding: UTF-8
 LazyData: true
 BugReports: https://github.com/tsmodels/tsgarch/issues
 RdMacros: Rdpack
-RoxygenNote: 7.3.2
 Roxygen: list(markdown = TRUE)
 ByteCompile: true
 URL: https://github.com/tsmodels/tsgarch, https://www.nopredict.com
@@ -23,3 +22,4 @@ Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 VignetteBuilder: knitr
+Config/roxygen2/version: 8.0.0

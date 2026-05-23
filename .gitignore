@@ -46,3 +46,4 @@ inst/doc
 inst/.DS_Store
 .DS_Store
 *.Rproj
+.positai

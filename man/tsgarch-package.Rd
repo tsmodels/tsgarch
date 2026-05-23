@@ -22,5 +22,10 @@ Useful links:
 \author{
 \strong{Maintainer}: Alexios Galanos \email{alexios@4dscape.com} (\href{https://orcid.org/0009-0000-9308-0457}{ORCID}) [copyright holder]
 
+Authors:
+\itemize{
+  \item Alexios Galanos \email{alexios@4dscape.com} (\href{https://orcid.org/0009-0000-9308-0457}{ORCID}) [copyright holder]
+}
+
 }
 \keyword{internal}

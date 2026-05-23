@@ -6,10 +6,10 @@
 #' @param y an xts vector with either \dQuote{Date} or \dQuote{POSIXct} index.
 #' @param constant whether to estimate a constant (mean) for y,
 #' @param model the type of GARCH model. Valid choices are \dQuote{garch} for
-#' vanilla GARCH, \dQuote{gjr} for asymmetric GARCH, \dQuote{egarch} for
+#' vanilla GARCH, \dQuote{gjrgarch} for asymmetric GARCH, \dQuote{egarch} for
 #' exponential GARCH, \dQuote{aparch} for asymmetric power ARCH,
-#' \dQuote{csGARCH} for the component GARCH, \dQuote{igarch} for the integrated
-#' GARCH.
+#' \dQuote{fgarch} for Family GARCH, \dQuote{cgarch} for component GARCH,
+#' \dQuote{igarch} for integrated GARCH, and \dQuote{ewma} for the EWMA model.
 #' @param order the (p,q) GARCH order.
 #' @param variance_targeting whether to use variance targeting rather than
 #' estimating the conditional variance intercept.

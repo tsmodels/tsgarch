@@ -23,10 +23,10 @@ garch_modelspec(
 \item{y}{an xts vector with either \dQuote{Date} or \dQuote{POSIXct} index.}
 
 \item{model}{the type of GARCH model. Valid choices are \dQuote{garch} for
-vanilla GARCH, \dQuote{gjr} for asymmetric GARCH, \dQuote{egarch} for
+vanilla GARCH, \dQuote{gjrgarch} for asymmetric GARCH, \dQuote{egarch} for
 exponential GARCH, \dQuote{aparch} for asymmetric power ARCH,
-\dQuote{csGARCH} for the component GARCH, \dQuote{igarch} for the integrated
-GARCH.}
+\dQuote{fgarch} for Family GARCH, \dQuote{cgarch} for component GARCH,
+\dQuote{igarch} for integrated GARCH, and \dQuote{ewma} for the EWMA model.}
 
 \item{constant}{whether to estimate a constant (mean) for y,}
 
