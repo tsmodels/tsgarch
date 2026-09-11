@@ -165,7 +165,9 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
                 kappa = kappa,
                 # extra degree of freedom for the init_variance
                 npars = NROW(parmatrix[estimate == 1]) + 1,
-                spec = spec)
+                spec = spec,
+                arma_residuals = scaled_solution$arma_residuals,
+                arma_summary = scaled_solution$arma_table)
     if (keep_tmb) out$tmb <- tmb
     class(out) <- "tsgarch.estimate"
     return(out)
@@ -242,6 +244,21 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     if (m > 0) {
         sig <- sig[-seq_len(m)]
     }
+    # ARMA mean equation residuals eps_t = (y_t - mu) - arma_recursion, only
+    # reported by the "garch" TMB template when arma > c(0,0) (see
+    # garchfun.hpp); for every other case fall back to NULL so that
+    # residuals.tsgarch.estimate() keeps using the prior y - mu behavior.
+    arma_residuals <- NULL
+    arma_table <- NULL
+    if (!is.null(object$model$arma) && sum(object$model$arma) > 0) {
+        arma_residuals <- scaled_env$tmb$report(scaled_sol$solution)$residuals
+        if (m > 0) arma_residuals <- arma_residuals[-seq_len(m)]
+        ar_order <- object$model$arma[1]
+        ma_order <- object$model$arma[2]
+        arma_table <- list(
+            ar = if (ar_order > 0) rr[rownames(rr) == "phi", , drop = FALSE][seq_len(ar_order), , drop = FALSE] else NULL,
+            ma = if (ma_order > 0) rr[rownames(rr) == "theta", , drop = FALSE][seq_len(ma_order), , drop = FALSE] else NULL)
+    }
     rm(scaled_tmb)
     return(list(solution = scaled_sol,
                 env = scaled_env,
@@ -260,6 +277,8 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
                 sigma = sig,
                 permanent_component = permanent_component,
                 transitory_component = transitory_component,
-                ll_vector = ll_vector
+                ll_vector = ll_vector,
+                arma_residuals = arma_residuals,
+                arma_table = arma_table
                 ))
 }

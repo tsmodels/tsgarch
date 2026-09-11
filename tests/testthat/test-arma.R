@@ -79,6 +79,64 @@ test_that("arma: is currently rejected for non-garch models", {
     expect_error(garch_modelspec(y[1:1800,1], constant = TRUE, model = "egarch", order = c(1,1), arma = c(1,0)))
 })
 
+test_that("arma: residuals() returns the true ARMA residual, not y - mu", {
+    spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
+    mod <- estimate(spec)
+    res <- as.numeric(residuals(mod))
+    naive <- as.numeric(mod$spec$target$y_orig - mod$parmatrix[parameter == "mu"]$value)
+    expect_false(isTRUE(all.equal(res, naive)))
+    expect_equal(length(res), length(naive))
+})
+
+test_that("arma: h-step point forecast matches stats::arima for AR(1)/MA(1)/AR(2)", {
+    set.seed(42)
+    n <- 2000
+    e <- rnorm(n)
+    yy <- numeric(n)
+    for (i in 2:n) yy[i] <- 2 + 0.6 * (yy[i - 1] - 2) + e[i]
+    yy <- yy[500:n]
+    ys <- xts(yy, as.Date(seq_along(yy), origin = "1970-01-01"))
+    spec <- garch_modelspec(ys, model = "garch", constant = TRUE, order = c(0,0), arma = c(1,0))
+    mod <- estimate(spec)
+    p <- suppressWarnings(predict(mod, h = 10, nsim = 0))
+    fit <- arima(yy, order = c(1,0,0))
+    fc <- predict(fit, n.ahead = 10)
+    expect_equal(as.numeric(p$mean), as.numeric(fc$pred), tolerance = 0.02)
+
+    set.seed(7)
+    n <- 3000
+    e <- rnorm(n)
+    yy <- numeric(n)
+    for (i in 2:n) yy[i] <- 0.3 + e[i] + 0.5 * e[i - 1]
+    yy <- yy[200:n]
+    ys <- xts(yy, as.Date(seq_along(yy), origin = "1970-01-01"))
+    spec <- garch_modelspec(ys, model = "garch", constant = TRUE, order = c(0,0), arma = c(0,1))
+    mod <- estimate(spec)
+    p <- suppressWarnings(predict(mod, h = 5, nsim = 0))
+    fit <- arima(yy, order = c(0,0,1))
+    fc <- predict(fit, n.ahead = 5)
+    expect_equal(as.numeric(p$mean), as.numeric(fc$pred), tolerance = 0.02)
+    # MA(1) forecast decays to the unconditional mean after 1 step
+    expect_equal(as.numeric(p$mean)[2:5], rep(as.numeric(p$mean)[5], 4), tolerance = 1e-6)
+})
+
+test_that("arma: predict() warns about simulated bands only when arma is active", {
+    spec0 <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(0,0))
+    mod0 <- estimate(spec0)
+    expect_warning(predict(mod0, h = 5, nsim = 100), NA)
+
+    spec1 <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
+    mod1 <- estimate(spec1)
+    expect_warning(predict(mod1, h = 5, nsim = 100), "ARMA mean dynamics")
+})
+
+test_that("arma: predict() mean forecast reduces exactly to constant mu when arma = c(0,0)", {
+    spec0 <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(0,0))
+    mod0 <- estimate(spec0)
+    p0 <- predict(mod0, h = 5, nsim = 0)
+    expect_true(all(as.numeric(p0$mean) == mod0$parmatrix[parameter == "mu"]$value))
+})
+
 test_that("arma: rejects malformed orders", {
     expect_error(garch_modelspec(y[1:1800,1], model = "garch", order = c(1,1), arma = c(-1,0)))
     expect_error(garch_modelspec(y[1:1800,1], model = "garch", order = c(1,1), arma = c(1,1,1)))

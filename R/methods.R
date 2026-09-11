@@ -197,7 +197,14 @@ fitted.tsgarch.multi_estimate <- function(object, ...)
 residuals.tsgarch.estimate <- function(object, standardize = FALSE, ...)
 {
     parameter <- NULL
-    res <- object$spec$target$y_orig - object$parmatrix[parameter == "mu"]$value
+    if (!is.null(object$arma_residuals)) {
+        # true ARMA-GARCH mean equation residuals eps_t = (y_t - mu) -
+        # arma_recursion(y, eps), as reported by the TMB template (see
+        # garchfun.hpp); falls back to y - mu below when arma = c(0,0).
+        res <- object$arma_residuals
+    } else {
+        res <- object$spec$target$y_orig - object$parmatrix[parameter == "mu"]$value
+    }
     res <- xts(res, object$spec$target$index)
     if (standardize) {
         res <- res/sigma(object)
