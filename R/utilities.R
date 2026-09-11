@@ -14,7 +14,9 @@
     } else {
         newvreg <- NULL
     }
-    new_spec <- garch_modelspec(y = y, model = object$model$model, constant = object$model$constant, order = object$model$order, variance_targeting = object$model$variance_targeting,
+    arma_order <- object$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
+    new_spec <- garch_modelspec(y = y, model = object$model$model, constant = object$model$constant, order = object$model$order, arma = arma_order, variance_targeting = object$model$variance_targeting,
                                 vreg = newvreg, multiplicative = object$vreg$multiplicative, init = object$model$init, backcast_lambda = object$model$backcast_lambda,
                                 sample_n = object$model$sample_n, distribution = object$distribution)
     return(new_spec)

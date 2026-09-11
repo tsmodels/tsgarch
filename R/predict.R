@@ -181,7 +181,13 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
             spec$parmatrix <- copy(object$parmatrix)
             zsim <- rdist(object$spec$distribution, h * nsim, 0, 1, skew = spec$parmatrix[parameter == "skew"]$value, shape = spec$parmatrix[parameter == "shape"]$value, lambda = spec$parmatrix[parameter == "lambda"]$value)
             zsim <- matrix(zsim, ncol = h, nrow = nsim)
-            maxpq <- max(spec$model$order)
+            arma_order <- spec$model$arma
+            if (is.null(arma_order)) arma_order <- c(0,0)
+            # combined pre-sample length (see .simulate_garch()); tail(...)
+            # below then naturally uses more genuine history when the ARMA
+            # order exceeds the GARCH order, in the correct chronological
+            # (oldest-to-most-recent) order already expected by simulate().
+            maxpq <- max(spec$model$order, arma_order)
             z <- as.numeric(residuals(object, standardize = TRUE))
             init_v <- tail(as.numeric(object$sigma), maxpq)^2
             init_z <- tail(z, maxpq)
@@ -189,7 +195,16 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
             if (object$spec$model$model == "cgarch") {
                 init_v <- cbind(init_v, tail(object$permanent_component, maxpq))
             }
-            out <- simulate(spec, h = h, nsim = nsim, var_init = init_v, innov = zsim, innov_init = init_z, vreg = tail(vreg, h), seed = seed)
+            extra_args <- list()
+            if (sum(arma_order) > 0) {
+                # continue the ARMA mean recursion from the actual last
+                # observed values/residuals rather than the unconditional
+                # mean, so the simulated bands are centered consistently
+                # with the analytic point forecast in .arma_mean_forecast().
+                extra_args$series_init <- tail(as.numeric(object$spec$target$y), maxpq)
+                extra_args$resid_init <- tail(as.numeric(residuals(object)), maxpq)
+            }
+            out <- do.call(simulate, c(list(object = spec, h = h, nsim = nsim, var_init = init_v, innov = zsim, innov_init = init_z, vreg = tail(vreg, h), seed = seed), extra_args))
             sigma_sim <- out$sigma
             colnames(sigma_sim) <- as.character(forc_dates)
             class(sigma_sim) <- "tsmodel.distribution"
@@ -210,9 +225,6 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     init_model <- setup_prediction(object, h = h, newxreg = newxreg, newvreg = newvreg, forc_dates = forc_dates)
     maxpq <- init_model$maxpq
     model_parameters <- init_model$model_parameters
-    if (nsim > 0 && (length(model_parameters$ar) > 0 || length(model_parameters$ma) > 0)) {
-        warning("\nsimulated distribution/quantile bands do not yet incorporate ARMA mean dynamics (only the analytic point forecast in $mean does); this will be addressed when simulate() gains ARMA support.")
-    }
     constant <- model_parameters$omega + init_model$variance_regressors
     if (object$spec$vreg$multiplicative) constant <- exp(constant)
     init_states <- initialize_states(object, init_states)

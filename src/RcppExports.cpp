@@ -125,8 +125,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // garchsimvec
-List garchsimvec(Eigen::Map<Eigen::MatrixXd>& epsilon, Eigen::Map<Eigen::MatrixXd>& sigma_sqr_sim, const Eigen::Map<Eigen::MatrixXd>& z, const Eigen::Map<Eigen::VectorXd>& variance_intercept, const Eigen::Map<Eigen::MatrixXd>& init, const Eigen::Map<Eigen::VectorXd>& alpha, const Eigen::Map<Eigen::VectorXd>& beta, const double mu, const Eigen::Map<Eigen::VectorXi>& order);
-RcppExport SEXP _tsgarch_garchsimvec(SEXP epsilonSEXP, SEXP sigma_sqr_simSEXP, SEXP zSEXP, SEXP variance_interceptSEXP, SEXP initSEXP, SEXP alphaSEXP, SEXP betaSEXP, SEXP muSEXP, SEXP orderSEXP) {
+List garchsimvec(Eigen::Map<Eigen::MatrixXd>& epsilon, Eigen::Map<Eigen::MatrixXd>& sigma_sqr_sim, const Eigen::Map<Eigen::MatrixXd>& z, const Eigen::Map<Eigen::VectorXd>& variance_intercept, const Eigen::Map<Eigen::MatrixXd>& init, const Eigen::Map<Eigen::VectorXd>& alpha, const Eigen::Map<Eigen::VectorXd>& beta, const double mu, const Eigen::Map<Eigen::VectorXi>& order, const int presample);
+RcppExport SEXP _tsgarch_garchsimvec(SEXP epsilonSEXP, SEXP sigma_sqr_simSEXP, SEXP zSEXP, SEXP variance_interceptSEXP, SEXP initSEXP, SEXP alphaSEXP, SEXP betaSEXP, SEXP muSEXP, SEXP orderSEXP, SEXP presampleSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -139,7 +139,24 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type beta(betaSEXP);
     Rcpp::traits::input_parameter< const double >::type mu(muSEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXi>& >::type order(orderSEXP);
-    rcpp_result_gen = Rcpp::wrap(garchsimvec(epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, beta, mu, order));
+    Rcpp::traits::input_parameter< const int >::type presample(presampleSEXP);
+    rcpp_result_gen = Rcpp::wrap(garchsimvec(epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, beta, mu, order, presample));
+    return rcpp_result_gen;
+END_RCPP
+}
+// armasimvec
+Eigen::MatrixXd armasimvec(Eigen::Map<Eigen::MatrixXd>& series_sim, const Eigen::Map<Eigen::MatrixXd>& epsilon, const Eigen::Map<Eigen::VectorXd>& ar, const Eigen::Map<Eigen::VectorXd>& ma, const double mu, const int presample);
+RcppExport SEXP _tsgarch_armasimvec(SEXP series_simSEXP, SEXP epsilonSEXP, SEXP arSEXP, SEXP maSEXP, SEXP muSEXP, SEXP presampleSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::MatrixXd>& >::type series_sim(series_simSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type epsilon(epsilonSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type ar(arSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type ma(maSEXP);
+    Rcpp::traits::input_parameter< const double >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< const int >::type presample(presampleSEXP);
+    rcpp_result_gen = Rcpp::wrap(armasimvec(series_sim, epsilon, ar, ma, mu, presample));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -256,7 +273,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_tsgarch_gjrgarchfilter", (DL_FUNC) &_tsgarch_gjrgarchfilter, 9},
     {"_tsgarch_fgarchfilter", (DL_FUNC) &_tsgarch_fgarchfilter, 10},
     {"_tsgarch_cgarchfilter", (DL_FUNC) &_tsgarch_cgarchfilter, 9},
-    {"_tsgarch_garchsimvec", (DL_FUNC) &_tsgarch_garchsimvec, 9},
+    {"_tsgarch_garchsimvec", (DL_FUNC) &_tsgarch_garchsimvec, 10},
+    {"_tsgarch_armasimvec", (DL_FUNC) &_tsgarch_armasimvec, 6},
     {"_tsgarch_egarchsimvec", (DL_FUNC) &_tsgarch_egarchsimvec, 10},
     {"_tsgarch_aparchsimvec", (DL_FUNC) &_tsgarch_aparchsimvec, 11},
     {"_tsgarch_gjrsimvec", (DL_FUNC) &_tsgarch_gjrsimvec, 10},

@@ -120,14 +120,24 @@ test_that("arma: h-step point forecast matches stats::arima for AR(1)/MA(1)/AR(2
     expect_equal(as.numeric(p$mean)[2:5], rep(as.numeric(p$mean)[5], 4), tolerance = 1e-6)
 })
 
-test_that("arma: predict() warns about simulated bands only when arma is active", {
+test_that("arma: predict() does not warn, with or without arma", {
     spec0 <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(0,0))
     mod0 <- estimate(spec0)
     expect_warning(predict(mod0, h = 5, nsim = 100), NA)
 
     spec1 <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
     mod1 <- estimate(spec1)
-    expect_warning(predict(mod1, h = 5, nsim = 100), "ARMA mean dynamics")
+    expect_warning(predict(mod1, h = 5, nsim = 100), NA)
+})
+
+test_that("arma: predict() simulated bands are centered consistently with the analytic mean forecast, including when arma order exceeds garch order", {
+    spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(2,2))
+    mod <- estimate(spec)
+    # previously errored: innov_init/var_init length mismatch when
+    # max(arma) > max(garch order)
+    p <- predict(mod, h = 8, nsim = 100000, seed = 1)
+    mc_mean <- colMeans(p$distribution)
+    expect_true(all(abs(as.numeric(mc_mean) - as.numeric(p$mean)) < 0.01))
 })
 
 test_that("arma: predict() mean forecast reduces exactly to constant mu when arma = c(0,0)", {
@@ -141,3 +151,88 @@ test_that("arma: rejects malformed orders", {
     expect_error(garch_modelspec(y[1:1800,1], model = "garch", order = c(1,1), arma = c(-1,0)))
     expect_error(garch_modelspec(y[1:1800,1], model = "garch", order = c(1,1), arma = c(1,1,1)))
 })
+
+# ---------------------------------------------------------------------------
+# Higher-order ARMA(p,q) coverage: (1,1), (1,2), (2,1), (2,2), including
+# cases where max(ar,ma) > max(garch order), which exercises the combined
+# pre-sample burn-in fix (max(garch order, arma order)) in specification.R,
+# garchfun.hpp, and simulate.R/simulation.cpp.
+# ---------------------------------------------------------------------------
+
+.simulate_arma_series <- function(ar_true, ma_true, mu = 0.5, n = 5000, seed = 1) {
+    set.seed(seed)
+    p <- length(ar_true); q <- length(ma_true)
+    burn <- 500
+    e <- rnorm(n + burn)
+    yy <- eps <- numeric(n + burn)
+    for (i in (max(p, q, 1) + 1):(n + burn)) {
+        val <- mu
+        for (j in seq_len(p)) val <- val + ar_true[j] * (yy[i - j] - mu)
+        for (j in seq_len(q)) val <- val + ma_true[j] * eps[i - j]
+        eps[i] <- e[i]
+        yy[i] <- val + eps[i]
+    }
+    tail(yy, n)
+}
+
+arma_orders_to_test <- list(
+    "ARMA(1,1)" = list(ar = 0.5, ma = 0.4, order = c(1,1)),
+    "ARMA(1,2)" = list(ar = 0.5, ma = c(0.3, -0.2), order = c(1,2)),
+    "ARMA(2,1)" = list(ar = c(0.4, -0.2), ma = 0.3, order = c(2,1)),
+    "ARMA(2,2)" = list(ar = c(0.4, -0.2), ma = c(0.3, 0.15), order = c(2,2))
+)
+
+for (nm in names(arma_orders_to_test)) {
+    spec_case <- arma_orders_to_test[[nm]]
+    local({
+        ar_true <- spec_case$ar
+        ma_true <- spec_case$ma
+        arma_order <- spec_case$order
+
+        test_that(paste0("arma: ", nm, " pure-ARMA parameter recovery matches stats::arima"), {
+            yy <- .simulate_arma_series(ar_true, ma_true, mu = 0.5, n = 5000, seed = 1)
+            ys <- xts(yy, as.Date(seq_along(yy), origin = "1970-01-01"))
+            spec <- garch_modelspec(ys, model = "garch", constant = TRUE, order = c(0,0), arma = arma_order)
+            mod <- estimate(spec)
+            ac <- arma_coefficients(mod)
+            fit <- arima(yy, order = c(arma_order[1], 0, arma_order[2]))
+            if (arma_order[1] > 0) expect_equal(as.numeric(ac$ar), unname(coef(fit)[paste0("ar", 1:arma_order[1])]), tolerance = 0.03)
+            if (arma_order[2] > 0) expect_equal(as.numeric(ac$ma), unname(coef(fit)[paste0("ma", 1:arma_order[2])]), tolerance = 0.03)
+            expect_equal(mod$parmatrix[parameter == "mu"]$value, unname(coef(fit)["intercept"]), tolerance = 0.03)
+            # nested-model likelihood sanity: tsgarch's MLE should be at least
+            # as good as arima's own (both fit the same model)
+            expect_true(as.numeric(logLik(mod)) >= fit$loglik - 0.5)
+        })
+
+        test_that(paste0("arma: ", nm, " + GARCH(1,1) estimated coefficients are stationary/invertible"), {
+            spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = arma_order)
+            mod <- estimate(spec)
+            expect_true(mod$conditions$kkt1)
+            ac <- arma_coefficients(mod)
+            if (length(ac$ar) > 0) expect_true(min(Mod(polyroot(c(1, -as.numeric(ac$ar))))) > 1)
+            if (length(ac$ma) > 0) expect_true(min(Mod(polyroot(c(1, as.numeric(ac$ma))))) > 1)
+        })
+
+        test_that(paste0("arma: ", nm, " + GARCH(1,1) simulate() zero-innovation path reduces exactly to mu"), {
+            spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = arma_order)
+            mod <- estimate(spec)
+            mu <- mod$parmatrix[parameter == "mu"]$value
+            spec_sim <- mod$spec
+            spec_sim$parmatrix <- mod$parmatrix
+            zeroinnov <- matrix(0, nrow = 1, ncol = 20)
+            sim0 <- simulate(spec_sim, h = 20, nsim = 1, innov = zeroinnov, seed = 1)
+            expect_equal(as.numeric(sim0$series), rep(mu, 20), tolerance = 1e-8)
+        })
+
+        test_that(paste0("arma: ", nm, " + GARCH(1,1) simulate() Monte Carlo mean converges to mu"), {
+            spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = arma_order)
+            mod <- estimate(spec)
+            mu <- mod$parmatrix[parameter == "mu"]$value
+            spec_sim <- mod$spec
+            spec_sim$parmatrix <- mod$parmatrix
+            sim <- simulate(spec_sim, h = 10, nsim = 20000, seed = 321)
+            mc_mean <- colMeans(sim$series)
+            expect_true(all(abs(mc_mean - mu) < 0.02))
+        })
+    })
+}

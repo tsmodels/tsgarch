@@ -93,6 +93,12 @@ Type garchfun(objective_function<Type>* obj) {
     vector<Type> phi = garchextra::pacf_to_ar(arpacf);
     vector<Type> theta = garchextra::pacf_to_ma(mapacf);
     vector<Type> z = y.array() - mu;
+    // y's pre-sample rows (indices < cmodel(0)) are zero-padded by the R
+    // wrapper, which would otherwise leak z(presample) = 0 - mu = -mu into
+    // the AR feedback for the first ar_order real observations. Force the
+    // pre-sample z (and residuals, already zero below) to 0, i.e. "the
+    // process starts at its unconditional mean with zero shocks".
+    for (int i = 0; i < cmodel(0); i++) z(i) = Type(0.0);
     vector<Type> residuals(timesteps);
     residuals.setZero();
     for (int i = cmodel(0); i < timesteps; i++) {

@@ -25,8 +25,12 @@
     .Call(`_tsgarch_cgarchfilter`, residuals, v, initstate, omega, alpha, rho, phi, beta, model)
 }
 
-.garchsimvec <- function(epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, beta, mu, order) {
-    .Call(`_tsgarch_garchsimvec`, epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, beta, mu, order)
+.garchsimvec <- function(epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, beta, mu, order, presample) {
+    .Call(`_tsgarch_garchsimvec`, epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, beta, mu, order, presample)
+}
+
+.armasimvec <- function(series_sim, epsilon, ar, ma, mu, presample) {
+    .Call(`_tsgarch_armasimvec`, series_sim, epsilon, ar, ma, mu, presample)
 }
 
 .egarchsimvec <- function(z, sigma_log_sim, variance_intercept, init, alpha, gamma, beta, kappa, mu, order) {

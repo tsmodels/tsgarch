@@ -5,7 +5,13 @@
     extra_args <- list(...)
     h <- h + burn
     parameter <- group <- NULL
-    maxpq <- max(object$model$order)
+    arma_order <- object$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
+    # combined pre-sample/burn-in length spanning both the GARCH order and
+    # the ARMA order (mirroring rugarch's combined maxOrder, used uniformly
+    # for both the variance and mean simulation recursions - see
+    # .garchsimvec()/.armasimvec() in src/simulation.cpp).
+    maxpq <- max(object$model$order, arma_order)
     mu <- object$parmatrix[parameter == "mu"]$value
     omega <- object$parmatrix[parameter == "omega"]$value
     alpha <- object$parmatrix[group == "alpha"]$value
@@ -48,7 +54,7 @@
     }
 
     if (!is.null(innov_init) & maxpq > 0) {
-        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
+        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
         z[,seq_len(maxpq)] <- matrix(innov_init, ncol = maxpq, nrow = nsim, byrow = TRUE)
     }
 
@@ -70,9 +76,54 @@
         init <- epsilon[,seq_len(maxpq), drop = FALSE]^2
         init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
     }
-    simc <- .garchsimvec(z = z, epsilon = epsilon, sigma_sqr_sim = sigma_sqr_sim, variance_intercept = variance_intercept, order = order, init = init, alpha = alpha, beta = beta, mu = mu)
+    simc <- .garchsimvec(z = z, epsilon = epsilon, sigma_sqr_sim = sigma_sqr_sim, variance_intercept = variance_intercept, order = order, init = init, alpha = alpha, beta = beta, mu = mu, presample = maxpq)
     sigma <- simc$sigma
-    series <- simc$series
+    if (sum(arma_order) > 0) {
+        # ARMA mean overlay on top of the already-simulated GARCH
+        # variance/innovation process (simc$epsilon), mirroring rugarch's
+        # own two-stage design (variance via sgarchsimC, mean overlay via
+        # armaxsim using the same innovations - see
+        # rugarch's src/garchsim.cpp: msgarchsim() + marmaxsim()).
+        arma_coef <- arma_coefficients(object)
+        ar <- as.numeric(arma_coef$ar)
+        ma <- as.numeric(arma_coef$ma)
+        series_sim <- simc$series
+        # seed the pre-sample series: defaults to the unconditional mean (so
+        # the AR feedback term (x_{t-i} - mu) vanishes there, i.e. "start
+        # from the unconditional mean"), but callers (e.g. predict()'s
+        # simulated distribution) can instead continue from the actual last
+        # observed values via extra_args$series_init (length maxpq).
+        if (maxpq > 0) {
+            if (!is.null(extra_args$series_init)) {
+                if (length(extra_args$series_init) != maxpq) stop(paste0("\nseries_init must be of length max(garch order, arma order) : ", maxpq))
+                series_sim[,seq_len(maxpq)] <- matrix(extra_args$series_init, ncol = maxpq, nrow = nsim, byrow = TRUE)
+            } else {
+                series_sim[,seq_len(maxpq)] <- mu
+            }
+        }
+        # the pre-sample columns of simc$epsilon default to z=1 (a
+        # deterministic, non-zero value used to seed the ARCH init term as
+        # sigma^2 - see the "init" construction above); this is fine for a
+        # squared ARCH term but would leak a spurious deterministic "shock"
+        # into the (sign-sensitive) MA lookback below, so use a copy that
+        # defaults to zeroed pre-sample entries for that purpose instead
+        # (unconditional start, zero shocks), unless the caller supplies the
+        # actual last observed residuals via extra_args$resid_init (length
+        # maxpq). The actual, real-valued forecast/simulated epsilon columns
+        # are unaffected either way.
+        ma_epsilon <- simc$epsilon
+        if (maxpq > 0) {
+            if (!is.null(extra_args$resid_init)) {
+                if (length(extra_args$resid_init) != maxpq) stop(paste0("\nresid_init must be of length max(garch order, arma order) : ", maxpq))
+                ma_epsilon[,seq_len(maxpq)] <- matrix(extra_args$resid_init, ncol = maxpq, nrow = nsim, byrow = TRUE)
+            } else {
+                ma_epsilon[,seq_len(maxpq)] <- 0
+            }
+        }
+        series <- .armasimvec(series_sim = series_sim, epsilon = ma_epsilon, ar = ar, ma = ma, mu = mu, presample = maxpq)
+    } else {
+        series <- simc$series
+    }
     if ((maxpq + burn) > 0) {
         sigma <- sigma[,-seq_len(maxpq + burn), drop = FALSE]
         series <- series[,-seq_len(maxpq + burn), drop = FALSE]
@@ -128,7 +179,7 @@
         initv <- log(var_init)
     }
     if (!is.null(innov_init) & maxpq > 0) {
-        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
+        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
         z[,seq_len(maxpq)] <- innov_init
     }
 
@@ -206,7 +257,7 @@
         z <- cbind(initz, z)
     }
     if (!is.null(innov_init) & maxpq > 0) {
-        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
+        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
         z[,seq_len(maxpq)] <- innov_init
     }
 
@@ -302,7 +353,7 @@
         z <- cbind(initz, z)
     }
     if (!is.null(innov_init) & maxpq > 0) {
-        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
+        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
         z[,seq_len(maxpq)] <- innov_init
     }
     kappa <- gjrgarch_moment(distribution = distribution, skew = dist[1], shape = dist[2], lambda = dist[3])
@@ -393,7 +444,7 @@
         z <- cbind(initz, z)
     }
     if (!is.null(innov_init) & maxpq > 0) {
-        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
+        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
         z[,seq_len(maxpq)] <- innov_init
     }
 
@@ -491,7 +542,7 @@
         z <- cbind(initz, z)
     }
     if (!is.null(innov_init) & maxpq > 0) {
-        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
+        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
         z[,seq_len(maxpq)] <- innov_init
     }
 
@@ -621,7 +672,7 @@
     }
 
     if (!is.null(innov_init) & maxpq > 0) {
-        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(order) : ", maxpq))
+        if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
         z[,seq_len(maxpq)] <- matrix(innov_init, ncol = maxpq, nrow = nsim, byrow = TRUE)
     }
 
@@ -643,7 +694,7 @@
         init <- epsilon[,seq_len(maxpq), drop = FALSE]^2
         init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
     }
-    simc <- .garchsimvec(z = z, epsilon = epsilon, sigma_sqr_sim = sigma_sqr_sim, variance_intercept = variance_intercept, order = order, init = init, alpha = alpha, beta = beta, mu = mu)
+    simc <- .garchsimvec(z = z, epsilon = epsilon, sigma_sqr_sim = sigma_sqr_sim, variance_intercept = variance_intercept, order = order, init = init, alpha = alpha, beta = beta, mu = mu, presample = maxpq)
     sigma <- simc$sigma
     series <- simc$series
     if ((maxpq + burn) > 0) {
