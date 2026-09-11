@@ -83,8 +83,8 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
         stop("arma must be a length 2 non-negative integer vector, e.g. c(1,1).")
     }
     arma <- as.integer(arma)
-    if (sum(arma) > 0 && model != "garch") {
-        stop("\narma is currently only supported for model = \"garch\".")
+    if (sum(arma) > 0 && model %in% c("igarch","ewma")) {
+        stop("\narma is not supported for model = \"", model, "\" (shares the plain garch mean equation).")
     }
     # egarch already in logs
     if (model == "egarch") {

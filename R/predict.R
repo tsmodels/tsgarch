@@ -313,7 +313,6 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     res <- c(init_states$residuals, rep(0, h))
     sigma_sqr <- c(init_states$variance, rep(0, h))
     res_sqr <- res^2
-    y <- rep(0, h)
     if (maxpq == 1) {
         sigma <- sqrt(.predict_egarch_analytic(object, h = h, init_model = init_model, init_states = init_states))
     } else {
@@ -322,7 +321,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
         sigma <- simulate(spec_copy, nsim = 10000, h = h, var_init = init_states$variance, innov_init = init_states$std_residuals, seed = seed)
         sigma <- sqrt(as.numeric(apply(sigma$sigma^2, 2, mean)))
     }
-    y <- rep(model_parameters$mu, h)
+    y <- .arma_mean_forecast(object, h, model_parameters)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim, model_parameters = model_parameters,
@@ -371,7 +370,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     }
     sigma <- power_sigma^(1/model_parameters$delta)
     if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    y <- y + model_parameters$mu
+    y <- .arma_mean_forecast(object, h, model_parameters)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,
@@ -424,7 +423,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     }
     sigma <- sqrt(sigma_sqr)
     if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    y <- y + model_parameters$mu
+    y <- .arma_mean_forecast(object, h, model_parameters)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,
@@ -474,7 +473,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     }
     sigma <- power_sigma^(1/model_parameters$delta)
     if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    y <- y + model_parameters$mu
+    y <- .arma_mean_forecast(object, h, model_parameters)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,
@@ -541,7 +540,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
 
     }
 
-    y <- y + model_parameters$mu
+    y <- .arma_mean_forecast(object, h, model_parameters)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,

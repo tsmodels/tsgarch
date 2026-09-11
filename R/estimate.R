@@ -259,8 +259,8 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
         ar_order <- object$model$arma[1]
         ma_order <- object$model$arma[2]
         arma_table <- list(
-            ar = if (ar_order > 0) rr[rownames(rr) == "phi", , drop = FALSE][seq_len(ar_order), , drop = FALSE] else NULL,
-            ma = if (ma_order > 0) rr[rownames(rr) == "theta", , drop = FALSE][seq_len(ma_order), , drop = FALSE] else NULL)
+            ar = if (ar_order > 0) rr[rownames(rr) == "arma_ar", , drop = FALSE][seq_len(ar_order), , drop = FALSE] else NULL,
+            ma = if (ma_order > 0) rr[rownames(rr) == "arma_ma", , drop = FALSE][seq_len(ma_order), , drop = FALSE] else NULL)
     }
     rm(scaled_tmb)
     return(list(solution = scaled_sol,

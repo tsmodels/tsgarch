@@ -82,8 +82,10 @@ Eigen::MatrixXd armasimvec(Eigen::Map<Eigen::MatrixXd>& series_sim, const Eigen:
 List egarchsimvec(const Eigen::MatrixXd& z, Eigen::MatrixXd& sigma_log_sim, const Eigen::VectorXd& variance_intercept,
                   const Eigen::MatrixXd& init, const Eigen::VectorXd& alpha, const Eigen::VectorXd& gamma,
                   const Eigen::VectorXd& beta, const double kappa, const double mu,
-                  const Eigen::VectorXi& order) {
-    const int maxpq = order.maxCoeff();
+                  const Eigen::VectorXi& order, const int presample) {
+    // see .garchsimvec() above for why this is an explicit parameter rather
+    // than derived from order.maxCoeff()
+    const int maxpq = presample;
     int h = z.cols() - maxpq;
     int nsim = z.rows();
     Eigen::MatrixXd sigma_sim = Eigen::MatrixXd::Zero(nsim, h + maxpq);
@@ -117,8 +119,10 @@ List egarchsimvec(const Eigen::MatrixXd& z, Eigen::MatrixXd& sigma_log_sim, cons
 List aparchsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_power_sim, const Eigen::MatrixXd& z,
                    const Eigen::VectorXd& variance_intercept, const Eigen::MatrixXd& init,
                    const Eigen::VectorXd& alpha, const Eigen::VectorXd& gamma, const Eigen::VectorXd& beta,
-                   const double delta, const double mu, const Eigen::VectorXi& order) {
-    const int maxpq = order.maxCoeff();
+                   const double delta, const double mu, const Eigen::VectorXi& order, const int presample) {
+    // see .garchsimvec() above for why this is an explicit parameter rather
+    // than derived from order.maxCoeff()
+    const int maxpq = presample;
     int h = z.cols() - maxpq; // Assuming z already includes space for burn-in
     int nsim = z.rows();
     Eigen::MatrixXd series_sim = Eigen::MatrixXd::Zero(nsim, h + maxpq);
@@ -151,9 +155,11 @@ List aparchsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_power_sim, co
 // [[Rcpp::export(.gjrsimvec)]]
 List gjrsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_sqr_sim, const Eigen::MatrixXd& z,
                 const Eigen::VectorXd& variance_intercept, const Eigen::MatrixXd& init, const Eigen::VectorXd& alpha,
-                const Eigen::VectorXd& gamma, const Eigen::VectorXd& beta, const double mu, const Eigen::VectorXi& order)
+                const Eigen::VectorXd& gamma, const Eigen::VectorXd& beta, const double mu, const Eigen::VectorXi& order, const int presample)
 {
-    const int maxpq = order.maxCoeff();
+    // see .garchsimvec() above for why this is an explicit parameter rather
+    // than derived from order.maxCoeff()
+    const int maxpq = presample;
     int h = z.cols() - maxpq; // Assuming z already includes space for burn-in
     int nsim = z.rows();
     Eigen::MatrixXd sigma_sim = Eigen::MatrixXd::Zero(nsim, h + maxpq);
@@ -189,8 +195,10 @@ List gjrsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_sqr_sim, const E
 List fgarchsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_power_sim, const Eigen::MatrixXd& z,
                    const Eigen::VectorXd& variance_intercept, const Eigen::MatrixXd& init, const Eigen::VectorXd& alpha,
                    const Eigen::VectorXd& gamma, const Eigen::VectorXd& eta, const Eigen::VectorXd& beta,
-                   const double delta, const double mu, const Eigen::VectorXi& order) {
-    const int maxpq = order.maxCoeff();
+                   const double delta, const double mu, const Eigen::VectorXi& order, const int presample) {
+    // see .garchsimvec() above for why this is an explicit parameter rather
+    // than derived from order.maxCoeff()
+    const int maxpq = presample;
     int h = z.cols() - maxpq; // Assuming z already includes space for burn-in
     int nsim = z.rows();
     Eigen::MatrixXd series_sim = Eigen::MatrixXd::Zero(nsim, h + maxpq);
@@ -225,8 +233,10 @@ List cgarchsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_sqr_sim, cons
                    const Eigen::VectorXd& variance_intercept, Eigen::MatrixXd& transitory_component_sim,
                    Eigen::MatrixXd& permanent_component_sim, const Eigen::VectorXd& alpha,
                    const Eigen::VectorXd& phi, const Eigen::VectorXd& rho, const Eigen::VectorXd& beta,
-                   const double mu, const Eigen::VectorXi& order) {
-    const int maxpq = order.maxCoeff();
+                   const double mu, const Eigen::VectorXi& order, const int presample) {
+    // see .garchsimvec() above for why this is an explicit parameter rather
+    // than derived from order.maxCoeff()
+    const int maxpq = presample;
     int h = z.cols() - maxpq; // Assuming z already includes space for burn-in
     int nsim = z.rows();
     Eigen::MatrixXd series_sim = Eigen::MatrixXd::Zero(nsim, h + maxpq);

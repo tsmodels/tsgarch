@@ -89,9 +89,9 @@ Type garchfun(objective_function<Type>* obj) {
     //   (y_t - mu) = sum_i phi_i * (y_{t-i} - mu) + eps_t + sum_j theta_j * eps_{t-j}
     // so that mu retains its interpretation as the unconditional mean of y
     // (when ar_order = ma_order = 0 this reduces exactly to eps_t = y_t - mu,
-    // i.e. the pre-ARMA behavior). phi/theta are guaranteed stationary/invertible.
-    vector<Type> phi = garchextra::pacf_to_ar(arpacf);
-    vector<Type> theta = garchextra::pacf_to_ma(mapacf);
+    // i.e. the pre-ARMA behavior). arma_ar/arma_ma are guaranteed stationary/invertible.
+    vector<Type> arma_ar = garchextra::pacf_to_ar(arpacf);
+    vector<Type> arma_ma = garchextra::pacf_to_ma(mapacf);
     vector<Type> z = y.array() - mu;
     // y's pre-sample rows (indices < cmodel(0)) are zero-padded by the R
     // wrapper, which would otherwise leak z(presample) = 0 - mu = -mu into
@@ -113,10 +113,10 @@ Type garchfun(objective_function<Type>* obj) {
     for (int i = cmodel(0); i < timesteps; i++) {
         Type mean_i = Type(0.0);
         for (j = 0; j < ar_order; j++) {
-            mean_i += phi(j) * z(i - j - 1);
+            mean_i += arma_ar(j) * z(i - j - 1);
         }
         for (j = 0; j < ma_order; j++) {
-            mean_i += theta(j) * residuals(i - j - 1);
+            mean_i += arma_ma(j) * residuals(i - j - 1);
         }
         residuals(i) = z(i) - mean_i;
         conditional_mean(i) = mu + mean_i;
@@ -183,12 +183,12 @@ Type garchfun(objective_function<Type>* obj) {
     REPORT(initial_arch);
     REPORT(sigma);
     REPORT(ll_vector);
-    REPORT(phi);
-    REPORT(theta);
+    REPORT(arma_ar);
+    REPORT(arma_ma);
     REPORT(residuals);
     REPORT(conditional_mean);
-    ADREPORT(phi);
-    ADREPORT(theta);
+    ADREPORT(arma_ar);
+    ADREPORT(arma_ma);
     Type nll = Type(-1.0) * ll_vector.log().sum();
     return(nll);
 }

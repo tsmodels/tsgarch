@@ -75,8 +75,9 @@ test_that("arma: joint ARMA(1,1)-GARCH(1,1) estimation is well-behaved and neste
     expect_true(mod1$conditions$kkt1)
 })
 
-test_that("arma: is currently rejected for non-garch models", {
-    expect_error(garch_modelspec(y[1:1800,1], constant = TRUE, model = "egarch", order = c(1,1), arma = c(1,0)))
+test_that("arma: is rejected for igarch/ewma (share the plain garch mean equation with no native arma support)", {
+    expect_error(garch_modelspec(y[1:1800,1], constant = TRUE, model = "igarch", order = c(1,1), arma = c(1,0)))
+    expect_error(garch_modelspec(y[1:1800,1], constant = TRUE, model = "ewma", arma = c(1,0)))
 })
 
 test_that("arma: residuals() returns the true ARMA residual, not y - mu", {
@@ -284,3 +285,74 @@ for (nm in names(arma_orders_to_test)) {
         })
     })
 }
+
+# ---------------------------------------------------------------------------
+# ARMA support across all 6 native GARCH variants (garch, egarch, gjrgarch,
+# aparch, fgarch, cgarch). igarch/ewma are intentionally excluded: they share
+# the plain "garch" TMB template with no native ARMA support (see
+# garch_modelspec()'s validation).
+# ---------------------------------------------------------------------------
+
+for (mdl in c("garch", "egarch", "gjrgarch", "aparch", "fgarch", "cgarch")) {
+    local({
+        model <- mdl
+
+        test_that(paste0("arma: ", model, " estimates ARMA(1,1)-GARCH(1,1) with improved likelihood and valid KKT"), {
+            spec0 <- garch_modelspec(y[1:1800,1], constant = TRUE, model = model, order = c(1,1), arma = c(0,0))
+            spec1 <- garch_modelspec(y[1:1800,1], constant = TRUE, model = model, order = c(1,1), arma = c(1,1))
+            mod0 <- estimate(spec0)
+            mod1 <- estimate(spec1)
+            expect_true(as.numeric(logLik(mod1)) >= as.numeric(logLik(mod0)) - 1e-4)
+            expect_true(mod1$conditions$kkt1)
+            ac <- arma_coefficients(mod1)
+            expect_true(min(Mod(polyroot(c(1, -as.numeric(ac$ar))))) > 1)
+            expect_true(min(Mod(polyroot(c(1, as.numeric(ac$ma))))) > 1)
+        })
+
+        test_that(paste0("arma: ", model, " fitted()/residuals() are consistent, with arma order > garch order"), {
+            spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = model, order = c(1,1), arma = c(2,2))
+            mod <- estimate(spec)
+            f <- as.numeric(fitted(mod))
+            expect_length(f, mod$nobs)
+            expect_true(length(unique(round(f, 8))) > 1)
+            expect_equal(as.numeric(residuals(mod)), as.numeric(mod$spec$target$y_orig) - f)
+        })
+
+        test_that(paste0("arma: ", model, " predict() bands are consistent with the analytic mean, with arma order > garch order"), {
+            spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = model, order = c(1,1), arma = c(2,2))
+            mod <- estimate(spec)
+            p <- predict(mod, h = 8, nsim = 20000, seed = 1)
+            mc_mean <- colMeans(p$distribution)
+            expect_true(all(abs(mc_mean - as.numeric(p$mean)) < 0.01))
+        })
+
+        test_that(paste0("arma: ", model, " simulate() zero-innovation path reduces exactly to mu, with arma order > garch order"), {
+            spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = model, order = c(1,1), arma = c(2,2))
+            mod <- estimate(spec)
+            mu <- mod$parmatrix[parameter == "mu"]$value
+            spec_sim <- mod$spec
+            spec_sim$parmatrix <- mod$parmatrix
+            zeroinnov <- matrix(0, nrow = 1, ncol = 20)
+            sim0 <- simulate(spec_sim, h = 20, nsim = 1, innov = zeroinnov, seed = 1)
+            expect_equal(as.numeric(sim0$series), rep(mu, 20), tolerance = 1e-8)
+        })
+
+        test_that(paste0("arma: ", model, " tsfilter() chained append matches a direct re-fit, with arma order > garch order"), {
+            spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = model, order = c(1,1), arma = c(2,2))
+            mod <- estimate(spec)
+            new_y <- y[1801:1974,1]
+            filtered <- tsfilter(mod, y = new_y)
+            expect_length(filtered$conditional_mu, 1974)
+            spec_full <- garch_modelspec(y[,1], constant = TRUE, model = model, order = c(1,1), arma = c(2,2))
+            spec_full$parmatrix <- copy(mod$parmatrix)
+            full_direct <- tsfilter(spec_full)
+            expect_equal(as.numeric(full_direct$conditional_mu), as.numeric(filtered$conditional_mu), tolerance = 1e-6)
+        })
+    })
+}
+
+test_that("arma: is rejected for igarch/ewma but allowed for all 6 native variants", {
+    for (mdl in c("garch", "egarch", "gjrgarch", "aparch", "fgarch", "cgarch")) {
+        expect_error(garch_modelspec(y[1:1800,1], constant = TRUE, model = mdl, order = c(1,1), arma = c(1,1)), NA)
+    }
+})

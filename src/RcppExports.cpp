@@ -161,8 +161,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // egarchsimvec
-List egarchsimvec(const Eigen::MatrixXd& z, Eigen::MatrixXd& sigma_log_sim, const Eigen::VectorXd& variance_intercept, const Eigen::MatrixXd& init, const Eigen::VectorXd& alpha, const Eigen::VectorXd& gamma, const Eigen::VectorXd& beta, const double kappa, const double mu, const Eigen::VectorXi& order);
-RcppExport SEXP _tsgarch_egarchsimvec(SEXP zSEXP, SEXP sigma_log_simSEXP, SEXP variance_interceptSEXP, SEXP initSEXP, SEXP alphaSEXP, SEXP gammaSEXP, SEXP betaSEXP, SEXP kappaSEXP, SEXP muSEXP, SEXP orderSEXP) {
+List egarchsimvec(const Eigen::MatrixXd& z, Eigen::MatrixXd& sigma_log_sim, const Eigen::VectorXd& variance_intercept, const Eigen::MatrixXd& init, const Eigen::VectorXd& alpha, const Eigen::VectorXd& gamma, const Eigen::VectorXd& beta, const double kappa, const double mu, const Eigen::VectorXi& order, const int presample);
+RcppExport SEXP _tsgarch_egarchsimvec(SEXP zSEXP, SEXP sigma_log_simSEXP, SEXP variance_interceptSEXP, SEXP initSEXP, SEXP alphaSEXP, SEXP gammaSEXP, SEXP betaSEXP, SEXP kappaSEXP, SEXP muSEXP, SEXP orderSEXP, SEXP presampleSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -176,13 +176,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const double >::type kappa(kappaSEXP);
     Rcpp::traits::input_parameter< const double >::type mu(muSEXP);
     Rcpp::traits::input_parameter< const Eigen::VectorXi& >::type order(orderSEXP);
-    rcpp_result_gen = Rcpp::wrap(egarchsimvec(z, sigma_log_sim, variance_intercept, init, alpha, gamma, beta, kappa, mu, order));
+    Rcpp::traits::input_parameter< const int >::type presample(presampleSEXP);
+    rcpp_result_gen = Rcpp::wrap(egarchsimvec(z, sigma_log_sim, variance_intercept, init, alpha, gamma, beta, kappa, mu, order, presample));
     return rcpp_result_gen;
 END_RCPP
 }
 // aparchsimvec
-List aparchsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_power_sim, const Eigen::MatrixXd& z, const Eigen::VectorXd& variance_intercept, const Eigen::MatrixXd& init, const Eigen::VectorXd& alpha, const Eigen::VectorXd& gamma, const Eigen::VectorXd& beta, const double delta, const double mu, const Eigen::VectorXi& order);
-RcppExport SEXP _tsgarch_aparchsimvec(SEXP epsilonSEXP, SEXP sigma_power_simSEXP, SEXP zSEXP, SEXP variance_interceptSEXP, SEXP initSEXP, SEXP alphaSEXP, SEXP gammaSEXP, SEXP betaSEXP, SEXP deltaSEXP, SEXP muSEXP, SEXP orderSEXP) {
+List aparchsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_power_sim, const Eigen::MatrixXd& z, const Eigen::VectorXd& variance_intercept, const Eigen::MatrixXd& init, const Eigen::VectorXd& alpha, const Eigen::VectorXd& gamma, const Eigen::VectorXd& beta, const double delta, const double mu, const Eigen::VectorXi& order, const int presample);
+RcppExport SEXP _tsgarch_aparchsimvec(SEXP epsilonSEXP, SEXP sigma_power_simSEXP, SEXP zSEXP, SEXP variance_interceptSEXP, SEXP initSEXP, SEXP alphaSEXP, SEXP gammaSEXP, SEXP betaSEXP, SEXP deltaSEXP, SEXP muSEXP, SEXP orderSEXP, SEXP presampleSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -197,13 +198,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const double >::type delta(deltaSEXP);
     Rcpp::traits::input_parameter< const double >::type mu(muSEXP);
     Rcpp::traits::input_parameter< const Eigen::VectorXi& >::type order(orderSEXP);
-    rcpp_result_gen = Rcpp::wrap(aparchsimvec(epsilon, sigma_power_sim, z, variance_intercept, init, alpha, gamma, beta, delta, mu, order));
+    Rcpp::traits::input_parameter< const int >::type presample(presampleSEXP);
+    rcpp_result_gen = Rcpp::wrap(aparchsimvec(epsilon, sigma_power_sim, z, variance_intercept, init, alpha, gamma, beta, delta, mu, order, presample));
     return rcpp_result_gen;
 END_RCPP
 }
 // gjrsimvec
-List gjrsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_sqr_sim, const Eigen::MatrixXd& z, const Eigen::VectorXd& variance_intercept, const Eigen::MatrixXd& init, const Eigen::VectorXd& alpha, const Eigen::VectorXd& gamma, const Eigen::VectorXd& beta, const double mu, const Eigen::VectorXi& order);
-RcppExport SEXP _tsgarch_gjrsimvec(SEXP epsilonSEXP, SEXP sigma_sqr_simSEXP, SEXP zSEXP, SEXP variance_interceptSEXP, SEXP initSEXP, SEXP alphaSEXP, SEXP gammaSEXP, SEXP betaSEXP, SEXP muSEXP, SEXP orderSEXP) {
+List gjrsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_sqr_sim, const Eigen::MatrixXd& z, const Eigen::VectorXd& variance_intercept, const Eigen::MatrixXd& init, const Eigen::VectorXd& alpha, const Eigen::VectorXd& gamma, const Eigen::VectorXd& beta, const double mu, const Eigen::VectorXi& order, const int presample);
+RcppExport SEXP _tsgarch_gjrsimvec(SEXP epsilonSEXP, SEXP sigma_sqr_simSEXP, SEXP zSEXP, SEXP variance_interceptSEXP, SEXP initSEXP, SEXP alphaSEXP, SEXP gammaSEXP, SEXP betaSEXP, SEXP muSEXP, SEXP orderSEXP, SEXP presampleSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -217,13 +219,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type beta(betaSEXP);
     Rcpp::traits::input_parameter< const double >::type mu(muSEXP);
     Rcpp::traits::input_parameter< const Eigen::VectorXi& >::type order(orderSEXP);
-    rcpp_result_gen = Rcpp::wrap(gjrsimvec(epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, gamma, beta, mu, order));
+    Rcpp::traits::input_parameter< const int >::type presample(presampleSEXP);
+    rcpp_result_gen = Rcpp::wrap(gjrsimvec(epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, gamma, beta, mu, order, presample));
     return rcpp_result_gen;
 END_RCPP
 }
 // fgarchsimvec
-List fgarchsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_power_sim, const Eigen::MatrixXd& z, const Eigen::VectorXd& variance_intercept, const Eigen::MatrixXd& init, const Eigen::VectorXd& alpha, const Eigen::VectorXd& gamma, const Eigen::VectorXd& eta, const Eigen::VectorXd& beta, const double delta, const double mu, const Eigen::VectorXi& order);
-RcppExport SEXP _tsgarch_fgarchsimvec(SEXP epsilonSEXP, SEXP sigma_power_simSEXP, SEXP zSEXP, SEXP variance_interceptSEXP, SEXP initSEXP, SEXP alphaSEXP, SEXP gammaSEXP, SEXP etaSEXP, SEXP betaSEXP, SEXP deltaSEXP, SEXP muSEXP, SEXP orderSEXP) {
+List fgarchsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_power_sim, const Eigen::MatrixXd& z, const Eigen::VectorXd& variance_intercept, const Eigen::MatrixXd& init, const Eigen::VectorXd& alpha, const Eigen::VectorXd& gamma, const Eigen::VectorXd& eta, const Eigen::VectorXd& beta, const double delta, const double mu, const Eigen::VectorXi& order, const int presample);
+RcppExport SEXP _tsgarch_fgarchsimvec(SEXP epsilonSEXP, SEXP sigma_power_simSEXP, SEXP zSEXP, SEXP variance_interceptSEXP, SEXP initSEXP, SEXP alphaSEXP, SEXP gammaSEXP, SEXP etaSEXP, SEXP betaSEXP, SEXP deltaSEXP, SEXP muSEXP, SEXP orderSEXP, SEXP presampleSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -239,13 +242,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const double >::type delta(deltaSEXP);
     Rcpp::traits::input_parameter< const double >::type mu(muSEXP);
     Rcpp::traits::input_parameter< const Eigen::VectorXi& >::type order(orderSEXP);
-    rcpp_result_gen = Rcpp::wrap(fgarchsimvec(epsilon, sigma_power_sim, z, variance_intercept, init, alpha, gamma, eta, beta, delta, mu, order));
+    Rcpp::traits::input_parameter< const int >::type presample(presampleSEXP);
+    rcpp_result_gen = Rcpp::wrap(fgarchsimvec(epsilon, sigma_power_sim, z, variance_intercept, init, alpha, gamma, eta, beta, delta, mu, order, presample));
     return rcpp_result_gen;
 END_RCPP
 }
 // cgarchsimvec
-List cgarchsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_sqr_sim, const Eigen::MatrixXd& z, const Eigen::VectorXd& variance_intercept, Eigen::MatrixXd& transitory_component_sim, Eigen::MatrixXd& permanent_component_sim, const Eigen::VectorXd& alpha, const Eigen::VectorXd& phi, const Eigen::VectorXd& rho, const Eigen::VectorXd& beta, const double mu, const Eigen::VectorXi& order);
-RcppExport SEXP _tsgarch_cgarchsimvec(SEXP epsilonSEXP, SEXP sigma_sqr_simSEXP, SEXP zSEXP, SEXP variance_interceptSEXP, SEXP transitory_component_simSEXP, SEXP permanent_component_simSEXP, SEXP alphaSEXP, SEXP phiSEXP, SEXP rhoSEXP, SEXP betaSEXP, SEXP muSEXP, SEXP orderSEXP) {
+List cgarchsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_sqr_sim, const Eigen::MatrixXd& z, const Eigen::VectorXd& variance_intercept, Eigen::MatrixXd& transitory_component_sim, Eigen::MatrixXd& permanent_component_sim, const Eigen::VectorXd& alpha, const Eigen::VectorXd& phi, const Eigen::VectorXd& rho, const Eigen::VectorXd& beta, const double mu, const Eigen::VectorXi& order, const int presample);
+RcppExport SEXP _tsgarch_cgarchsimvec(SEXP epsilonSEXP, SEXP sigma_sqr_simSEXP, SEXP zSEXP, SEXP variance_interceptSEXP, SEXP transitory_component_simSEXP, SEXP permanent_component_simSEXP, SEXP alphaSEXP, SEXP phiSEXP, SEXP rhoSEXP, SEXP betaSEXP, SEXP muSEXP, SEXP orderSEXP, SEXP presampleSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -261,7 +265,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type beta(betaSEXP);
     Rcpp::traits::input_parameter< const double >::type mu(muSEXP);
     Rcpp::traits::input_parameter< const Eigen::VectorXi& >::type order(orderSEXP);
-    rcpp_result_gen = Rcpp::wrap(cgarchsimvec(epsilon, sigma_sqr_sim, z, variance_intercept, transitory_component_sim, permanent_component_sim, alpha, phi, rho, beta, mu, order));
+    Rcpp::traits::input_parameter< const int >::type presample(presampleSEXP);
+    rcpp_result_gen = Rcpp::wrap(cgarchsimvec(epsilon, sigma_sqr_sim, z, variance_intercept, transitory_component_sim, permanent_component_sim, alpha, phi, rho, beta, mu, order, presample));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -275,11 +280,11 @@ static const R_CallMethodDef CallEntries[] = {
     {"_tsgarch_cgarchfilter", (DL_FUNC) &_tsgarch_cgarchfilter, 9},
     {"_tsgarch_garchsimvec", (DL_FUNC) &_tsgarch_garchsimvec, 10},
     {"_tsgarch_armasimvec", (DL_FUNC) &_tsgarch_armasimvec, 6},
-    {"_tsgarch_egarchsimvec", (DL_FUNC) &_tsgarch_egarchsimvec, 10},
-    {"_tsgarch_aparchsimvec", (DL_FUNC) &_tsgarch_aparchsimvec, 11},
-    {"_tsgarch_gjrsimvec", (DL_FUNC) &_tsgarch_gjrsimvec, 10},
-    {"_tsgarch_fgarchsimvec", (DL_FUNC) &_tsgarch_fgarchsimvec, 12},
-    {"_tsgarch_cgarchsimvec", (DL_FUNC) &_tsgarch_cgarchsimvec, 12},
+    {"_tsgarch_egarchsimvec", (DL_FUNC) &_tsgarch_egarchsimvec, 11},
+    {"_tsgarch_aparchsimvec", (DL_FUNC) &_tsgarch_aparchsimvec, 12},
+    {"_tsgarch_gjrsimvec", (DL_FUNC) &_tsgarch_gjrsimvec, 11},
+    {"_tsgarch_fgarchsimvec", (DL_FUNC) &_tsgarch_fgarchsimvec, 13},
+    {"_tsgarch_cgarchsimvec", (DL_FUNC) &_tsgarch_cgarchsimvec, 13},
     {NULL, NULL, 0}
 };
 

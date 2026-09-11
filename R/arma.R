@@ -100,6 +100,65 @@ ar_to_pacf <- function(phi) coef_to_pacf(phi)
 #' @noRd
 ma_to_pacf <- function(theta) -coef_to_pacf(-theta)
 
+#' Construct the arpacf/mapacf parmatrix rows for a model's mean equation
+#'
+#' @description Builds the \sQuote{arpacf}/\sQuote{mapacf} parameter rows
+#' shared by every \sQuote{.parameters_<model>} initializer (see
+#' R/initialization.R), holding the raw Durbin-Levinson (partial
+#' autocorrelation) parameters rather than the AR/MA coefficients themselves.
+#' Any value in \sQuote{(-1,1)} maps (inside the TMB template) to AR
+#' coefficients in the stationarity region and MA coefficients in the
+#' invertibility region, so no additional nonlinear constraint is required.
+#' The actual ar/ma coefficients implied by these raw values are available
+#' separately via \code{\link{arma_coefficients}}.
+#' @param y numeric vector, the (not necessarily demeaned) target series;
+#' only used, together with \code{mu}, to generate \code{stats::arima}-based
+#' starting values when \sQuote{sum(arma) > 0}.
+#' @param mu the (scalar) constant/unconditional mean value.
+#' @param arma length 2 integer vector \sQuote{c(ar, ma)}.
+#' @return a \code{data.table} with the same columns as the rest of a
+#' \sQuote{parmatrix} (parameter, value, lower, upper, estimate, scale,
+#' group, equation, symbol), with \sQuote{ar_order} (or 1, as a fixed dummy
+#' row when \sQuote{ar_order = 0}) rows of group \sQuote{arpacf} followed by
+#' \sQuote{ma_order} (or 1 dummy) rows of group \sQuote{mapacf}.
+#' @keywords internal
+#' @noRd
+arma_parmatrix_rows <- function(y, mu, arma)
+{
+    ar_order <- arma[1]
+    ma_order <- arma[2]
+    if (sum(arma) > 0) {
+        arma_pacf <- initialize_arma_pacf(y - mu, arma)
+    } else {
+        arma_pacf <- list(ar = numeric(0), ma = numeric(0))
+    }
+    if (ar_order == 0) {
+        ar_rows <- data.table("parameter" = "arpacf1", value = 0,
+                              lower = -0.995, upper = 0.995, estimate = 0,
+                              scale = 1, group = "arpacf", equation = "[M]",
+                              symbol = "r^{ar}_1")
+    } else {
+        ar_rows <- data.table("parameter" = paste0("arpacf",1:ar_order),
+                              value = arma_pacf$ar, lower = -0.995, upper = 0.995,
+                              estimate = 1, scale = 1, group = "arpacf",
+                              equation = "[M]",
+                              symbol = paste0("r^{ar}_",1:ar_order))
+    }
+    if (ma_order == 0) {
+        ma_rows <- data.table("parameter" = "mapacf1", value = 0,
+                              lower = -0.995, upper = 0.995, estimate = 0,
+                              scale = 1, group = "mapacf", equation = "[M]",
+                              symbol = "r^{ma}_1")
+    } else {
+        ma_rows <- data.table("parameter" = paste0("mapacf",1:ma_order),
+                              value = arma_pacf$ma, lower = -0.995, upper = 0.995,
+                              estimate = 1, scale = 1, group = "mapacf",
+                              equation = "[M]",
+                              symbol = paste0("r^{ma}_",1:ma_order))
+    }
+    rbind(ar_rows, ma_rows)
+}
+
 #' Initial values for the ARMA mean equation parameters
 #'
 #' @description Fits an unconstrained \code{stats::arima} model to (demeaned)
