@@ -139,10 +139,17 @@ sigma.tsgarch.multi_estimate <- function(object, ...)
 #' @param object an object of class \dQuote{tsgarch.estimate} or
 #' \dQuote{tsgarch.multi_estimate}.
 #' @param ... not currently used.
-#' @returns An xts vector of the fitted values for the univariate type
-#' objects. In the case of a multi-estimate object, a list of xts vectors is
-#' returned if the individual univariate objects have unequal indices, else an
-#' xts matrix is returned.
+#' @returns An xts vector of the fitted values (the model's conditional mean)
+#' for the univariate type objects, always the same length as the original
+#' series. When \sQuote{arma = c(0,0)} (the default) this is a constant,
+#' equal to \sQuote{mu} (or zero if \sQuote{constant = FALSE}). When an ARMA
+#' mean equation is specified (currently only for \sQuote{model = "garch"},
+#' \sQuote{"egarch"}, \sQuote{"gjrgarch"}, \sQuote{"aparch"}, \sQuote{"fgarch"}
+#' or \sQuote{"cgarch"}) this is the genuinely time-varying conditional mean
+#' implied by the AR/MA recursion; see \code{\link{arma_coefficients}} for
+#' the estimated AR/MA coefficients. In the case of a multi-estimate object,
+#' a list of xts vectors is returned if the individual univariate objects
+#' have unequal indices, else an xts matrix is returned.
 #' @aliases fitted
 #' @method fitted tsgarch.estimate
 #' @rdname fitted
@@ -188,12 +195,16 @@ fitted.tsgarch.multi_estimate <- function(object, ...)
 #' @param standardize logical. Whether to standardize the residuals by the
 #' conditional volatility.
 #' @param ... not currently used.
-#' @returns An xts vector of the model residuals for the univariate type
-#' objects. In the case of a multi-estimate object, a list of xts vectors is
-#' returned if the individual univariate objects have unequal indices, else an
-#' xts matrix is returned.
-#' Note that If the model had no constant in the conditional mean equation then this
-#' just returns the original data (which is assumed to be zero mean noise).
+#' @returns An xts vector of the model residuals (\sQuote{y - fitted(object)},
+#' see \code{\link{fitted}}) for the univariate type objects. In the case of
+#' a multi-estimate object, a list of xts vectors is returned if the
+#' individual univariate objects have unequal indices, else an xts matrix is
+#' returned.
+#' Note that if the model had no constant and no ARMA mean equation, then
+#' this just returns the original data (which is assumed to be zero mean
+#' noise). When an ARMA mean equation is specified, these are the true ARMA
+#' innovations (i.e. the recursion's \sQuote{eps_t}), not simply
+#' \sQuote{y - mu}.
 #' @aliases residuals
 #' @method residuals tsgarch.estimate
 #' @rdname residuals
@@ -367,7 +378,7 @@ logLik.tsgarch.estimate <- function(object, ...)
 #'
 summary.tsgarch.estimate <- function(object, digits = 4, vcov_type = "H", include_persistence = TRUE, ...)
 {
-    estimate <- NULL
+    estimate <- parameter <- term <- NULL
     V <- vcov(object, type = vcov_type)
     est <- object$parmatrix[estimate == 1]$value
     par_names <- object$parmatrix[estimate == 1]$parameters
@@ -394,6 +405,34 @@ summary.tsgarch.estimate <- function(object, digits = 4, vcov_type = "H", includ
     initvar <- object$var_initial
     setnames(coefficients, "rn","term")
     syms <- object$parmatrix[estimate == 1]$symbol
+    # ARMA: display the transformed (true) ar/ma coefficients and their
+    # delta-method standard errors (object$arma_summary, from ADREPORT'd
+    # arma_ar/arma_ma via sdreport - see estimate.R) in place of the raw,
+    # not-directly-interpretable Durbin-Levinson pacf parameters
+    # (arpacf#/mapacf#) used internally during estimation.
+    if (!is.null(object$arma_summary)) {
+        term_labels <- object$parmatrix[estimate == 1]$parameter
+        ar_idx <- which(grepl("^arpacf", term_labels))
+        ma_idx <- which(grepl("^mapacf", term_labels))
+        if (length(ar_idx) > 0 && !is.null(object$arma_summary$ar)) {
+            ar_tab <- object$arma_summary$ar
+            coefficients[ar_idx, `Estimate` := ar_tab[,"Estimate"]]
+            coefficients[ar_idx, `Std. Error` := ar_tab[,"Std. Error"]]
+            coefficients[ar_idx, `t value` := ar_tab[,"z value"]]
+            coefficients[ar_idx, `Pr(>|t|)` := ar_tab[,"Pr(>|z^2|)"]]
+            coefficients[ar_idx, term := paste0("ar", seq_along(ar_idx))]
+            syms[ar_idx] <- paste0("\\phi_",seq_along(ar_idx))
+        }
+        if (length(ma_idx) > 0 && !is.null(object$arma_summary$ma)) {
+            ma_tab <- object$arma_summary$ma
+            coefficients[ma_idx, `Estimate` := ma_tab[,"Estimate"]]
+            coefficients[ma_idx, `Std. Error` := ma_tab[,"Std. Error"]]
+            coefficients[ma_idx, `t value` := ma_tab[,"z value"]]
+            coefficients[ma_idx, `Pr(>|t|)` := ma_tab[,"Pr(>|z^2|)"]]
+            coefficients[ma_idx, term := paste0("ma", seq_along(ma_idx))]
+            syms[ma_idx] <- paste0("\\theta_",seq_along(ma_idx))
+        }
+    }
     if (object$spec$model$variance_targeting) {
         syms <- c(syms, "\\omega")
     }

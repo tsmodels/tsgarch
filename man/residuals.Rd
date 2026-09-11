@@ -20,12 +20,16 @@ conditional volatility.}
 \item{...}{not currently used.}
 }
 \value{
-An xts vector of the model residuals for the univariate type
-objects. In the case of a multi-estimate object, a list of xts vectors is
-returned if the individual univariate objects have unequal indices, else an
-xts matrix is returned.
-Note that If the model had no constant in the conditional mean equation then this
-just returns the original data (which is assumed to be zero mean noise).
+An xts vector of the model residuals (\sQuote{y - fitted(object)},
+see \code{\link{fitted}}) for the univariate type objects. In the case of
+a multi-estimate object, a list of xts vectors is returned if the
+individual univariate objects have unequal indices, else an xts matrix is
+returned.
+Note that if the model had no constant and no ARMA mean equation, then
+this just returns the original data (which is assumed to be zero mean
+noise). When an ARMA mean equation is specified, these are the true ARMA
+innovations (i.e. the recursion's \sQuote{eps_t}), not simply
+\sQuote{y - mu}.
 }
 \description{
 Extract the residuals of the estimated model.

@@ -351,6 +351,25 @@ for (mdl in c("garch", "egarch", "gjrgarch", "aparch", "fgarch", "cgarch")) {
     })
 }
 
+test_that("arma: summary()/print()/as_flextable() show the transformed ar/ma coefficients, not raw arpacf/mapacf", {
+    spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(2,1))
+    mod <- estimate(spec)
+    s <- summary(mod)
+    expect_true(all(c("ar1","ar2","ma1") %in% s$coefficients$term))
+    expect_false(any(grepl("^arpacf|^mapacf", s$coefficients$term)))
+    ac <- arma_coefficients(mod)
+    expect_equal(s$coefficients[term == "ar1"]$Estimate, unname(ac$ar["ar1"]))
+    expect_equal(s$coefficients[term == "ar2"]$Estimate, unname(ac$ar["ar2"]))
+    expect_equal(s$coefficients[term == "ma1"]$Estimate, unname(ac$ma["ma1"]))
+    expect_equal(s$symbol[s$coefficients$term == "ar1"], "\\phi_1")
+    expect_equal(s$symbol[s$coefficients$term == "ma1"], "\\theta_1")
+    # unaffected when arma = c(0,0)
+    spec0 <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1))
+    mod0 <- estimate(spec0)
+    s0 <- summary(mod0)
+    expect_false(any(grepl("^ar[0-9]|^ma[0-9]", s0$coefficients$term)))
+})
+
 test_that("arma: is rejected for igarch/ewma but allowed for all 6 native variants", {
     for (mdl in c("garch", "egarch", "gjrgarch", "aparch", "fgarch", "cgarch")) {
         expect_error(garch_modelspec(y[1:1800,1], constant = TRUE, model = mdl, order = c(1,1), arma = c(1,1)), NA)
