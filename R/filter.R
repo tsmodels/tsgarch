@@ -38,6 +38,15 @@
     parmatrix[parameter == "omega", value := target_omega]
     # return the ll_vector
     llvector <- -1.0 * log(tmb$report(pars)$ll_vector)
+    # ARMA mean equation residuals eps_t = (y_t - mu) - arma_recursion(y, eps),
+    # only reported by the "garch" TMB template when arma > c(0,0) (see
+    # garchfun.hpp); used to seed subsequent incremental tsfilter() calls
+    # (see .filter.tsgarch.estimate() / arma_filter_extend()).
+    arma_residuals <- NULL
+    if (!is.null(newspec$model$arma) && sum(newspec$model$arma) > 0) {
+        arma_residuals <- env$tmb$report(pars)$residuals
+        if (m > 0) arma_residuals <- arma_residuals[-seq_len(m)]
+    }
     out <- list(parmatrix = parmatrix, scaled_hessian = hessian,
                 scaled_scores = scores,
                 parameter_scale = rep(1, length(pars)),
@@ -54,7 +63,8 @@
                 variance_target_summary = variance_target_table,
                 # extra degree of freedom for the init_variance
                 npars = NROW(parmatrix[estimate == 1]) + 1,
-                spec = spec)
+                spec = spec,
+                arma_residuals = arma_residuals)
     if (object$model$model == "cgarch") {
         permanent_component <- env$tmb$report(pars)$permanent_component
         transitory_component <- env$tmb$report(pars)$transitory_component
@@ -84,7 +94,17 @@
     xi <- extract_model_values(object, object_type = "estimate", value_name = "xi")
     dpars <- extract_model_values(object, object_type = "estimate", value_name = "distribution")
     omega <- omega(object)
-    L <- list(v_orig = v_orig, mu = mu, alpha = alpha, beta = beta, xi = xi, dpars = dpars, omega = omega)
+    arma_order <- object$spec$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
+    if (sum(arma_order) > 0) {
+        arma_coef <- arma_coefficients(object)
+        ar <- as.numeric(arma_coef$ar)
+        ma <- as.numeric(arma_coef$ma)
+    } else {
+        ar <- numeric(0)
+        ma <- numeric(0)
+    }
+    L <- list(v_orig = v_orig, mu = mu, alpha = alpha, beta = beta, xi = xi, dpars = dpars, omega = omega, ar = ar, ma = ma)
     if (model == "egarch" | model == "gjrgarch") {
         gamma <- extract_model_values(object, object_type = "estimate", value_name = "gamma")
         L$gamma <- gamma
@@ -176,8 +196,24 @@
         initstate <- cbind(tail(object$transitory_component, maxpq), tail(object$permanent_component, maxpq))
     }
     v <- as.numeric(v_new %*% L$xi)
-    residuals <- as.numeric(y_new) - L$mu
-    residuals <- tail(residuals, n + maxpq)
+    arma_order <- spec$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
+    if (sum(arma_order) > 0) {
+        # continue the ARMA mean recursion (see garchfun.hpp) for the newly
+        # appended observations only, using the already-computed historical
+        # residuals as the continuation state (object$arma_residuals, set by
+        # estimate()/.filter.tsgarch.spec() and updated below so repeated
+        # tsfilter() calls keep chaining correctly).
+        old_residuals <- object$arma_residuals
+        if (is.null(old_residuals)) {
+            stop("\nobject does not carry arma_residuals but has arma > c(0,0); re-fit/re-filter the base object with the updated tsgarch version.")
+        }
+        new_residuals <- arma_filter_extend(as.numeric(y_new), length(old_residuals), L$mu, L$ar, L$ma, old_residuals)
+        full_residuals <- c(old_residuals, new_residuals)
+    } else {
+        full_residuals <- as.numeric(y_new) - L$mu
+    }
+    residuals <- tail(full_residuals, n + maxpq)
     v <- tail(v, n + maxpq)
     # Rcpp code
     negative_indicator <- 1 * (residuals <= 0)
@@ -210,12 +246,13 @@
         if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
     }
     object$sigma <- c(object$sigma, sigma)
+    if (sum(arma_order) > 0) object$arma_residuals <- full_residuals
     # create filter object for spec input
     good <- rep(1, NROW(y_new))
     if (any(is.na(y_new))) {
         good[which(is.na(y_new))] <- 0
     }
-    logl <- -sum(ddist(object$spec$distribution, (as.numeric(y_new) - L$mu)/object$sigma, 0, 1, skew = L$dpars[1], shape = L$dpars[2], lambda = L$dpars[3], log = TRUE) - log(object$sigma))
+    logl <- -sum(ddist(object$spec$distribution, full_residuals/object$sigma, 0, 1, skew = L$dpars[1], shape = L$dpars[2], lambda = L$dpars[3], log = TRUE) - log(object$sigma))
     object$loglik <- logl
     object$spec$target$y_orig <- as.numeric(y_new)
     # add filtered dates (increment)

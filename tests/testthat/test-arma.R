@@ -234,5 +234,25 @@ for (nm in names(arma_orders_to_test)) {
             mc_mean <- colMeans(sim$series)
             expect_true(all(abs(mc_mean - mu) < 0.02))
         })
+
+        test_that(paste0("arma: ", nm, " + GARCH(1,1) tsfilter() chained append matches a direct re-fit of the full series"), {
+            spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = arma_order)
+            mod <- estimate(spec)
+            expect_equal(length(mod$arma_residuals), 1800)
+
+            new_y <- y[1801:1974,1]
+            filtered <- tsfilter(mod, y = new_y)
+            expect_length(filtered$arma_residuals, 1974)
+            expect_equal(filtered$nobs, 1974)
+
+            # a fixed-parameter direct filter over the FULL series should
+            # produce numerically identical residuals to the chained,
+            # incremental tsfilter() append (both continue the same ARMA
+            # recursion, just via different code paths)
+            spec_full <- garch_modelspec(y[,1], constant = TRUE, model = "garch", order = c(1,1), arma = arma_order)
+            spec_full$parmatrix <- copy(mod$parmatrix)
+            full_direct <- tsfilter(spec_full)
+            expect_equal(as.numeric(full_direct$arma_residuals), as.numeric(filtered$arma_residuals), tolerance = 1e-8)
+        })
     })
 }

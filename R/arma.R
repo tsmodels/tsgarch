@@ -142,3 +142,55 @@ initialize_arma_pacf <- function(y, arma)
     }
     list(ar = ar_pacf, ma = ma_pacf)
 }
+
+#' Extend the ARMA mean equation residuals with newly observed data
+#'
+#' @description Continues the ARMA mean recursion
+#' \sQuote{(y_t - mu) = sum_i phi_i*(y_{t-i}-mu) + eps_t + sum_j theta_j*eps_{t-j}}
+#' (the same recursion used inside the TMB template, see
+#' \code{src/TMB/garchfun.hpp}) for newly appended observations, using the
+#' already-computed historical residuals as the continuation state. This
+#' lets \code{\link{tsfilter}} incrementally update residuals for new data
+#' without re-running the full TMB likelihood.
+#' @param y_full numeric vector of the full (old + new), merged series.
+#' @param n_old integer, the number of observations already covered by
+#' \code{old_residuals} (i.e. \sQuote{length(y_full) - n_old} new observations
+#' will be computed).
+#' @param mu the (scalar) unconditional mean.
+#' @param ar numeric vector of AR coefficients (already transformed via
+#' \code{\link{pacf_to_ar}}; may be length zero).
+#' @param ma numeric vector of MA coefficients (already transformed via
+#' \code{\link{pacf_to_ma}}; may be length zero).
+#' @param old_residuals numeric vector of length \sQuote{n_old} with the
+#' already-computed historical residuals.
+#' @return a numeric vector of length \sQuote{length(y_full) - n_old} with the
+#' residuals for the newly appended observations only.
+#' @keywords internal
+#' @noRd
+arma_filter_extend <- function(y_full, n_old, mu, ar, ma, old_residuals)
+{
+    ar_order <- length(ar)
+    ma_order <- length(ma)
+    n_new <- length(y_full) - n_old
+    if (n_new <= 0) return(numeric(0))
+    z <- as.numeric(y_full) - mu
+    eps <- c(old_residuals, rep(0, n_new))
+    for (i in seq_len(n_new)) {
+        t <- n_old + i
+        mean_t <- 0
+        if (ar_order > 0) {
+            for (j in seq_len(ar_order)) {
+                idx <- t - j
+                mean_t <- mean_t + ar[j] * (if (idx <= 0) 0 else z[idx])
+            }
+        }
+        if (ma_order > 0) {
+            for (j in seq_len(ma_order)) {
+                idx <- t - j
+                mean_t <- mean_t + ma[j] * (if (idx <= 0) 0 else eps[idx])
+            }
+        }
+        eps[t] <- z[t] - mean_t
+    }
+    eps[(n_old + 1):(n_old + n_new)]
+}
