@@ -13,6 +13,11 @@ Type garchfun(objective_function<Type>* obj) {
     DATA_INTEGER(samplen);
     DATA_STRING(initmethod);
     PARAMETER(mu);
+    // raw (pacf-space) Durbin-Levinson parameters for the ARMA mean equation;
+    // see durbinlevinson.h. Guaranteed stationary/invertible for any value in
+    // (-1,1), so no additional nonlinear constraint is required.
+    PARAMETER_VECTOR(arpacf);
+    PARAMETER_VECTOR(mapacf);
     PARAMETER(omega);
     PARAMETER_VECTOR(alpha);
     PARAMETER_VECTOR(beta);
@@ -22,7 +27,7 @@ Type garchfun(objective_function<Type>* obj) {
     DATA_VECTOR(pscale);
     // variance regressors
     DATA_MATRIX(v);
-    // model flags [maxpq arch_order garch_order variance_targeting multiplicative distribution_no]
+    // model flags [maxpq arch_order garch_order variance_targeting multiplicative distribution_no ar_order ma_order]
     DATA_IVECTOR(cmodel);
     const int timesteps = y.rows();
     vector<Type> regressors(timesteps);
@@ -31,11 +36,29 @@ Type garchfun(objective_function<Type>* obj) {
     regressors.setZero();
     int m = v.cols();
     int j = 0;
+    const int ar_order = cmodel(6);
+    const int ma_order = cmodel(7);
 
     // re-scale parameters
     int k = 0;
     mu *= pscale(k);
     k += 1;
+    for(j = 0;j<ar_order;j++) {
+        arpacf(j) *= pscale(j + k);
+    }
+    if (ar_order == 0) {
+        k += 1;
+    } else {
+        k += ar_order;
+    }
+    for(j = 0;j<ma_order;j++) {
+        mapacf(j) *= pscale(j + k);
+    }
+    if (ma_order == 0) {
+        k += 1;
+    } else {
+        k += ma_order;
+    }
     omega *= pscale(k);
     k += 1;
     for(j = 0;j<cmodel(1);j++) {
@@ -62,8 +85,27 @@ Type garchfun(objective_function<Type>* obj) {
     distribution(1) *= pscale(k + 1);
     distribution(2) *= pscale(k + 2);
 
+    // ARMA mean equation:
+    //   (y_t - mu) = sum_i phi_i * (y_{t-i} - mu) + eps_t + sum_j theta_j * eps_{t-j}
+    // so that mu retains its interpretation as the unconditional mean of y
+    // (when ar_order = ma_order = 0 this reduces exactly to eps_t = y_t - mu,
+    // i.e. the pre-ARMA behavior). phi/theta are guaranteed stationary/invertible.
+    vector<Type> phi = garchextra::pacf_to_ar(arpacf);
+    vector<Type> theta = garchextra::pacf_to_ma(mapacf);
+    vector<Type> z = y.array() - mu;
+    vector<Type> residuals(timesteps);
+    residuals.setZero();
+    for (int i = cmodel(0); i < timesteps; i++) {
+        Type mean_i = Type(0.0);
+        for (j = 0; j < ar_order; j++) {
+            mean_i += phi(j) * z(i - j - 1);
+        }
+        for (j = 0; j < ma_order; j++) {
+            mean_i += theta(j) * residuals(i - j - 1);
+        }
+        residuals(i) = z(i) - mean_i;
+    }
     // variance and arch initialization based on user choice
-    vector<Type> residuals = y.array() - mu;
     vector<Type> residuals_squared = residuals.array().square();
     // extract the actual, not zero augmented vector for calculations
     vector<Type> tmp_block = residuals.tail(timesteps - cmodel(0));
@@ -125,6 +167,11 @@ Type garchfun(objective_function<Type>* obj) {
     REPORT(initial_arch);
     REPORT(sigma);
     REPORT(ll_vector);
+    REPORT(phi);
+    REPORT(theta);
+    REPORT(residuals);
+    ADREPORT(phi);
+    ADREPORT(theta);
     Type nll = Type(-1.0) * ll_vector.log().sum();
     return(nll);
 }

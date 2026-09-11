@@ -13,6 +13,7 @@
 #include <TMB.hpp>
 #include "distfun.h"
 #include "garchextra.h"
+#include "durbinlevinson.h"
 #include "egarchkappa.h"
 #include "aparchkappa.h"
 #include "fgarchkappa.h"

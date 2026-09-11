@@ -1,5 +1,5 @@
 initialize_parameters <- function(model = "garch", y, constant = 0.0,
-                                  order = c(1,1), variance_targeting = FALSE,
+                                  order = c(1,1), arma = c(0,0), variance_targeting = FALSE,
                                   vreg = NULL, multiplicative = TRUE,
                                   init = c("unconditional","sample","backcast"),
                                   backcast_lambda = 0.7, sample_n = 10,
@@ -7,7 +7,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
 {
     switch(model,
            "garch" = .parameters_garch(y = y, constant = constant,
-                                       order = order,
+                                       order = order, arma = arma,
                                        variance_targeting = variance_targeting,
                                        vreg = vreg,
                                        multiplicative = multiplicative,
@@ -80,7 +80,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                                          distribution = distribution))
 }
 
-.parameters_garch <- function(y, constant = FALSE, order = c(1,1),
+.parameters_garch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0),
                               variance_targeting = FALSE,
                               vreg = NULL, multiplicative = TRUE,
                               init = c("unconditional","sample","backcast"),
@@ -103,7 +103,48 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             estimate = ifelse(constant, 1, 0),
                             scale = 1, group = "mu", equation = "[M]",
                             symbol = "\\mu")
-
+    ar_order <- arma[1]
+    ma_order <- arma[2]
+    if (sum(arma) > 0) {
+        arma_pacf <- initialize_arma_pacf(y - mu, arma)
+    } else {
+        arma_pacf <- list(ar = numeric(0), ma = numeric(0))
+    }
+    # NOTE: the "arpacf"/"mapacf" groups hold *raw* Durbin-Levinson (partial
+    # autocorrelation) parameters, not the AR/MA coefficients themselves. Any
+    # value in (-1,1) maps (inside the TMB template) to AR coefficients in the
+    # stationarity region and MA coefficients in the invertibility region, so
+    # no additional nonlinear constraint is required. The actual ar/ma
+    # coefficients implied by these raw values are reported separately (see
+    # `arma_coefficients()` / the estimated object's `arma` slot).
+    if (ar_order == 0) {
+        parmatrix <- rbind(parmatrix,
+                           data.table("parameter" = "arpacf1", value = 0,
+                                      lower = -0.995, upper = 0.995, estimate = 0,
+                                      scale = 1, group = "arpacf", equation = "[M]",
+                                      symbol = "r^{ar}_1"))
+    } else {
+        parmatrix <- rbind(parmatrix,
+                           data.table("parameter" = paste0("arpacf",1:ar_order),
+                                      value = arma_pacf$ar, lower = -0.995, upper = 0.995,
+                                      estimate = 1, scale = 1, group = "arpacf",
+                                      equation = "[M]",
+                                      symbol = paste0("r^{ar}_",1:ar_order)))
+    }
+    if (ma_order == 0) {
+        parmatrix <- rbind(parmatrix,
+                           data.table("parameter" = "mapacf1", value = 0,
+                                      lower = -0.995, upper = 0.995, estimate = 0,
+                                      scale = 1, group = "mapacf", equation = "[M]",
+                                      symbol = "r^{ma}_1"))
+    } else {
+        parmatrix <- rbind(parmatrix,
+                           data.table("parameter" = paste0("mapacf",1:ma_order),
+                                      value = arma_pacf$ma, lower = -0.995, upper = 0.995,
+                                      estimate = 1, scale = 1, group = "mapacf",
+                                      equation = "[M]",
+                                      symbol = paste0("r^{ma}_",1:ma_order)))
+    }
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = var_y * 0.01,
                                   lower = 1e-12, upper = var_y/0.01,
@@ -728,6 +769,19 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             estimate = ifelse(constant, 1, 0),
                             scale = 1, group = "mu", equation = "[M]",
                             symbol = "\\mu")
+    # igarch shares the compiled "garch" TMB template, which always expects
+    # arpacf/mapacf parameter vectors (ARMA is not yet exposed for igarch, so
+    # these are fixed, unestimated dummies; see .parameters_garch).
+    parmatrix <- rbind(parmatrix,
+                       data.table("parameter" = "arpacf1", value = 0,
+                                  lower = -0.995, upper = 0.995, estimate = 0,
+                                  scale = 1, group = "arpacf", equation = "[M]",
+                                  symbol = "r^{ar}_1"))
+    parmatrix <- rbind(parmatrix,
+                       data.table("parameter" = "mapacf1", value = 0,
+                                  lower = -0.995, upper = 0.995, estimate = 0,
+                                  scale = 1, group = "mapacf", equation = "[M]",
+                                  symbol = "r^{ma}_1"))
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = var_y * 0.01,
                                   lower = 1e-12, upper = var_y/0.01,
@@ -836,6 +890,19 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             estimate = ifelse(constant, 1, 0),
                             scale = 1, group = "mu", equation = "[M]",
                             symbol = "\\mu")
+    # ewma ultimately shares the compiled "garch" TMB template (via igarch),
+    # which always expects arpacf/mapacf parameter vectors (ARMA is not yet
+    # exposed for ewma, so these are fixed, unestimated dummies).
+    parmatrix <- rbind(parmatrix,
+                       data.table("parameter" = "arpacf1", value = 0,
+                                  lower = -0.995, upper = 0.995, estimate = 0,
+                                  scale = 1, group = "arpacf", equation = "[M]",
+                                  symbol = "r^{ar}_1"))
+    parmatrix <- rbind(parmatrix,
+                       data.table("parameter" = "mapacf1", value = 0,
+                                  lower = -0.995, upper = 0.995, estimate = 0,
+                                  scale = 1, group = "mapacf", equation = "[M]",
+                                  symbol = "r^{ma}_1"))
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = var_y * 0.01,
                                   lower = 1e-12, upper = var_y/0.01,
