@@ -38,14 +38,12 @@
     parmatrix[parameter == "omega", value := target_omega]
     # return the ll_vector
     llvector <- -1.0 * log(tmb$report(pars)$ll_vector)
-    # ARMA mean equation residuals eps_t = (y_t - mu) - arma_recursion(y, eps),
-    # only reported by the "garch" TMB template when arma > c(0,0) (see
-    # garchfun.hpp); used to seed subsequent incremental tsfilter() calls
-    # (see .filter.tsgarch.estimate() / arma_filter_extend()).
-    arma_residuals <- NULL
+    # conditional_mean(t), only reported by the "garch" TMB template when
+    # arma > c(0,0) (see garchfun.hpp); used to seed subsequent incremental
+    # tsfilter() calls (see .filter.tsgarch.estimate() / arma_filter_extend()).
+    conditional_mu <- NULL
     if (!is.null(newspec$model$arma) && sum(newspec$model$arma) > 0) {
-        arma_residuals <- env$tmb$report(pars)$residuals
-        if (m > 0) arma_residuals <- arma_residuals[-seq_len(m)]
+        conditional_mu <- tail(env$tmb$report(pars)$conditional_mean, length(sig))
     }
     out <- list(parmatrix = parmatrix, scaled_hessian = hessian,
                 scaled_scores = scores,
@@ -64,7 +62,7 @@
                 # extra degree of freedom for the init_variance
                 npars = NROW(parmatrix[estimate == 1]) + 1,
                 spec = spec,
-                arma_residuals = arma_residuals)
+                conditional_mu = conditional_mu)
     if (object$model$model == "cgarch") {
         permanent_component <- env$tmb$report(pars)$permanent_component
         transitory_component <- env$tmb$report(pars)$transitory_component
@@ -201,18 +199,19 @@
     if (sum(arma_order) > 0) {
         # continue the ARMA mean recursion (see garchfun.hpp) for the newly
         # appended observations only, using the already-computed historical
-        # residuals as the continuation state (object$arma_residuals, set by
-        # estimate()/.filter.tsgarch.spec() and updated below so repeated
-        # tsfilter() calls keep chaining correctly).
-        old_residuals <- object$arma_residuals
-        if (is.null(old_residuals)) {
-            stop("\nobject does not carry arma_residuals but has arma > c(0,0); re-fit/re-filter the base object with the updated tsgarch version.")
+        # conditional mean as the continuation state (object$conditional_mu,
+        # set by estimate()/.filter.tsgarch.spec() and updated below so
+        # repeated tsfilter() calls keep chaining correctly).
+        old_conditional_mu <- object$conditional_mu
+        if (is.null(old_conditional_mu)) {
+            stop("\nobject does not carry conditional_mu but has arma > c(0,0); re-fit/re-filter the base object with the updated tsgarch version.")
         }
-        new_residuals <- arma_filter_extend(as.numeric(y_new), length(old_residuals), L$mu, L$ar, L$ma, old_residuals)
-        full_residuals <- c(old_residuals, new_residuals)
+        new_conditional_mu <- arma_filter_extend(as.numeric(y_new), length(old_conditional_mu), L$mu, L$ar, L$ma, old_conditional_mu)
+        full_conditional_mu <- c(old_conditional_mu, new_conditional_mu)
     } else {
-        full_residuals <- as.numeric(y_new) - L$mu
+        full_conditional_mu <- rep(L$mu, NROW(y_new))
     }
+    full_residuals <- as.numeric(y_new) - full_conditional_mu
     residuals <- tail(full_residuals, n + maxpq)
     v <- tail(v, n + maxpq)
     # Rcpp code
@@ -246,7 +245,7 @@
         if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
     }
     object$sigma <- c(object$sigma, sigma)
-    if (sum(arma_order) > 0) object$arma_residuals <- full_residuals
+    if (sum(arma_order) > 0) object$conditional_mu <- full_conditional_mu
     # create filter object for spec input
     good <- rep(1, NROW(y_new))
     if (any(is.na(y_new))) {

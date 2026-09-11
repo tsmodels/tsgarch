@@ -152,9 +152,15 @@ sigma.tsgarch.multi_estimate <- function(object, ...)
 fitted.tsgarch.estimate <- function(object, ...)
 {
     parameter <- NULL
-    mu <- object$parmatrix[parameter == "mu"]$value
     idx <- object$spec$target$index
-    f <- xts(rep(mu, length(idx)), idx)
+    if (!is.null(object$conditional_mu)) {
+        # time-varying ARMA conditional mean (see garchfun.hpp); reduces to
+        # a constant mu (or zero, if constant = FALSE) whenever arma = c(0,0)
+        f <- xts(object$conditional_mu, idx)
+    } else {
+        mu <- object$parmatrix[parameter == "mu"]$value
+        f <- xts(rep(mu, length(idx)), idx)
+    }
     colnames(f) <- ".fitted"
     return(f)
 }
@@ -196,15 +202,11 @@ fitted.tsgarch.multi_estimate <- function(object, ...)
 #'
 residuals.tsgarch.estimate <- function(object, standardize = FALSE, ...)
 {
-    parameter <- NULL
-    if (!is.null(object$arma_residuals)) {
-        # true ARMA-GARCH mean equation residuals eps_t = (y_t - mu) -
-        # arma_recursion(y, eps), as reported by the TMB template (see
-        # garchfun.hpp); falls back to y - mu below when arma = c(0,0).
-        res <- object$arma_residuals
-    } else {
-        res <- object$spec$target$y_orig - object$parmatrix[parameter == "mu"]$value
-    }
+    # residuals are always y - fitted(object): this is exact and requires no
+    # special-casing for ARMA vs constant-mean vs zero-mean models, since
+    # fitted() already returns the correct (possibly time-varying)
+    # conditional mean in every case (see fitted.tsgarch.estimate()).
+    res <- object$spec$target$y_orig - as.numeric(fitted(object))
     res <- xts(res, object$spec$target$index)
     if (standardize) {
         res <- res/sigma(object)

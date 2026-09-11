@@ -166,7 +166,7 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
                 # extra degree of freedom for the init_variance
                 npars = NROW(parmatrix[estimate == 1]) + 1,
                 spec = spec,
-                arma_residuals = scaled_solution$arma_residuals,
+                conditional_mu = scaled_solution$conditional_mu,
                 arma_summary = scaled_solution$arma_table)
     if (keep_tmb) out$tmb <- tmb
     class(out) <- "tsgarch.estimate"
@@ -244,15 +244,18 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     if (m > 0) {
         sig <- sig[-seq_len(m)]
     }
-    # ARMA mean equation residuals eps_t = (y_t - mu) - arma_recursion, only
-    # reported by the "garch" TMB template when arma > c(0,0) (see
-    # garchfun.hpp); for every other case fall back to NULL so that
-    # residuals.tsgarch.estimate() keeps using the prior y - mu behavior.
-    arma_residuals <- NULL
+    # conditional_mean(t) is the model's fitted conditional mean of y at
+    # time t (mu + the AR/MA deviation term), reported by the "garch" TMB
+    # template only when arma > c(0,0) (see garchfun.hpp); every other case
+    # falls back to NULL so that fitted.tsgarch.estimate() keeps using its
+    # prior rep(mu, n) behavior. residuals are always y - conditional_mu
+    # (see residuals.tsgarch.estimate()), so no separate residual field is
+    # needed here.
+    conditional_mu <- NULL
     arma_table <- NULL
     if (!is.null(object$model$arma) && sum(object$model$arma) > 0) {
-        arma_residuals <- scaled_env$tmb$report(scaled_sol$solution)$residuals
-        if (m > 0) arma_residuals <- arma_residuals[-seq_len(m)]
+        # sig has already been trimmed to the actual (non-padded) length above
+        conditional_mu <- tail(scaled_env$tmb$report(scaled_sol$solution)$conditional_mean, length(sig))
         ar_order <- object$model$arma[1]
         ma_order <- object$model$arma[2]
         arma_table <- list(
@@ -278,7 +281,7 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
                 permanent_component = permanent_component,
                 transitory_component = transitory_component,
                 ll_vector = ll_vector,
-                arma_residuals = arma_residuals,
+                conditional_mu = conditional_mu,
                 arma_table = arma_table
                 ))
 }

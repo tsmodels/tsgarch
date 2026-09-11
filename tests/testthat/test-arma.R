@@ -88,6 +88,33 @@ test_that("arma: residuals() returns the true ARMA residual, not y - mu", {
     expect_equal(length(res), length(naive))
 })
 
+test_that("arma: fitted() returns the time-varying conditional mean, and residuals() == y - fitted() exactly", {
+    spec0 <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(0,0))
+    mod0 <- estimate(spec0)
+    f0 <- as.numeric(fitted(mod0))
+    mu0 <- mod0$parmatrix[parameter == "mu"]$value
+    # no ARMA: fitted() is still a full-length vector, constant at mu
+    expect_length(f0, mod0$nobs)
+    expect_true(all(f0 == mu0))
+    expect_equal(as.numeric(residuals(mod0)), as.numeric(mod0$spec$target$y_orig) - f0)
+
+    spec1 <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
+    mod1 <- estimate(spec1)
+    f1 <- as.numeric(fitted(mod1))
+    expect_length(f1, mod1$nobs)
+    # ARMA: fitted() is genuinely time-varying, not constant
+    expect_true(length(unique(round(f1, 8))) > 1)
+    expect_equal(as.numeric(residuals(mod1)), as.numeric(mod1$spec$target$y_orig) - f1)
+})
+
+test_that("arma: constant = FALSE with no arma gives fitted() == 0 (full-length vector)", {
+    spec <- garch_modelspec(y[1:1800,1], constant = FALSE, model = "garch", order = c(1,1))
+    mod <- estimate(spec)
+    f <- as.numeric(fitted(mod))
+    expect_length(f, mod$nobs)
+    expect_true(all(f == 0))
+})
+
 test_that("arma: h-step point forecast matches stats::arima for AR(1)/MA(1)/AR(2)", {
     set.seed(42)
     n <- 2000
@@ -238,21 +265,22 @@ for (nm in names(arma_orders_to_test)) {
         test_that(paste0("arma: ", nm, " + GARCH(1,1) tsfilter() chained append matches a direct re-fit of the full series"), {
             spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = arma_order)
             mod <- estimate(spec)
-            expect_equal(length(mod$arma_residuals), 1800)
+            expect_equal(length(mod$conditional_mu), 1800)
+            expect_equal(as.numeric(residuals(mod)), as.numeric(mod$spec$target$y_orig) - as.numeric(fitted(mod)))
 
             new_y <- y[1801:1974,1]
             filtered <- tsfilter(mod, y = new_y)
-            expect_length(filtered$arma_residuals, 1974)
+            expect_length(filtered$conditional_mu, 1974)
             expect_equal(filtered$nobs, 1974)
 
             # a fixed-parameter direct filter over the FULL series should
-            # produce numerically identical residuals to the chained,
-            # incremental tsfilter() append (both continue the same ARMA
-            # recursion, just via different code paths)
+            # produce a numerically identical fitted conditional mean to the
+            # chained, incremental tsfilter() append (both continue the same
+            # ARMA recursion, just via different code paths)
             spec_full <- garch_modelspec(y[,1], constant = TRUE, model = "garch", order = c(1,1), arma = arma_order)
             spec_full$parmatrix <- copy(mod$parmatrix)
             full_direct <- tsfilter(spec_full)
-            expect_equal(as.numeric(full_direct$arma_residuals), as.numeric(filtered$arma_residuals), tolerance = 1e-8)
+            expect_equal(as.numeric(full_direct$conditional_mu), as.numeric(filtered$conditional_mu), tolerance = 1e-8)
         })
     })
 }

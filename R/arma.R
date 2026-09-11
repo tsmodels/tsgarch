@@ -143,38 +143,44 @@ initialize_arma_pacf <- function(y, arma)
     list(ar = ar_pacf, ma = ma_pacf)
 }
 
-#' Extend the ARMA mean equation residuals with newly observed data
+#' Extend the ARMA conditional mean with newly observed data
 #'
 #' @description Continues the ARMA mean recursion
-#' \sQuote{(y_t - mu) = sum_i phi_i*(y_{t-i}-mu) + eps_t + sum_j theta_j*eps_{t-j}}
+#' \sQuote{conditional_mean_t = mu + sum_i phi_i*(y_{t-i}-mu) + sum_j theta_j*eps_{t-j}}
 #' (the same recursion used inside the TMB template, see
-#' \code{src/TMB/garchfun.hpp}) for newly appended observations, using the
-#' already-computed historical residuals as the continuation state. This
-#' lets \code{\link{tsfilter}} incrementally update residuals for new data
-#' without re-running the full TMB likelihood.
+#' \code{src/TMB/garchfun.hpp}, where \sQuote{eps_t = y_t - conditional_mean_t})
+#' for newly appended observations, using the already-computed historical
+#' conditional mean as the continuation state (residuals are always
+#' recoverable as \sQuote{y - conditional_mean}, see
+#' \code{fitted}/\code{residuals} methods). This lets \code{\link{tsfilter}}
+#' incrementally update the fitted mean for new data without re-running the
+#' full TMB likelihood.
 #' @param y_full numeric vector of the full (old + new), merged series.
 #' @param n_old integer, the number of observations already covered by
-#' \code{old_residuals} (i.e. \sQuote{length(y_full) - n_old} new observations
-#' will be computed).
+#' \code{old_conditional_mu} (i.e. \sQuote{length(y_full) - n_old} new
+#' observations will be computed).
 #' @param mu the (scalar) unconditional mean.
 #' @param ar numeric vector of AR coefficients (already transformed via
 #' \code{\link{pacf_to_ar}}; may be length zero).
 #' @param ma numeric vector of MA coefficients (already transformed via
 #' \code{\link{pacf_to_ma}}; may be length zero).
-#' @param old_residuals numeric vector of length \sQuote{n_old} with the
-#' already-computed historical residuals.
+#' @param old_conditional_mu numeric vector of length \sQuote{n_old} with the
+#' already-computed historical conditional mean.
 #' @return a numeric vector of length \sQuote{length(y_full) - n_old} with the
-#' residuals for the newly appended observations only.
+#' conditional mean for the newly appended observations only.
 #' @keywords internal
 #' @noRd
-arma_filter_extend <- function(y_full, n_old, mu, ar, ma, old_residuals)
+arma_filter_extend <- function(y_full, n_old, mu, ar, ma, old_conditional_mu)
 {
     ar_order <- length(ar)
     ma_order <- length(ma)
     n_new <- length(y_full) - n_old
     if (n_new <= 0) return(numeric(0))
-    z <- as.numeric(y_full) - mu
-    eps <- c(old_residuals, rep(0, n_new))
+    y_full <- as.numeric(y_full)
+    z <- y_full - mu
+    old_eps <- head(y_full, n_old) - old_conditional_mu
+    eps <- c(old_eps, rep(0, n_new))
+    cond_mu <- c(old_conditional_mu, rep(mu, n_new))
     for (i in seq_len(n_new)) {
         t <- n_old + i
         mean_t <- 0
@@ -191,6 +197,7 @@ arma_filter_extend <- function(y_full, n_old, mu, ar, ma, old_residuals)
             }
         }
         eps[t] <- z[t] - mean_t
+        cond_mu[t] <- mu + mean_t
     }
-    eps[(n_old + 1):(n_old + n_new)]
+    cond_mu[(n_old + 1):(n_old + n_new)]
 }

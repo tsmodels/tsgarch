@@ -101,6 +101,15 @@ Type garchfun(objective_function<Type>* obj) {
     for (int i = 0; i < cmodel(0); i++) z(i) = Type(0.0);
     vector<Type> residuals(timesteps);
     residuals.setZero();
+    // conditional_mean(i) is the model's fitted conditional mean of y at
+    // time i (i.e. mu + the AR/MA deviation term), so that
+    // residuals(i) = y(i) - conditional_mean(i) always holds exactly - the
+    // same relationship used by fitted()/residuals() on the R side. Reduces
+    // to a constant mu everywhere when ar_order = ma_order = 0. Pre-sample
+    // rows are set to mu (consistent with the "start at the unconditional
+    // mean" convention used for the pre-sample z/residuals above).
+    vector<Type> conditional_mean(timesteps);
+    conditional_mean.fill(mu);
     for (int i = cmodel(0); i < timesteps; i++) {
         Type mean_i = Type(0.0);
         for (j = 0; j < ar_order; j++) {
@@ -110,6 +119,7 @@ Type garchfun(objective_function<Type>* obj) {
             mean_i += theta(j) * residuals(i - j - 1);
         }
         residuals(i) = z(i) - mean_i;
+        conditional_mean(i) = mu + mean_i;
     }
     // variance and arch initialization based on user choice
     vector<Type> residuals_squared = residuals.array().square();
@@ -176,6 +186,7 @@ Type garchfun(objective_function<Type>* obj) {
     REPORT(phi);
     REPORT(theta);
     REPORT(residuals);
+    REPORT(conditional_mean);
     ADREPORT(phi);
     ADREPORT(theta);
     Type nll = Type(-1.0) * ll_vector.log().sum();
