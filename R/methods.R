@@ -808,8 +808,10 @@ plot.tsgarch.newsimpact <- function(x, y = NULL, ...)
 #' e.g. \code{which = 1} for a single full-size inverse-roots plot.
 #' @param ... for \code{type = "arma"}, further arguments passed to the ARMA
 #' panel: \code{cumulative} (logical, adds a cumulative IRF line in panel 2),
-#' \code{envelope} (character, see \dQuote{Details}) and \code{B} (number of
-#' replications for the simulation envelope).
+#' \code{envelope} (character, see \dQuote{Details}), \code{B} (number of
+#' replications for the \code{"simulate"}/\code{"parametric"} envelopes) and
+#' \code{vcov_type} (the \code{\link{vcov}} type used by the
+#' \code{"parametric"} envelope).
 #' @details
 #' The ARMA diagnostic panel (\code{type = "arma"}) is only available for
 #' models estimated with a non-zero \code{arma} order. Panel 1 shows the
@@ -821,10 +823,31 @@ plot.tsgarch.newsimpact <- function(x, y = NULL, ...)
 #' model the longer lags (beyond the first few) are the most informative,
 #' because estimation makes the first-lag Bartlett bands conservative.
 #'
-#' The default \code{envelope = "bartlett"} draws asymptotic \eqn{\pm 1.96 / \sqrt{n}}
-#' bands under the iid assumption, which is valid for correctly specified
-#' standardized residuals. \code{envelope = "simulate"} is planned but not yet
-#' implemented; it is accepted as an argument but raises an informative error.
+#' Three envelopes are available for panels 3/4:
+#' \itemize{
+#' \item \code{"bartlett"} (default): asymptotic \eqn{\pm 1.96/\sqrt{n}} bands
+#' under the iid assumption. Valid for correctly specified standardized
+#' residuals, but conservative at the first few lags because it ignores
+#' parameter estimation.
+#' \item \code{"simulate"}: draws \code{B} independent samples of length
+#' \eqn{n} from the fitted innovation distribution (at the point estimates of
+#' \code{skew}/\code{shape}/\code{lambda}) and computes the pointwise 95\%
+#' envelope of their ACFs. This characterizes the exact sampling
+#' distribution of the ACF statistic under the fitted distribution, but
+#' \emph{ignores all parameter estimation uncertainty} (both mean/variance
+#' and distributional).
+#' \item \code{"parametric"}: draws \code{B} parameter vectors from
+#' \eqn{\hat\theta + N(0, V)} with \eqn{V = }\code{vcov(object, type = vcov_type)},
+#' and for each draw re-filters the \emph{actual observed data} (a cheap
+#' forward TMB pass, no re-simulation or re-optimization) to obtain a
+#' perturbed standardized residual series and its ACF. This \emph{does}
+#' reflect parameter estimation uncertainty (including in the ARMA and GARCH
+#' parameters), at the cost of the (standard, delta-method style) asymptotic
+#' normal approximation to the sampling distribution of the estimator, and
+#' clipping of extreme draws to each parameter's box bounds. It does not
+#' capture the full simulate-then-refit sampling distribution, which is
+#' considerably more expensive to compute.
+#' }
 #' @returns a panel with plots for the estimated sigma value, the news impact curve
 #' and a \dQuote{QQ} plot of the standardized residuals when
 #' \code{type = "garch"}, or an ARMA diagnostic panel when

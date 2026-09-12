@@ -1,5 +1,6 @@
 .plot_tsgarch_estimate_arma <- function(x, which = 1:4, cumulative = FALSE,
-                                         envelope = c("bartlett", "simulate"), B = 500, ...)
+                                         envelope = c("bartlett", "simulate", "parametric"),
+                                         B = 500, vcov_type = "H", ...)
 {
     arma_order <- if (!is.null(x$spec$model$arma)) x$spec$model$arma else c(0,0)
     if (sum(arma_order) == 0) {
@@ -12,7 +13,7 @@
     on.exit(par(oldpar), add = TRUE)
 
     if (length(which) == 1) {
-        .plot_arma_panel(x, which[1], cumulative, envelope, B)
+        .plot_arma_panel(x, which[1], cumulative, envelope, B, vcov_type)
     } else {
         panels <- sort(unique(which))
         n <- length(panels)
@@ -22,18 +23,18 @@
             par(mfrow = c(2, 2))
         }
         for (p in panels) {
-            .plot_arma_panel(x, p, cumulative, envelope, B)
+            .plot_arma_panel(x, p, cumulative, envelope, B, vcov_type)
         }
     }
 }
 
-.plot_arma_panel <- function(x, panel, cumulative, envelope, B)
+.plot_arma_panel <- function(x, panel, cumulative, envelope, B, vcov_type = "H")
 {
     switch(panel,
            "1" = .plot_arma_inverse_roots(x),
            "2" = .plot_arma_irf(x, cumulative),
-           "3" = .plot_arma_acf(x, variable = "z", envelope = envelope, B = B),
-           "4" = .plot_arma_acf(x, variable = "z2", envelope = envelope, B = B))
+           "3" = .plot_arma_acf(x, variable = "z", envelope = envelope, B = B, vcov_type = vcov_type),
+           "4" = .plot_arma_acf(x, variable = "z2", envelope = envelope, B = B, vcov_type = vcov_type))
 }
 
 .plot_arma_inverse_roots <- function(x)
@@ -87,7 +88,8 @@
     }
 }
 
-.plot_arma_acf <- function(x, variable = c("z", "z2"), envelope = c("bartlett", "simulate"), B = 500)
+.plot_arma_acf <- function(x, variable = c("z", "z2"), envelope = c("bartlett", "simulate", "parametric"),
+                           B = 500, vcov_type = "H")
 {
     variable <- match.arg(variable)
     envelope <- match.arg(envelope)
@@ -106,18 +108,49 @@
     n <- length(vals)
     ci <- 1.96 / sqrt(n)
 
-    if (envelope == "simulate") {
-        stop("\nenvelope = 'simulate' is not yet implemented. Use envelope = 'bartlett'.")
+    env_lo <- env_hi <- NULL
+    if (envelope %in% c("simulate", "parametric")) {
+        L <- max(lag)
+        if (envelope == "simulate") {
+            dpars <- extract_model_values(x, object_type = "estimate", "distribution")
+            distribution <- x$spec$distribution
+            zsim <- matrix(rdist(distribution, n * B, mu = 0, sigma = 1,
+                                 skew = dpars[1], shape = dpars[2], lambda = dpars[3]),
+                           nrow = n, ncol = B)
+        } else {
+            zsim <- .parametric_standardized_residual_draws(x, B = B, vcov_type = vcov_type)
+        }
+        simvals <- if (variable == "z2") zsim^2 else zsim
+        acf_sim <- apply(simvals, 2, function(col) {
+            col <- col[!is.na(col)]
+            as.numeric(stats::acf(col, plot = FALSE, lag.max = L, na.action = stats::na.pass)$acf[-1])
+        })
+        env_lo <- apply(acf_sim, 1, stats::quantile, probs = 0.025, na.rm = TRUE)
+        env_hi <- apply(acf_sim, 1, stats::quantile, probs = 0.975, na.rm = TRUE)
     }
 
     oldpar <- par(no.readonly = TRUE)
     on.exit(par(oldpar), add = TRUE)
     par(mar = c(4, 4, 2.5, 0.5))
-    plot(range(c(0, lag + 0.5)), range(c(min(acfval, -ci), max(acfval, ci))),
+    ylim <- range(c(min(acfval, -ci), max(acfval, ci), env_lo, env_hi))
+    plot(range(c(0, lag + 0.5)), ylim,
          type = "n", xlab = "Lag", ylab = "ACF", main = main)
     abline(h = 0, col = "gray60")
+    if (!is.null(env_lo)) {
+        lines(lag, env_lo, col = "darkgreen", lty = 3)
+        lines(lag, env_hi, col = "darkgreen", lty = 3)
+    }
     abline(h = c(-ci, ci), col = "coral", lty = 2)
     lines(lag, acfval, type = "h", lwd = 1.2, col = "steelblue")
     points(lag, acfval, pch = 19, cex = 0.7, col = "steelblue")
+    legend_labels <- c("Bartlett")
+    legend_col <- c("coral")
+    legend_lty <- c(2)
+    if (!is.null(env_lo)) {
+        legend_labels <- c(legend_labels, if (envelope == "simulate") "Simulated (no param. uncertainty)" else "Parametric (with param. uncertainty)")
+        legend_col <- c(legend_col, "darkgreen")
+        legend_lty <- c(legend_lty, 3)
+    }
+    legend("topright", legend = legend_labels, col = legend_col, lty = legend_lty, bg = "white", cex = 0.7)
     grid()
 }

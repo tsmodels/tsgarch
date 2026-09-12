@@ -75,9 +75,9 @@ test_that("arma: joint ARMA(1,1)-GARCH(1,1) estimation is well-behaved and neste
     expect_true(mod1$conditions$kkt1)
 })
 
-test_that("arma: is rejected for igarch/ewma (share the plain garch mean equation with no native arma support)", {
-    expect_error(garch_modelspec(y[1:1800,1], constant = TRUE, model = "igarch", order = c(1,1), arma = c(1,0)))
-    expect_error(garch_modelspec(y[1:1800,1], constant = TRUE, model = "ewma", arma = c(1,0)))
+test_that("arma: is allowed for igarch/ewma", {
+    expect_error(garch_modelspec(y[1:1800,1], constant = TRUE, model = "igarch", order = c(1,1), arma = c(1,0)), NA)
+    expect_error(garch_modelspec(y[1:1800,1], constant = TRUE, model = "ewma", arma = c(1,0)), NA)
 })
 
 test_that("arma: residuals() returns the true ARMA residual, not y - mu", {

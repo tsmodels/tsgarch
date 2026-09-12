@@ -107,3 +107,63 @@ arma_near_cancellation <- function(roots, tol = 0.1)
     }
     return(out)
 }
+
+#' Parametric-uncertainty draws of the standardized residuals
+#'
+#' @description Draws \code{B} perturbed parameter vectors from the
+#' asymptotic normal approximation \eqn{\hat\theta + N(0, V)}, where \eqn{V}
+#' is \code{\link{vcov}}, and for each draw re-filters the \emph{actual
+#' observed data} (no re-simulation, no re-optimization) via a cheap forward
+#' TMB \code{report()} call to obtain the implied conditional mean and
+#' conditional standard deviation, and hence a perturbed standardized
+#' residual series \eqn{z_t = (y_t - \mu_{t,b})/\sigma_{t,b}}. This
+#' characterizes how much the standardized-residual diagnostics themselves
+#' wobble due to parameter estimation uncertainty. Perturbed draws are
+#' clipped to each parameter's \code{lower}/\code{upper} bounds (as stored in
+#' \code{object$parmatrix}) to keep the forward pass numerically valid; this
+#' is a deliberate simplification appropriate for a diagnostic plot, not a
+#' formal inferential procedure.
+#' @param object an object of class \dQuote{tsgarch.estimate}.
+#' @param B integer, the number of draws.
+#' @param vcov_type the type of covariance matrix to use (see \code{\link{vcov}}).
+#' @return A numeric matrix with \code{B} columns, one perturbed standardized
+#' residual series per column, and \code{length(residuals(object))} rows.
+#' @keywords internal
+#' @noRd
+.parametric_standardized_residual_draws <- function(object, B = 500, vcov_type = "H")
+{
+    estimate <- NULL
+    theta_hat <- coef(object)
+    k <- length(theta_hat)
+    V <- vcov(object, type = vcov_type)
+    Lchol <- tryCatch(chol(V), error = function(e) {
+        tryCatch(chol(V + diag(1e-8, k)),
+                 error = function(e2) stop("\nvcov(object, type = '", vcov_type, "') is not positive-definite; try a different vcov_type or envelope = 'simulate'."))
+    })
+    lower <- object$parmatrix[estimate == 1]$lower
+    upper <- object$parmatrix[estimate == 1]$upper
+
+    full_spec <- object$spec
+    full_spec$parmatrix <- data.table::copy(object$parmatrix)
+    model_init <- .tmb_initialize_model(full_spec)
+    tmb <- TMB::MakeADFun(data = model_init$data, parameters = model_init$parameters,
+                          map = model_init$map, silent = TRUE, DLL = "tsgarch_TMBExports")
+    m <- full_spec$model_options[1]
+    y <- as.numeric(object$spec$target$y_orig)
+    n <- length(y)
+
+    z <- matrix(NA_real_, nrow = n, ncol = B)
+    for (b in seq_len(B)) {
+        theta_b <- as.numeric(theta_hat) + as.numeric(t(Lchol) %*% stats::rnorm(k))
+        theta_b <- pmin(pmax(theta_b, lower), upper)
+        rep_b <- tmb$report(theta_b)
+        sigma_b <- rep_b$sigma
+        mu_b <- rep_b$conditional_mean
+        if (m > 0) {
+            sigma_b <- sigma_b[-seq_len(m)]
+            mu_b <- mu_b[-seq_len(m)]
+        }
+        z[, b] <- (y - mu_b) / sigma_b
+    }
+    return(z)
+}

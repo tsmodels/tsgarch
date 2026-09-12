@@ -94,3 +94,39 @@ test_that("plot type = 'arma' errors for models without ARMA", {
     mod0 <- estimate(spec0)
     expect_error(plot(mod0, type = "arma"), "ARMA mean equation")
 })
+
+test_that(".parametric_standardized_residual_draws returns a valid n x B matrix", {
+    spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
+    mod <- estimate(spec)
+    z <- tsgarch:::.parametric_standardized_residual_draws(mod, B = 15)
+    expect_equal(dim(z), c(mod$nobs, 15))
+    expect_false(any(is.na(z)))
+    # different columns (different draws) should not be identical
+    expect_false(isTRUE(all.equal(z[,1], z[,2])))
+})
+
+test_that("plot arma panel works with envelope = 'simulate' and 'parametric'", {
+    spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(2,1))
+    mod <- estimate(spec)
+
+    tmp <- tempfile(fileext = ".png")
+    png(tmp)
+    out <- plot(mod, type = "arma", which = 3, envelope = "simulate", B = 30)
+    dev.off()
+    expect_identical(out, mod)
+
+    tmp2 <- tempfile(fileext = ".png")
+    png(tmp2)
+    out2 <- plot(mod, type = "arma", which = 4, envelope = "parametric", B = 30)
+    dev.off()
+    expect_identical(out2, mod)
+})
+
+test_that("plot arma panel errors informatively for unsupported envelope values", {
+    spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
+    mod <- estimate(spec)
+    tmp <- tempfile(fileext = ".png")
+    png(tmp)
+    expect_error(plot(mod, type = "arma", which = 3, envelope = "bogus"), "should be one of")
+    dev.off()
+})

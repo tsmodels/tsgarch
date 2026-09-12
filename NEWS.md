@@ -8,7 +8,13 @@ impulse response, and ACFs of the standardized residuals `z_t` and `z_t^2`.
 The `type` argument defaults to `"garch"` and keeps the original volatility/
 news-impact/QQ panel completely unchanged. New computational helpers
 `arma_inverse_roots()`, `arma_irf()` and `arma_near_cancellation()` are
-exported for programmatic use.
+exported for programmatic use. The residual ACF panels support three
+envelopes: the default asymptotic `"bartlett"` band, a `"simulate"` band
+from the fitted innovation distribution at the point parameter estimates
+(no parameter uncertainty), and a `"parametric"` band that perturbs the
+full parameter vector using `vcov()` and re-filters the observed data (a
+cheap forward pass, no re-optimization) to reflect parameter estimation
+uncertainty.
 
 # tsgarch 1.0.5
 
