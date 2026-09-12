@@ -1,7 +1,7 @@
 test_that("garch(1,1) backtest:rolling",{
     spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), vreg = y[1:1800,2], distribution = "norm")
     b <- tsbacktest(spec, start = 1000, end = 1200, h = 1, estimate_every = 100, rolling = TRUE, trace = FALSE)
-    f_dates_diff <- unique(diff(b$table$forecast_date))
+    f_dates_diff <- as.integer(unique(diff(b$table$forecast_date)))
     e_dates_diff <- as.integer(max(diff(b$table$estimation_date)))
     e_dates_diff <- as.integer(max(diff(b$table$estimation_date)))
     e_dates_sum <- as.integer(sum(diff(b$table$estimation_date)))
@@ -14,7 +14,7 @@ test_that("garch(1,1) backtest:rolling",{
 test_that("garch(1,1) backtest:rolling multihorizon",{
     spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), vreg = y[1:1800,2], distribution = "norm")
     b <- tsbacktest(spec, start = 1000, end = 1200, h = 5, estimate_every = 100, rolling = TRUE, trace = FALSE)
-    f_dates_diff <- unique(b$table$forecast_date - b$table$filter_date)
+    f_dates_diff <- as.integer(unique(b$table$forecast_date - b$table$filter_date))
     e_dates_diff <- as.integer(max(diff(b$table$estimation_date)))
     e_dates_diff <- as.integer(max(diff(b$table$estimation_date)))
     e_dates_sum <- as.integer(sum(diff(b$table$estimation_date)))
@@ -28,7 +28,7 @@ test_that("garch(1,1) backtest:rolling multihorizon",{
 test_that("garch(1,1) backtest: non rolling",{
     spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), vreg = y[1:1800,2], distribution = "norm")
     b <- tsbacktest(spec, start = 1000, end = 1200, h = 100, estimate_every = 100, rolling = FALSE, trace = FALSE)
-    f_dates_diff <- unique(diff(b$table$forecast_date))
+    f_dates_diff <- as.integer(unique(diff(b$table$forecast_date)))
     e_dates_diff <- as.integer(max(diff(b$table$estimation_date)))
     e_dates_diff <- as.integer(max(diff(b$table$estimation_date)))
     e_dates_sum <- as.integer(sum(diff(b$table$estimation_date)))
@@ -43,7 +43,7 @@ test_that("garch(1,1) backtest: non rolling",{
 test_that("garch(1,1) backtest: non rolling non overlapping",{
     spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), vreg = y[1:1800,2], distribution = "norm")
     b <- tsbacktest(spec, start = 1000, end = 1200, h = 80, estimate_every = 100, rolling = FALSE, trace = FALSE)
-    f_dates_diff <- unique(diff(b$table$forecast_date))
+    f_dates_diff <- as.integer(unique(diff(b$table$forecast_date)))
     e_dates_diff <- as.integer(max(diff(b$table$estimation_date)))
     e_dates_diff <- as.integer(max(diff(b$table$estimation_date)))
     e_dates_sum <- as.integer(sum(diff(b$table$estimation_date)))
