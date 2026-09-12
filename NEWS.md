@@ -1,3 +1,15 @@
+# tsgarch 1.0.6
+
+* ARMA mean equation support extended to `igarch` and `ewma` models, so that
+all 8 native GARCH flavors now accept the `arma` argument.
+* Added a new `plot()` diagnostic panel for the ARMA mean equation
+(`plot(object, type = "arma")`). The panel includes inverse AR/MA roots,
+impulse response, and ACFs of the standardized residuals `z_t` and `z_t^2`.
+The `type` argument defaults to `"garch"` and keeps the original volatility/
+news-impact/QQ panel completely unchanged. New computational helpers
+`arma_inverse_roots()`, `arma_irf()` and `arma_near_cancellation()` are
+exported for programmatic use.
+
 # tsgarch 1.0.5
 
 * Added a jointly estimated ARMA(p,q) mean equation, via a new `arma` argument

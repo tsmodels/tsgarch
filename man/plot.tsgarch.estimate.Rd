@@ -4,19 +4,60 @@
 \alias{plot.tsgarch.estimate}
 \title{Estimated Model Plots}
 \usage{
-\method{plot}{tsgarch.estimate}(x, y = NULL, ...)
+\method{plot}{tsgarch.estimate}(x, y = NULL, type = c("garch", "arma"), which = 1:4, ...)
 }
 \arguments{
 \item{x}{an object of class \dQuote{tsgarch.estimate}.}
 
 \item{y}{not used.}
 
-\item{...}{not used.}
+\item{type}{character, one of \dQuote{garch} (the original volatility/
+news-impact/QQ panel, the default) or \dQuote{arma} (an ARMA diagnostic
+panel). The default is \dQuote{garch} for backwards compatibility.}
+
+\item{which}{for \code{type = "arma"} only, an integer vector selecting one
+or more of the four ARMA diagnostic panels. Defaults to \code{1:4}; use
+e.g. \code{which = 1} for a single full-size inverse-roots plot.}
+
+\item{...}{for \code{type = "arma"}, further arguments passed to the ARMA
+panel: \code{cumulative} (logical, adds a cumulative IRF line in panel 2),
+\code{envelope} (character, see \dQuote{Details}) and \code{B} (number of
+replications for the simulation envelope).}
 }
 \value{
 a panel with plots for the estimated sigma value, the news impact curve
-and a \dQuote{QQ} plot of the standardized residuals.
+and a \dQuote{QQ} plot of the standardized residuals when
+\code{type = "garch"}, or an ARMA diagnostic panel when
+\code{type = "arma"}. Invisibly returns \code{x}.
 }
 \description{
 Plot method for \dQuote{tsgarch.estimate} class.
+}
+\details{
+The ARMA diagnostic panel (\code{type = "arma"}) is only available for
+models estimated with a non-zero \code{arma} order. Panel 1 shows the
+inverse AR and MA roots with the unit circle; close AR/MA roots are joined
+to highlight possible common factors. Panel 2 shows the impulse response
+function in units of the innovation, so \code{psi[0] = 1} and the response
+decays to zero for a stationary model. Panels 3 and 4 show the ACFs of the
+standardized residuals \eqn{z_t} and \eqn{z_t^2}; for a well-specified
+model the longer lags (beyond the first few) are the most informative,
+because estimation makes the first-lag Bartlett bands conservative.
+
+The default \code{envelope = "bartlett"} draws asymptotic \eqn{\pm 1.96 / \sqrt{n}}
+bands under the iid assumption, which is valid for correctly specified
+standardized residuals. \code{envelope = "simulate"} is planned but not yet
+implemented; it is accepted as an argument but raises an informative error.
+}
+\examples{
+\donttest{
+data(dmbp)
+y <- xts(dmbp, as.Date(seq_len(nrow(dmbp)), origin = "1970-01-01"))
+spec <- garch_modelspec(y[1:1000,1], constant = TRUE, model = "garch",
+                        order = c(1,1), arma = c(1,1))
+mod <- estimate(spec)
+plot(mod)                         # original garch panel (default)
+plot(mod, type = "arma")          # four-panel ARMA diagnostics
+plot(mod, type = "arma", which = c(1,2))
+}
 }
