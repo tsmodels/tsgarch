@@ -15,6 +15,12 @@ from the fitted innovation distribution at the point parameter estimates
 full parameter vector using `vcov()` and re-filters the observed data (a
 cheap forward pass, no re-optimization) to reflect parameter estimation
 uncertainty.
+* `plot(object, type = "arma")`'s `which` argument now defaults to `NULL`,
+plotting all four panels in a `2x2` layout (previously defaulted to `1:4`
+with the same effect, but `NULL` is now the documented default, consistent
+with the single-layout `type = "garch"` panel not requiring a `which`
+argument at all). 
+
 
 # tsgarch 1.0.5
 

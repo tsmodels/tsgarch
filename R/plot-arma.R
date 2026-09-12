@@ -1,4 +1,4 @@
-.plot_tsgarch_estimate_arma <- function(x, which = 1:4, cumulative = FALSE,
+.plot_tsgarch_estimate_arma <- function(x, which = NULL, cumulative = FALSE,
                                          envelope = c("bartlett", "simulate", "parametric"),
                                          B = 500, vcov_type = "H", ...)
 {
@@ -6,6 +6,7 @@
     if (sum(arma_order) == 0) {
         stop("\ntype = 'arma' requires a model with an ARMA mean equation (arma != c(0,0)).")
     }
+    if (is.null(which)) which <- 1:4
     envelope <- match.arg(envelope)
     which <- as.integer(which)
     if (any(which < 1) || any(which > 4)) stop("\nwhich must be an integer vector with values in 1:4.")
@@ -20,7 +21,7 @@
         if (n == 2) {
             par(mfrow = c(1, 2))
         } else if (n >= 3) {
-            par(mfrow = c(2, 2))
+            par(mfrow = c(2, 2), mar = c(3, 3, 3, 3))
         }
         for (p in panels) {
             .plot_arma_panel(x, p, cumulative, envelope, B, vcov_type)
@@ -43,8 +44,16 @@
     near <- arma_near_cancellation(roots, tol = 0.1)
     has_canc <- nrow(near) > 0
 
-    oldpar <- par(no.readonly = TRUE)
-    on.exit(par(oldpar), add = TRUE)
+    # No par() save/restore here: this is an internal (non-exported) helper,
+    # always called from .plot_tsgarch_estimate_arma(), which already
+    # captures and restores the *complete* par state exactly once for the
+    # whole (possibly multi-panel) call - the only place CRAN's "restore
+    # graphical parameters" requirement actually applies, since this
+    # function is never reachable directly by a user. A second, nested
+    # full-state save/restore here would reset par("mfg") (the plotting
+    # cursor within an mfrow layout) after every single panel, which is
+    # exactly what previously caused every panel to overwrite the same grid
+    # cell instead of advancing through the 2x2 layout.
     par(mar = c(2.5, 2.5, 2.5, 0.5))
     theta <- seq(0, 2 * pi, length.out = 200)
     plot(0, 0, xlim = c(-1.1, 1.1), ylim = c(-1.1, 1.1), asp = 1,
@@ -73,8 +82,8 @@
 {
     irf <- arma_irf(x)
     lag <- seq_along(irf$psi) - 1
-    oldpar <- par(no.readonly = TRUE)
-    on.exit(par(oldpar), add = TRUE)
+    # see the comment in .plot_arma_inverse_roots(): no par() save/restore
+    # here by design, the outer .plot_tsgarch_estimate_arma() owns that.
     par(mar = c(4, 4, 2.5, 0.5))
     plot(lag, irf$psi, type = "h", lwd = 1.2, col = "steelblue",
          xlab = "Lag", ylab = expression(psi), main = "Impulse Response")
@@ -129,8 +138,8 @@
         env_hi <- apply(acf_sim, 1, stats::quantile, probs = 0.975, na.rm = TRUE)
     }
 
-    oldpar <- par(no.readonly = TRUE)
-    on.exit(par(oldpar), add = TRUE)
+    # see the comment in .plot_arma_inverse_roots(): no par() save/restore
+    # here by design, the outer .plot_tsgarch_estimate_arma() owns that.
     par(mar = c(4, 4, 2.5, 0.5))
     ylim <- range(c(min(acfval, -ci), max(acfval, ci), env_lo, env_hi))
     plot(range(c(0, lag + 0.5)), ylim,

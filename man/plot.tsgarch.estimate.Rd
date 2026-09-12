@@ -4,7 +4,7 @@
 \alias{plot.tsgarch.estimate}
 \title{Estimated Model Plots}
 \usage{
-\method{plot}{tsgarch.estimate}(x, y = NULL, type = c("garch", "arma"), which = 1:4, ...)
+\method{plot}{tsgarch.estimate}(x, y = NULL, type = c("garch", "arma"), which = NULL, ...)
 }
 \arguments{
 \item{x}{an object of class \dQuote{tsgarch.estimate}.}
@@ -16,8 +16,10 @@ news-impact/QQ panel, the default) or \dQuote{arma} (an ARMA diagnostic
 panel). The default is \dQuote{garch} for backwards compatibility.}
 
 \item{which}{for \code{type = "arma"} only, an integer vector selecting one
-or more of the four ARMA diagnostic panels. Defaults to \code{1:4}; use
-e.g. \code{which = 1} for a single full-size inverse-roots plot.}
+or more of the four ARMA diagnostic panels. Defaults to \code{NULL}, which
+plots all four panels in a \code{2x2} layout
+(\code{par(mfrow = c(2,2), mar = c(3,3,3,3))}); use e.g. \code{which = 1}
+for a single full-size inverse-roots plot.}
 
 \item{...}{for \code{type = "arma"}, further arguments passed to the ARMA
 panel: \code{cumulative} (logical, adds a cumulative IRF line in panel 2),

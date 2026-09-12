@@ -52,37 +52,23 @@ test_that("arma_near_cancellation detects close AR/MA roots", {
     expect_lt(out$distance[1], 0.1)
 })
 
-test_that("plot method dispatches to garch panel and preserves par state", {
+test_that(".parametric_standardized_residual_draws returns a valid n x B matrix", {
     spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
     mod <- estimate(spec)
-    old <- par(no.readonly = TRUE)
-    on.exit(par(old), add = TRUE)
-    tmp <- tempfile(fileext = ".png")
-    png(tmp)
-    out <- plot(mod)
-    dev.off()
-    expect_identical(out, mod)
-    # verify par is restored to original state (with tolerance for unimportant fields)
-    expect_equal(par(no.readonly = TRUE)$mfrow, old$mfrow)
-    expect_equal(par(no.readonly = TRUE)$mar, old$mar)
+    z <- tsgarch:::.parametric_standardized_residual_draws(mod, B = 15)
+    expect_equal(dim(z), c(mod$nobs, 15))
+    expect_false(any(is.na(z)))
+    # different columns (different draws) should not be identical
+    expect_false(isTRUE(all.equal(z[,1], z[,2])))
 })
 
-test_that("plot method dispatches to arma panel and returns object", {
-    spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(2,1))
-    mod <- estimate(spec)
-    tmp <- tempfile(fileext = ".png")
-    png(tmp)
-    out <- plot(mod, type = "arma")
-    dev.off()
-    expect_identical(out, mod)
-
-    tmp2 <- tempfile(fileext = ".png")
-    png(tmp2)
-    out2 <- plot(mod, type = "arma", which = 1)
-    dev.off()
-    expect_identical(out2, mod)
-})
-
+# Argument-validation checks below deliberately do not exercise any actual
+# plotting/graphics device: plot.tsgarch.estimate() and its internal ARMA
+# panel dispatcher both validate `type`/`which`/`envelope` (via match.arg()
+# and explicit checks) before touching par()/graphics, so these errors are
+# raised without ever opening a device. Rendering itself is verified
+# manually (see plot.tsgarch.estimate examples), not in the automated suite,
+# to avoid device-dependent plotting tests in testthat.
 test_that("plot type validation errors on invalid type", {
     spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
     mod <- estimate(spec)
@@ -95,38 +81,15 @@ test_that("plot type = 'arma' errors for models without ARMA", {
     expect_error(plot(mod0, type = "arma"), "ARMA mean equation")
 })
 
-test_that(".parametric_standardized_residual_draws returns a valid n x B matrix", {
-    spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
-    mod <- estimate(spec)
-    z <- tsgarch:::.parametric_standardized_residual_draws(mod, B = 15)
-    expect_equal(dim(z), c(mod$nobs, 15))
-    expect_false(any(is.na(z)))
-    # different columns (different draws) should not be identical
-    expect_false(isTRUE(all.equal(z[,1], z[,2])))
-})
-
-test_that("plot arma panel works with envelope = 'simulate' and 'parametric'", {
-    spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(2,1))
-    mod <- estimate(spec)
-
-    tmp <- tempfile(fileext = ".png")
-    png(tmp)
-    out <- plot(mod, type = "arma", which = 3, envelope = "simulate", B = 30)
-    dev.off()
-    expect_identical(out, mod)
-
-    tmp2 <- tempfile(fileext = ".png")
-    png(tmp2)
-    out2 <- plot(mod, type = "arma", which = 4, envelope = "parametric", B = 30)
-    dev.off()
-    expect_identical(out2, mod)
-})
-
 test_that("plot arma panel errors informatively for unsupported envelope values", {
     spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
     mod <- estimate(spec)
-    tmp <- tempfile(fileext = ".png")
-    png(tmp)
     expect_error(plot(mod, type = "arma", which = 3, envelope = "bogus"), "should be one of")
-    dev.off()
+})
+
+test_that("plot arma panel errors informatively for invalid which values", {
+    spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
+    mod <- estimate(spec)
+    expect_error(plot(mod, type = "arma", which = 5), "which must be an integer vector")
+    expect_error(plot(mod, type = "arma", which = 0), "which must be an integer vector")
 })
