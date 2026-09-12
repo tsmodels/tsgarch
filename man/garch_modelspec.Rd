@@ -36,9 +36,8 @@ exponential GARCH, \dQuote{aparch} for asymmetric power ARCH,
 \item{arma}{the (ar,ma) order of the ARMA mean equation, jointly estimated
 with the GARCH variance equation. Defaults to \sQuote{c(0,0)} (no ARMA
 dynamics in the mean, matching prior behavior where the mean is either
-zero or a constant). Supported for all models except \dQuote{igarch} and
-\dQuote{ewma} (which share the plain \dQuote{garch} mean equation with no
-native ARMA support). Stationarity of the AR polynomial and invertibility
+zero or a constant). Supported for all models, including \dQuote{igarch}
+and \dQuote{ewma}. Stationarity of the AR polynomial and invertibility
 of the MA polynomial are guaranteed by construction via a Durbin-Levinson
 (partial autocorrelation) reparameterization, and therefore do not
 require additional nonlinear constraints during estimation. The estimated

@@ -61,7 +61,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                                          sample_n = sample_n,
                                          distribution = distribution),
            "igarch" = .parameters_igarch(y = y, constant = constant,
-                                         order = order,
+                                         order = order, arma = arma,
                                          variance_targeting = variance_targeting,
                                          vreg = vreg,
                                          multiplicative = multiplicative,
@@ -70,7 +70,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                                          sample_n = sample_n,
                                          distribution = distribution),
            "ewma" = .parameters_ewma(y = y, constant = constant,
-                                         order = order,
+                                         order = order, arma = arma,
                                          variance_targeting = variance_targeting,
                                          vreg = vreg,
                                          multiplicative = multiplicative,
@@ -710,7 +710,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
 }
 
 
-.parameters_igarch <- function(y, constant = FALSE, order = c(1,1),
+.parameters_igarch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0),
                               variance_targeting = FALSE,
                               vreg = NULL, multiplicative = TRUE,
                               init = c("unconditional","sample","backcast"),
@@ -733,10 +733,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             estimate = ifelse(constant, 1, 0),
                             scale = 1, group = "mu", equation = "[M]",
                             symbol = "\\mu")
-    # igarch shares the compiled "garch" TMB template, which always expects
-    # arpacf/mapacf parameter vectors (ARMA is not yet exposed for igarch, so
-    # these are fixed, unestimated dummies; see .parameters_garch).
-    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, c(0,0)))
+    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma))
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = var_y * 0.01,
                                   lower = 1e-12, upper = var_y/0.01,
@@ -822,7 +819,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
     return(parmatrix)
 }
 
-.parameters_ewma <- function(y, constant = FALSE, order = c(1,1),
+.parameters_ewma <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0),
                                variance_targeting = FALSE,
                                vreg = NULL, multiplicative = TRUE,
                                init = c("unconditional","sample","backcast"),
@@ -845,10 +842,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             estimate = ifelse(constant, 1, 0),
                             scale = 1, group = "mu", equation = "[M]",
                             symbol = "\\mu")
-    # ewma ultimately shares the compiled "garch" TMB template (via igarch),
-    # which always expects arpacf/mapacf parameter vectors (ARMA is not yet
-    # exposed for ewma, so these are fixed, unestimated dummies).
-    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, c(0,0)))
+    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma))
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = var_y * 0.01,
                                   lower = 1e-12, upper = var_y/0.01,

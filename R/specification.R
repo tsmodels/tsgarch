@@ -14,9 +14,8 @@
 #' @param arma the (ar,ma) order of the ARMA mean equation, jointly estimated
 #' with the GARCH variance equation. Defaults to \sQuote{c(0,0)} (no ARMA
 #' dynamics in the mean, matching prior behavior where the mean is either
-#' zero or a constant). Supported for all models except \dQuote{igarch} and
-#' \dQuote{ewma} (which share the plain \dQuote{garch} mean equation with no
-#' native ARMA support). Stationarity of the AR polynomial and invertibility
+#' zero or a constant). Supported for all models, including \dQuote{igarch}
+#' and \dQuote{ewma}. Stationarity of the AR polynomial and invertibility
 #' of the MA polynomial are guaranteed by construction via a Durbin-Levinson
 #' (partial autocorrelation) reparameterization, and therefore do not
 #' require additional nonlinear constraints during estimation. The estimated
@@ -96,9 +95,7 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
         stop("arma must be a length 2 non-negative integer vector, e.g. c(1,1).")
     }
     arma <- as.integer(arma)
-    if (sum(arma) > 0 && model %in% c("igarch","ewma")) {
-        stop("\narma is not supported for model = \"", model, "\" (shares the plain garch mean equation).")
-    }
+
     # egarch already in logs
     if (model == "egarch") {
         if (multiplicative) warning("\nmultiplicative not valid for egarch model (already multiplicative due to log specification). Setting to FALSE")

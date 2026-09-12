@@ -229,8 +229,7 @@ The combined pre-sample/burn-in length used internally is
 $\max\left(\text{GARCH order}, \text{ARMA order}\right)$, so that e.g. an
 ARMA(2,2) mean equation with a GARCH(1,1) variance equation initializes
 correctly. ARMA support is available for all GARCH flavors described in
-Section \ref{sec:estimation:flavors} except `igarch` and `ewma`
-(which share the plain `garch` mean equation and TMB template).
+Section \ref{sec:estimation:flavors}, including `igarch` and `ewma`.
 
 An entire AR and/or MA polynomial can instead be fixed at target
 coefficients rather than estimated, by setting `value` to the desired
@@ -538,8 +537,7 @@ residual values from some other model as discussed in Section \ref{sec:introduct
 This is the mean equation used by default (`arma = c(0,0)`); when an
 ARMA($p,q$) mean equation is instead requested, $\mu_t$ becomes the
 time-varying conditional mean of Equation \ref{eq:arma_mean} (Section
-\ref{sec:estimation:arma}) for every flavor below except `igarch` and
-`ewma`, with $\varepsilon_t$ unchanged in its role as the innovation
+\ref{sec:estimation:arma}) for every flavor below, with $\varepsilon_t$ unchanged in its role as the innovation
 driving each flavor's conditional variance equation.
 
 Note that the parameter symbols for the model equations presented in the
@@ -1292,8 +1290,8 @@ is likely to be on models for high frequency data and porting the
 multivariate models from **rmgarch**.
 
 A separate package called [tstests](https://github.com/tsmodels/tstests)
-includes a number of tests which were previously part of **rugarch** and
-will be released to CRAN soon.
+includes a number of tests which were previously part of **rugarch** is
+already on CRAN.
 
 
 \section{References}

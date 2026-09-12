@@ -287,10 +287,8 @@ for (nm in names(arma_orders_to_test)) {
 }
 
 # ---------------------------------------------------------------------------
-# ARMA support across all 6 native GARCH variants (garch, egarch, gjrgarch,
-# aparch, fgarch, cgarch). igarch/ewma are intentionally excluded: they share
-# the plain "garch" TMB template with no native ARMA support (see
-# garch_modelspec()'s validation).
+# ARMA support across all 8 GARCH variants (garch, egarch, gjrgarch,
+# aparch, fgarch, cgarch, igarch, ewma).
 # ---------------------------------------------------------------------------
 
 for (mdl in c("garch", "egarch", "gjrgarch", "aparch", "fgarch", "cgarch")) {
@@ -351,6 +349,28 @@ for (mdl in c("garch", "egarch", "gjrgarch", "aparch", "fgarch", "cgarch")) {
     })
 }
 
+# igarch and ewma also support ARMA but are equality-constrained (persistence = 1)
+# and are therefore tested with a lighter, separate block.
+for (mdl in c("igarch","ewma")) {
+    local({
+        model <- mdl
+        test_that(paste0("arma: ", model, " estimates ARMA(1,1)-GARCH(1,1)"), {
+            spec0 <- garch_modelspec(y[1:1800,1], constant = TRUE, model = model, order = c(1,1), arma = c(0,0))
+            spec1 <- garch_modelspec(y[1:1800,1], constant = TRUE, model = model, order = c(1,1), arma = c(1,1))
+            mod0 <- estimate(spec0)
+            mod1 <- estimate(spec1)
+            expect_true(as.numeric(logLik(mod1)) >= as.numeric(logLik(mod0)) - 1e-4)
+            # equality-constrained persistence = 1 sits at the boundary
+            expect_false(mod1$conditions$kkt1)
+            ac <- arma_coefficients(mod1)
+            expect_true(min(Mod(polyroot(c(1, -as.numeric(ac$ar))))) > 1)
+            expect_true(min(Mod(polyroot(c(1, as.numeric(ac$ma))))) > 1)
+            s <- summary(mod1)
+            expect_true(any(grepl("^ar[0-9]|^ma[0-9]", s$coefficients$term)))
+        })
+    })
+}
+
 test_that("arma: summary()/print()/as_flextable() show the transformed ar/ma coefficients, not raw arpacf/mapacf", {
     spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(2,1))
     mod <- estimate(spec)
@@ -370,8 +390,8 @@ test_that("arma: summary()/print()/as_flextable() show the transformed ar/ma coe
     expect_false(any(grepl("^ar[0-9]|^ma[0-9]", s0$coefficients$term)))
 })
 
-test_that("arma: is rejected for igarch/ewma but allowed for all 6 native variants", {
-    for (mdl in c("garch", "egarch", "gjrgarch", "aparch", "fgarch", "cgarch")) {
+test_that("arma: is allowed for all 8 native variants including igarch/ewma", {
+    for (mdl in c("garch", "egarch", "gjrgarch", "aparch", "fgarch", "cgarch", "igarch", "ewma")) {
         expect_error(garch_modelspec(y[1:1800,1], constant = TRUE, model = mdl, order = c(1,1), arma = c(1,1)), NA)
     }
 })
