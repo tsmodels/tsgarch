@@ -1,3 +1,43 @@
+# tsgarch 1.0.5
+
+* Added a jointly estimated ARMA(p,q) mean equation, via a new `arma` argument
+to `garch_modelspec` (defaults to `c(0,0)`, fully backward compatible).
+Available for all GARCH flavors except `igarch` and `ewma` (which share the
+plain `garch` mean equation with no native ARMA support). The `constant`
+argument remains independent of `arma` and continues to control only whether
+the unconditional mean `mu` is estimated or fixed at zero.
+* The AR/MA coefficients are guaranteed stationary/invertible by construction,
+via a Durbin-Levinson/Jones partial-autocorrelation (PACF) reparameterization
+of the raw optimization parameters, so no additional nonlinear constraints
+are required; exact (autodiff, not finite-difference) Jacobians of the ARMA
+mean equation are available throughout via TMB. The transformed AR/MA
+coefficients can be extracted with the new `arma_coefficients()` function.
+* `fitted()` now returns the genuinely time-varying conditional mean when an
+ARMA mean equation is specified (previously always a constant `mu`, now
+completing the documented "vector the size of y" contract), and `residuals()`
+is now always exactly `y - fitted(object)` for every model, including a fix
+for models with no ARMA (a small, purely internal simplification with no
+behavior change there).
+* `predict()`, `simulate()` and `tsfilter()` are all ARMA-aware: point
+forecasts, simulated paths and incremental filtering all correctly account
+for the AR/MA dynamics in the mean equation. The combined pre-sample/burn-in
+length used internally is `max(garch order, arma order)`.
+* `summary()` (and its console `print()`/`as_flextable()` methods) now
+displays the transformed `ar`/`ma` coefficients with their delta-method
+standard errors, rather than the raw (not directly interpretable)
+Durbin-Levinson parameters used internally during estimation.
+* An entire AR and/or MA polynomial in the ARMA mean equation can now be
+fixed at target coefficients rather than estimated: set `value` to the
+desired ar/ma coefficients (not the internal pacf parameterization) and
+`estimate = 0` on every `arpacf#`/`mapacf#` row of the relevant group in the
+spec's `parmatrix`; the correct internal Durbin-Levinson transform is then
+applied automatically wherever needed (estimation, `arma_coefficients()`,
+`predict()`, `simulate()`, `tsfilter()`), and the fixed coefficients are
+validated for stationarity/invertibility up front. Fixing only some (not
+all) of the lags of a given polynomial is not supported, since the
+reparameterization couples all of a polynomial's lags together, and raises
+an informative error, as does mixing `estimate` values within one group.
+
 # tsgarch 1.0.4
 
 * Now returning the series name of the data in the spec object for use in

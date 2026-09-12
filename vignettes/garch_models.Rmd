@@ -62,18 +62,22 @@ by the same author, with key differences summarized below:
     Multiplicative Component GARCH and Realized GARCH are not currently
     implemented.
 
--   does not implement joint ARFIMA-GARCH estimation. The conditional
-    mean equation only allows for a constant. With so many options for
-    modelling the conditional mean, many of which are available in the
-    **tsmodels** framework, it was decided to keep this package simpler
-    and avoid the joint estimation of both conditional mean and variance
-    dynamics. While the 2 step estimation approach, whereby the
-    residuals of the conditional mean are passed to the variance
-    dynamics estimation, may be less efficient for small sized datasets,
-    it is expected to be more flexible in what can be achieved.
-    Additionally, the ARCH-in-mean model is no longer available, as it
-    was found to have very limited value within the **tsmodels**
-    framework or in general, this author's experience. A separate
+-   does not implement joint ARFIMA-GARCH estimation, but does allow for a
+    jointly estimated ARMA($p,q$) mean equation (see
+    Section \ref{sec:estimation:arma}) in addition to the constant. With so
+    many options for modelling the conditional mean beyond low order ARMA
+    dynamics, many of which are available in the **tsmodels** framework, it
+    was decided to keep this package's mean equation support deliberately
+    limited rather than pursue full joint estimation of arbitrary mean
+    dynamics with the variance equation. For a fully general mean equation
+    (e.g. ARFIMA-X, or higher order fractional dynamics), the 2 step
+    estimation approach, whereby the residuals of the conditional mean are
+    passed to the variance dynamics estimation, remains available and may be
+    more flexible in what can be achieved, even if potentially less
+    efficient for small sized datasets. Additionally, the ARCH-in-mean model
+    is no longer available, as it was found to have very limited value
+    within the **tsmodels** framework or in general, this author's
+    experience. A separate
     [tsarma](https://github.com/tsmodels/tsarma) package for ARMA(p,q)-X
     models is however available.
 
@@ -173,6 +177,73 @@ Estimation is performed using the [nloptr](https://CRAN.R-project.org/package=nl
 solver with analytic Gradient and Jacobian of the constraints^[For some of the problems, 
 the persistence has an easy closed form solution and therefore the Jacobian is 
 hardcoded instead of making use of autodiff.] provided through autodiff in **TMB**.
+
+\subsection{ARMA Mean Equation}\label{sec:estimation:arma}
+
+By default $\mu_t$ reduces to either zero or a constant $\mu$
+(controlled by the `constant` argument to `garch_modelspec`), in
+which case $y_t - \mu_t = y_t - \mu$ is simply passed to the conditional
+variance equation. Setting the `arma = c(p,q)` argument instead
+specifies a jointly estimated ARMA($p,q$) mean equation:
+
+\begin{equation}
+y_t - \mu = \sum_{i=1}^{p}\phi_i\left(y_{t-i}-\mu\right) + \varepsilon_t + \sum_{j=1}^{q}\theta_j\varepsilon_{t-j}
+\label{eq:arma_mean}
+\end{equation}
+
+so that $\mu$ retains its interpretation as the unconditional mean of $y$,
+and $\varepsilon_t$ (rather than $y_t - \mu$) is passed on to the
+conditional variance equation of whichever GARCH flavor was chosen. Setting
+`arma = c(0,0)` (the default) reduces Equation \ref{eq:arma_mean}
+exactly to the pre-existing constant-mean behavior. The `constant`
+argument remains independent of `arma`: it controls only whether $\mu$
+is estimated or fixed at zero.
+
+Stationarity of the AR polynomial and invertibility of the MA polynomial
+are required for $\phi$ and $\theta$ to be well defined, but rather than
+impose these as nonlinear constraints on $\phi_i$ and $\theta_j$ directly
+(which would require either finite-difference Jacobians or an
+autodiff-aware eigendecomposition of a companion matrix, e.g. via
+[RTMB](https://CRAN.R-project.org/package=RTMB)), the raw parameters
+optimized over are instead a Durbin-Levinson / Jones partial
+autocorrelation (PACF) reparameterization $r^{ar}_i, r^{ma}_j \in (-1,1)$,
+from which $\phi$ (guaranteed to lie in the stationarity region) and
+$\theta$ (guaranteed to lie in the invertibility region, via the
+well-known AR/MA duality) are recovered by a smooth, exact-autodiff-
+compatible recursion. This means only simple box constraints on
+$r^{ar}_i,r^{ma}_j$ are required during optimization, with exact
+(rather than finite-difference) Jacobians of the mean equation available
+throughout via **TMB**. The raw PACF parameters (`arpacf`/`mapacf`
+in the model's `parmatrix`) are not directly interpretable; the
+transformed $\phi$/$\theta$ coefficients are what `summary()` displays,
+and are also available via `arma_coefficients()`.
+
+When `arma` is active, `fitted()` returns the (now genuinely
+time-varying) conditional mean $\mu_t = \mu + \sum_i\phi_i\left(y_{t-i}-\mu\right) + \sum_j\theta_j\varepsilon_{t-j}$
+rather than the constant $\mu$, and `residuals()` returns the true
+ARMA innovations $\varepsilon_t = y_t - \mu_t$ rather than $y_t - \mu$.
+Both `predict()` and `simulate()` account for the ARMA dynamics
+in the mean forecast/simulated paths, and `tsfilter()` continues the
+ARMA recursion when incrementally filtering newly appended observations.
+The combined pre-sample/burn-in length used internally is
+$\max\left(\text{GARCH order}, \text{ARMA order}\right)$, so that e.g. an
+ARMA(2,2) mean equation with a GARCH(1,1) variance equation initializes
+correctly. ARMA support is available for all GARCH flavors described in
+Section \ref{sec:estimation:flavors} except `igarch` and `ewma`
+(which share the plain `garch` mean equation and TMB template).
+
+An entire AR and/or MA polynomial can instead be fixed at target
+coefficients rather than estimated, by setting `value` to the desired
+ar/ma coefficients directly (not $r^{ar}_i$/$r^{ma}_j$) and `estimate = 0`
+on every `arpacf`/`mapacf` row of the relevant polynomial in the spec's
+`parmatrix`; the corresponding raw pacf values are computed automatically.
+Fixing only some (not all) of the lags of a given polynomial is not
+supported - since $\phi_i$ depends jointly on $r^{ar}_1,\ldots,r^{ar}_p$
+(and similarly for $\theta_j$), there is no way to hold one lag's
+coefficient fixed while leaving others free without either giving up the
+stationarity/invertibility guarantee or reintroducing a nonlinear
+constraint - and raises an error, as does supplying a fixed target that is
+not itself stationary (AR) or invertible (MA).
 
 \subsection{Recursion Initialization ($\sigma^\delta_0$)}\label{sec:estimation:recursion}
 
@@ -464,6 +535,12 @@ distribution. These additional distributional parameters may be present
 in some combination or not at all depending on the distribution. It is
 also possible to set $\mu$ to zero and pass a series of pre-filtered
 residual values from some other model as discussed in Section \ref{sec:introduction}.
+This is the mean equation used by default (`arma = c(0,0)`); when an
+ARMA($p,q$) mean equation is instead requested, $\mu_t$ becomes the
+time-varying conditional mean of Equation \ref{eq:arma_mean} (Section
+\ref{sec:estimation:arma}) for every flavor below except `igarch` and
+`ewma`, with $\varepsilon_t$ unchanged in its role as the innovation
+driving each flavor's conditional variance equation.
 
 Note that the parameter symbols for the model equations presented in the
 following subsections will be exactly the same as those output by the
@@ -1200,6 +1277,11 @@ following methods from the **tsmethods** package are included:
 - `persistence`: model persistence
 
 Also included from the **sandwich** package are methods for `estfun` and `bread`.
+
+Additionally, `arma_coefficients` returns the estimated AR/MA coefficients
+(Section \ref{sec:estimation:arma}) implied by the raw partial
+autocorrelation parameters used internally during estimation, for models
+specified with a non-trivial `arma` order.
 
 
 \section{Conclusion}\label{sec:conclusion}

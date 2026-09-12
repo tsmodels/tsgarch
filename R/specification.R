@@ -11,6 +11,27 @@
 #' \dQuote{fgarch} for Family GARCH, \dQuote{cgarch} for component GARCH,
 #' \dQuote{igarch} for integrated GARCH, and \dQuote{ewma} for the EWMA model.
 #' @param order the (p,q) GARCH order.
+#' @param arma the (ar,ma) order of the ARMA mean equation, jointly estimated
+#' with the GARCH variance equation. Defaults to \sQuote{c(0,0)} (no ARMA
+#' dynamics in the mean, matching prior behavior where the mean is either
+#' zero or a constant). Supported for all models except \dQuote{igarch} and
+#' \dQuote{ewma} (which share the plain \dQuote{garch} mean equation with no
+#' native ARMA support). Stationarity of the AR polynomial and invertibility
+#' of the MA polynomial are guaranteed by construction via a Durbin-Levinson
+#' (partial autocorrelation) reparameterization, and therefore do not
+#' require additional nonlinear constraints during estimation. The estimated
+#' AR/MA coefficients can be extracted with \code{\link{arma_coefficients}};
+#' see also \code{\link{fitted}} for the (possibly time-varying) conditional
+#' mean and \code{\link{residuals}} for the ARMA innovations. To fix an
+#' entire AR and/or MA polynomial at target coefficients instead of
+#' estimating them, set \sQuote{value} to the desired ar/ma coefficients
+#' (not the internal pacf parameterization) and \sQuote{estimate = 0} on
+#' every \sQuote{arpacf#}/\sQuote{mapacf#} row of the spec's
+#' \sQuote{parmatrix} for that polynomial; the correct internal
+#' Durbin-Levinson transform is then applied automatically. Fixing only
+#' some (not all) of the lags of a given polynomial is not supported, since
+#' the reparameterization couples all of a polynomial's lags together, and
+#' will raise an error.
 #' @param variance_targeting whether to use variance targeting rather than
 #' estimating the conditional variance intercept.
 #' @param vreg an optional xts matrix of regressors in the conditional variance
@@ -37,7 +58,7 @@
 #'
 #'
 garch_modelspec <- function(y, model = "garch", constant = FALSE,
-                            order = c(1,1), variance_targeting = FALSE,
+                            order = c(1,1), arma = c(0,0), variance_targeting = FALSE,
                             vreg = NULL, multiplicative = FALSE,
                             init = c("unconditional","sample","backcast"),
                             backcast_lambda = 0.7, sample_n = 10,
@@ -69,6 +90,14 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
     if (sum(order) == 0) {
         variance_targeting <- FALSE
         init <- "unconditional"
+    }
+    # 2b. validate arma order
+    if (length(arma) != 2 || any(!is.finite(arma)) || any(arma < 0) || any(arma != as.integer(arma))) {
+        stop("arma must be a length 2 non-negative integer vector, e.g. c(1,1).")
+    }
+    arma <- as.integer(arma)
+    if (sum(arma) > 0 && model %in% c("igarch","ewma")) {
+        stop("\narma is not supported for model = \"", model, "\" (shares the plain garch mean equation).")
     }
     # egarch already in logs
     if (model == "egarch") {
@@ -104,11 +133,15 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
         multiplicative <- FALSE
     }
     # 4. populate specification object
-    # cmodel: [maxpq, arch, garch, variance_targeting, multiplicative, distribution]
-    cmodel <- c(max(order), order[1], order[2], as.integer(variance_targeting),
-                as.integer(multiplicative), distribution_class(distribution))
+    # cmodel: [maxpq, arch, garch, variance_targeting, multiplicative, distribution, ar, ma]
+    # maxpq is the overall pre-sample burn-in length, covering both the variance
+    # recursion (garch order) and the mean recursion (arma order).
+    cmodel <- c(max(order, arma), order[1], order[2], as.integer(variance_targeting),
+                as.integer(multiplicative), distribution_class(distribution),
+                arma[1], arma[2])
     spec$model$model <- model
     spec$model$order <- order
+    spec$model$arma <- arma
     spec$model$variance_targeting <- variance_targeting
     spec$model$init <- init
     spec$model$backcast_lambda = backcast_lambda
@@ -125,7 +158,7 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
     spec$distribution <- distribution
     # 5. populate parameters
     parmatrix <- initialize_parameters(model, y, constant = constant,
-                                       order = order,
+                                       order = order, arma = arma,
                                        variance_targeting = variance_targeting,
                                        vreg = vreg,
                                        multiplicative = multiplicative,

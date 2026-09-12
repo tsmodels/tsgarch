@@ -9,6 +9,7 @@ garch_modelspec(
   model = "garch",
   constant = FALSE,
   order = c(1, 1),
+  arma = c(0, 0),
   variance_targeting = FALSE,
   vreg = NULL,
   multiplicative = FALSE,
@@ -31,6 +32,28 @@ exponential GARCH, \dQuote{aparch} for asymmetric power ARCH,
 \item{constant}{whether to estimate a constant (mean) for y,}
 
 \item{order}{the (p,q) GARCH order.}
+
+\item{arma}{the (ar,ma) order of the ARMA mean equation, jointly estimated
+with the GARCH variance equation. Defaults to \sQuote{c(0,0)} (no ARMA
+dynamics in the mean, matching prior behavior where the mean is either
+zero or a constant). Supported for all models except \dQuote{igarch} and
+\dQuote{ewma} (which share the plain \dQuote{garch} mean equation with no
+native ARMA support). Stationarity of the AR polynomial and invertibility
+of the MA polynomial are guaranteed by construction via a Durbin-Levinson
+(partial autocorrelation) reparameterization, and therefore do not
+require additional nonlinear constraints during estimation. The estimated
+AR/MA coefficients can be extracted with \code{\link{arma_coefficients}};
+see also \code{\link{fitted}} for the (possibly time-varying) conditional
+mean and \code{\link{residuals}} for the ARMA innovations. To fix an
+entire AR and/or MA polynomial at target coefficients instead of
+estimating them, set \sQuote{value} to the desired ar/ma coefficients
+(not the internal pacf parameterization) and \sQuote{estimate = 0} on
+every \sQuote{arpacf#}/\sQuote{mapacf#} row of the spec's
+\sQuote{parmatrix} for that polynomial; the correct internal
+Durbin-Levinson transform is then applied automatically. Fixing only
+some (not all) of the lags of a given polynomial is not supported, since
+the reparameterization couples all of a polynomial's lags together, and
+will raise an error.}
 
 \item{variance_targeting}{whether to use variance targeting rather than
 estimating the conditional variance intercept.}

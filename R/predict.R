@@ -10,6 +10,15 @@ get_group_parameters <- function(object)
     parlist$beta <- object$parmatrix[group == "beta"]$value
     parlist$xi <- object$parmatrix[group == "xi"]$value
     parlist$distribution <- object$parmatrix[group == "distribution"]$value
+    arma_order <- object$spec$model$arma
+    if (!is.null(arma_order) && sum(arma_order) > 0) {
+        arma_coef <- arma_coefficients(object)
+        parlist$ar <- arma_coef$ar
+        parlist$ma <- arma_coef$ma
+    } else {
+        parlist$ar <- numeric(0)
+        parlist$ma <- numeric(0)
+    }
     if (model %in% c("egarch","gjrgarch")) {
         parlist$gamma <- object$parmatrix[group == "gamma"]$value
     } else if (model == "aparch") {
@@ -41,6 +50,59 @@ setup_prediction <- function(object, h, newxreg = NULL, newvreg = NULL, forc_dat
 
     constant <- model_parameters$omega + v
     return(list(variance_regressors = v, model_parameters = model_parameters, forc_dates = forc_dates, garch_order = garch_order, maxpq = maxpq))
+}
+
+#' Deterministic h-step-ahead ARMA mean forecast
+#'
+#' @description Analytic point forecast of the conditional mean equation
+#' \sQuote{(y_t - mu) = sum_i phi_i*(y_{t-i}-mu) + eps_t + sum_j theta_j*eps_{t-j}}.
+#' AR terms roll forward using the (already forecast) series itself; MA terms
+#' use the actual filtered/estimated residuals while the lag still falls
+#' within the estimation sample, and are dropped (treated as their
+#' unconditional expectation of zero) once the horizon exceeds that lag -
+#' this is the same algorithm used by \sQuote{rugarch}'s \code{armaf} (see
+#' \code{rugarch:::armaf}) and the standard textbook ARMA forecast recursion
+#' (e.g. Box, Jenkins and Reinsel). Reduces to \sQuote{rep(mu, h)} when
+#' \sQuote{ar_order = ma_order = 0}, matching prior behavior exactly.
+#' @keywords internal
+#' @noRd
+.arma_mean_forecast <- function(object, h, model_parameters)
+{
+    ar <- model_parameters$ar
+    ma <- model_parameters$ma
+    ar_order <- length(ar)
+    ma_order <- length(ma)
+    mu <- model_parameters$mu
+    maxpq <- max(ar_order, ma_order)
+    if (maxpq == 0) {
+        return(rep(mu, h))
+    }
+    y_hist <- tail(as.numeric(object$spec$target$y), maxpq)
+    eps_hist <- tail(as.numeric(residuals(object)), maxpq)
+    if (length(y_hist) < maxpq) y_hist <- c(rep(mu, maxpq - length(y_hist)), y_hist)
+    if (length(eps_hist) < maxpq) eps_hist <- c(rep(0, maxpq - length(eps_hist)), eps_hist)
+    x <- c(y_hist, rep(0, h))
+    eps <- c(eps_hist, rep(0, h))
+    for (i in 1:h) {
+        idx <- maxpq + i
+        val <- mu
+        if (ar_order > 0) {
+            for (j in 1:ar_order) {
+                val <- val + ar[j] * (x[idx - j] - mu)
+            }
+        }
+        if (ma_order > 0) {
+            for (j in 1:ma_order) {
+                # once the required lag (i - j) refers to a future (not yet
+                # forecast) shock, its expectation is zero and it is dropped
+                if (i - j <= 0) {
+                    val <- val + ma[j] * eps[idx - j]
+                }
+            }
+        }
+        x[idx] <- val
+    }
+    return(x[(maxpq + 1):(maxpq + h)])
 }
 
 
@@ -119,7 +181,13 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
             spec$parmatrix <- copy(object$parmatrix)
             zsim <- rdist(object$spec$distribution, h * nsim, 0, 1, skew = spec$parmatrix[parameter == "skew"]$value, shape = spec$parmatrix[parameter == "shape"]$value, lambda = spec$parmatrix[parameter == "lambda"]$value)
             zsim <- matrix(zsim, ncol = h, nrow = nsim)
-            maxpq <- max(spec$model$order)
+            arma_order <- spec$model$arma
+            if (is.null(arma_order)) arma_order <- c(0,0)
+            # combined pre-sample length (see .simulate_garch()); tail(...)
+            # below then naturally uses more genuine history when the ARMA
+            # order exceeds the GARCH order, in the correct chronological
+            # (oldest-to-most-recent) order already expected by simulate().
+            maxpq <- max(spec$model$order, arma_order)
             z <- as.numeric(residuals(object, standardize = TRUE))
             init_v <- tail(as.numeric(object$sigma), maxpq)^2
             init_z <- tail(z, maxpq)
@@ -127,7 +195,16 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
             if (object$spec$model$model == "cgarch") {
                 init_v <- cbind(init_v, tail(object$permanent_component, maxpq))
             }
-            out <- simulate(spec, h = h, nsim = nsim, var_init = init_v, innov = zsim, innov_init = init_z, vreg = tail(vreg, h), seed = seed)
+            extra_args <- list()
+            if (sum(arma_order) > 0) {
+                # continue the ARMA mean recursion from the actual last
+                # observed values/residuals rather than the unconditional
+                # mean, so the simulated bands are centered consistently
+                # with the analytic point forecast in .arma_mean_forecast().
+                extra_args$series_init <- tail(as.numeric(object$spec$target$y), maxpq)
+                extra_args$resid_init <- tail(as.numeric(residuals(object)), maxpq)
+            }
+            out <- do.call(simulate, c(list(object = spec, h = h, nsim = nsim, var_init = init_v, innov = zsim, innov_init = init_z, vreg = tail(vreg, h), seed = seed), extra_args))
             sigma_sim <- out$sigma
             colnames(sigma_sim) <- as.character(forc_dates)
             class(sigma_sim) <- "tsmodel.distribution"
@@ -154,7 +231,6 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     res <- c(init_states$residuals, rep(0, h))
     sigma_sqr <- c(init_states$variance, rep(0, h))
     res_sqr <- res^2
-    y <- rep(0, h)
     for (i in (maxpq + 1):(h + maxpq)) {
         sigma_sqr[i] <- constant[i]
         if (init_model$garch_order[2] > 0) {
@@ -175,7 +251,11 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     }
     sigma <- sqrt(sigma_sqr)
     if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    y <- y + model_parameters$mu
+    # deterministic ARMA point forecast for the mean (reduces to rep(mu, h)
+    # when arma = c(0,0), matching prior behavior exactly); see
+    # .arma_mean_forecast() for the recursion (same algorithm as rugarch's
+    # armaf/.nsgarchforecast).
+    y <- .arma_mean_forecast(object, h, model_parameters)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,
@@ -233,7 +313,6 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     res <- c(init_states$residuals, rep(0, h))
     sigma_sqr <- c(init_states$variance, rep(0, h))
     res_sqr <- res^2
-    y <- rep(0, h)
     if (maxpq == 1) {
         sigma <- sqrt(.predict_egarch_analytic(object, h = h, init_model = init_model, init_states = init_states))
     } else {
@@ -242,7 +321,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
         sigma <- simulate(spec_copy, nsim = 10000, h = h, var_init = init_states$variance, innov_init = init_states$std_residuals, seed = seed)
         sigma <- sqrt(as.numeric(apply(sigma$sigma^2, 2, mean)))
     }
-    y <- rep(model_parameters$mu, h)
+    y <- .arma_mean_forecast(object, h, model_parameters)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim, model_parameters = model_parameters,
@@ -291,7 +370,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     }
     sigma <- power_sigma^(1/model_parameters$delta)
     if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    y <- y + model_parameters$mu
+    y <- .arma_mean_forecast(object, h, model_parameters)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,
@@ -344,7 +423,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     }
     sigma <- sqrt(sigma_sqr)
     if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    y <- y + model_parameters$mu
+    y <- .arma_mean_forecast(object, h, model_parameters)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,
@@ -394,7 +473,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     }
     sigma <- power_sigma^(1/model_parameters$delta)
     if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    y <- y + model_parameters$mu
+    y <- .arma_mean_forecast(object, h, model_parameters)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,
@@ -461,7 +540,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
 
     }
 
-    y <- y + model_parameters$mu
+    y <- .arma_mean_forecast(object, h, model_parameters)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,

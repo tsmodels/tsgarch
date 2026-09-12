@@ -17,10 +17,17 @@
 \item{...}{not currently used.}
 }
 \value{
-An xts vector of the fitted values for the univariate type
-objects. In the case of a multi-estimate object, a list of xts vectors is
-returned if the individual univariate objects have unequal indices, else an
-xts matrix is returned.
+An xts vector of the fitted values (the model's conditional mean)
+for the univariate type objects, always the same length as the original
+series. When \sQuote{arma = c(0,0)} (the default) this is a constant,
+equal to \sQuote{mu} (or zero if \sQuote{constant = FALSE}). When an ARMA
+mean equation is specified (currently only for \sQuote{model = "garch"},
+\sQuote{"egarch"}, \sQuote{"gjrgarch"}, \sQuote{"aparch"}, \sQuote{"fgarch"}
+or \sQuote{"cgarch"}) this is the genuinely time-varying conditional mean
+implied by the AR/MA recursion; see \code{\link{arma_coefficients}} for
+the estimated AR/MA coefficients. In the case of a multi-estimate object,
+a list of xts vectors is returned if the individual univariate objects
+have unequal indices, else an xts matrix is returned.
 }
 \description{
 Extract the fitted values of the estimated model.

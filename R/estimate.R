@@ -64,7 +64,33 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
 .tmb_initialize_model <- function(spec, ...)
 {
     estimate <- include <- value <- group <- .N <- NULL
-    parmatrix <- spec$parmatrix
+    # copy rather than alias: this function mutates parmatrix (both the
+    # pre-existing "include" helper column below and, when an entire ar/ma
+    # polynomial is fixed, the arpacf/mapacf values themselves - see below)
+    # and must not leak those changes back into the caller's spec object.
+    parmatrix <- copy(spec$parmatrix)
+    arma_order <- spec$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
+    # Users can fix an entire AR and/or MA polynomial at target coefficients
+    # simply by setting value = the desired ar/ma coefficients (not the
+    # internal pacf parameterization) and estimate = 0 on every row of the
+    # arpacf/mapacf group (see arma_coefficients()/garch_modelspec()); this
+    # is the one place that "magic" needs to be resolved into the actual
+    # raw pacf parameters TMB expects (which will, internally, re-apply the
+    # forward pacf_to_ar/pacf_to_ma transform and recover exactly the fixed
+    # target, since ar_to_pacf/ma_to_pacf are its exact inverse).
+    # arma_block_status() rejects partial (mixed estimate) fixing within a
+    # group with an informative error.
+    if (arma_order[1] > 0 && identical(arma_block_status(parmatrix, "arpacf"), "fixed")) {
+        target_ar <- parmatrix[group == "arpacf"]$value
+        validate_arma_fixed_target(target_ar, "ar")
+        parmatrix[group == "arpacf", value := ar_to_pacf(target_ar)]
+    }
+    if (arma_order[2] > 0 && identical(arma_block_status(parmatrix, "mapacf"), "fixed")) {
+        target_ma <- parmatrix[group == "mapacf"]$value
+        validate_arma_fixed_target(target_ma, "ma")
+        parmatrix[group == "mapacf", value := ma_to_pacf(target_ma)]
+    }
     parmatrix[,include := 1]
     parmatrix[estimate == 0, include := as.numeric(NA)]
     map <- lapply(split(parmatrix[,list(P = 1:.N * include), by = "group"], by = "group", keep.by = FALSE, drop = T), function(x) as.factor(x$P))
@@ -165,7 +191,9 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
                 kappa = kappa,
                 # extra degree of freedom for the init_variance
                 npars = NROW(parmatrix[estimate == 1]) + 1,
-                spec = spec)
+                spec = spec,
+                conditional_mu = scaled_solution$conditional_mu,
+                arma_summary = scaled_solution$arma_table)
     if (keep_tmb) out$tmb <- tmb
     class(out) <- "tsgarch.estimate"
     return(out)
@@ -242,6 +270,24 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     if (m > 0) {
         sig <- sig[-seq_len(m)]
     }
+    # conditional_mean(t) is the model's fitted conditional mean of y at
+    # time t (mu + the AR/MA deviation term), reported by the "garch" TMB
+    # template only when arma > c(0,0) (see garchfun.hpp); every other case
+    # falls back to NULL so that fitted.tsgarch.estimate() keeps using its
+    # prior rep(mu, n) behavior. residuals are always y - conditional_mu
+    # (see residuals.tsgarch.estimate()), so no separate residual field is
+    # needed here.
+    conditional_mu <- NULL
+    arma_table <- NULL
+    if (!is.null(object$model$arma) && sum(object$model$arma) > 0) {
+        # sig has already been trimmed to the actual (non-padded) length above
+        conditional_mu <- tail(scaled_env$tmb$report(scaled_sol$solution)$conditional_mean, length(sig))
+        ar_order <- object$model$arma[1]
+        ma_order <- object$model$arma[2]
+        arma_table <- list(
+            ar = if (ar_order > 0) rr[rownames(rr) == "arma_ar", , drop = FALSE][seq_len(ar_order), , drop = FALSE] else NULL,
+            ma = if (ma_order > 0) rr[rownames(rr) == "arma_ma", , drop = FALSE][seq_len(ma_order), , drop = FALSE] else NULL)
+    }
     rm(scaled_tmb)
     return(list(solution = scaled_sol,
                 env = scaled_env,
@@ -260,6 +306,8 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
                 sigma = sig,
                 permanent_component = permanent_component,
                 transitory_component = transitory_component,
-                ll_vector = ll_vector
+                ll_vector = ll_vector,
+                conditional_mu = conditional_mu,
+                arma_table = arma_table
                 ))
 }
