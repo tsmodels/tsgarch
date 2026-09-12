@@ -375,3 +375,103 @@ test_that("arma: is rejected for igarch/ewma but allowed for all 6 native varian
         expect_error(garch_modelspec(y[1:1800,1], constant = TRUE, model = mdl, order = c(1,1), arma = c(1,1)), NA)
     }
 })
+
+# ---------------------------------------------------------------------------
+# Fixing an entire AR and/or MA polynomial at target coefficients (set
+# value = target coefficients, estimate = 0, on every row of the group).
+# ---------------------------------------------------------------------------
+
+test_that("arma: fixing ar1 in ARMA(1,1) (order 1, no lag coupling) recovers the exact target", {
+    spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
+    spec$parmatrix[parameter == "arpacf1", value := 0.5]
+    spec$parmatrix[parameter == "arpacf1", estimate := 0]
+    mod <- estimate(spec)
+    ac <- arma_coefficients(mod)
+    expect_equal(unname(ac$ar["ar1"]), 0.5)
+    # value in parmatrix reflects the target coefficient directly, not a
+    # raw pacf transform of it
+    expect_equal(mod$parmatrix[parameter == "arpacf1"]$value, 0.5)
+    # summary excludes fixed parameters from the estimated coefficient table
+    s <- summary(mod)
+    expect_false("ar1" %in% s$coefficients$term)
+})
+
+test_that("arma: fixing the entire ar polynomial (order 3) recovers the exact joint target despite lag coupling", {
+    spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(3,1))
+    target_ar <- c(0.3, -0.1, 0.05)
+    spec$parmatrix[group == "arpacf", value := target_ar]
+    spec$parmatrix[group == "arpacf", estimate := 0]
+    mod <- estimate(spec)
+    ac <- arma_coefficients(mod)
+    expect_equal(unname(ac$ar), target_ar, tolerance = 1e-6)
+    # ma (order 1, no coupling with ar) remains free and estimated
+    expect_true("ma1" %in% summary(mod)$coefficients$term)
+})
+
+test_that("arma: fixing the entire ARMA(2,2) mean equation (both ar and ma) leaves only variance parameters estimated", {
+    spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(2,2))
+    target_ar <- c(0.4, -0.2)
+    target_ma <- c(-0.3, 0.1)
+    spec$parmatrix[group == "arpacf", value := target_ar]
+    spec$parmatrix[group == "arpacf", estimate := 0]
+    spec$parmatrix[group == "mapacf", value := target_ma]
+    spec$parmatrix[group == "mapacf", estimate := 0]
+    mod <- estimate(spec)
+    ac <- arma_coefficients(mod)
+    expect_equal(unname(ac$ar), target_ar, tolerance = 1e-6)
+    expect_equal(unname(ac$ma), target_ma, tolerance = 1e-6)
+    s <- summary(mod)
+    expect_false(any(grepl("^ar[0-9]|^ma[0-9]", s$coefficients$term)))
+    expect_true(all(c("mu","omega","alpha1","beta1") %in% s$coefficients$term))
+
+    # fully downstream-consistent: predict/simulate/tsfilter all see the
+    # fixed target coefficients via the same arma_coefficients() accessor
+    p <- predict(mod, h = 5, nsim = 5000, seed = 1)
+    expect_length(as.numeric(p$mean), 5)
+    mu <- mod$parmatrix[parameter == "mu"]$value
+    spec_sim <- mod$spec; spec_sim$parmatrix <- mod$parmatrix
+    sim0 <- simulate(spec_sim, h = 10, nsim = 1, innov = matrix(0, 1, 10), seed = 1)
+    expect_equal(as.numeric(sim0$series), rep(mu, 10), tolerance = 1e-8)
+    filtered <- tsfilter(mod, y = y[1801:1974,1])
+    ac_after <- arma_coefficients(filtered)
+    expect_equal(unname(ac_after$ar), target_ar, tolerance = 1e-6)
+    expect_equal(unname(ac_after$ma), target_ma, tolerance = 1e-6)
+    expect_equal(as.numeric(residuals(filtered)), as.numeric(filtered$spec$target$y_orig) - as.numeric(fitted(filtered)))
+})
+
+test_that("arma: partially fixing only some lags of a polynomial is rejected", {
+    spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(3,1))
+    spec$parmatrix[parameter == "arpacf1", estimate := 0]
+    expect_error(estimate(spec), "partial fixing")
+})
+
+test_that("arma: fixing a non-stationary AR target or non-invertible MA target is rejected", {
+    spec_ar <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
+    spec_ar$parmatrix[parameter == "arpacf1", value := 1.5]
+    spec_ar$parmatrix[parameter == "arpacf1", estimate := 0]
+    expect_error(estimate(spec_ar), "stationary")
+
+    spec_ma <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
+    spec_ma$parmatrix[parameter == "mapacf1", value := -1.2]
+    spec_ma$parmatrix[parameter == "mapacf1", estimate := 0]
+    expect_error(estimate(spec_ma), "invertible")
+})
+
+test_that("arma: fixed target coefficients are not cumulatively re-transformed across repeated estimate() calls", {
+    # the coefficient -> raw pacf transform for a fixed block happens on a
+    # local copy inside .tmb_initialize_model() (never written back to the
+    # caller's spec$parmatrix), so re-estimating from a spec whose fixed
+    # arpacf/mapacf rows still hold the literal target coefficients should
+    # give identical results every time, not a double-transformed one
+    spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(2,1))
+    target_ar <- c(0.4, -0.2)
+    spec$parmatrix[group == "arpacf", value := target_ar]
+    spec$parmatrix[group == "arpacf", estimate := 0]
+    mod <- estimate(spec)
+    expect_equal(unname(arma_coefficients(mod)$ar), target_ar, tolerance = 1e-6)
+    # the fixed rows in spec$parmatrix still hold the literal target after
+    # estimate() (only estimate == 1 rows get overwritten with optimizer output)
+    expect_equal(spec$parmatrix[group == "arpacf"]$value, target_ar)
+    mod2 <- estimate(spec)
+    expect_equal(arma_coefficients(mod)$ar, arma_coefficients(mod2)$ar)
+})

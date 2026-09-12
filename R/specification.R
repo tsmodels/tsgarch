@@ -22,7 +22,16 @@
 #' require additional nonlinear constraints during estimation. The estimated
 #' AR/MA coefficients can be extracted with \code{\link{arma_coefficients}};
 #' see also \code{\link{fitted}} for the (possibly time-varying) conditional
-#' mean and \code{\link{residuals}} for the ARMA innovations.
+#' mean and \code{\link{residuals}} for the ARMA innovations. To fix an
+#' entire AR and/or MA polynomial at target coefficients instead of
+#' estimating them, set \sQuote{value} to the desired ar/ma coefficients
+#' (not the internal pacf parameterization) and \sQuote{estimate = 0} on
+#' every \sQuote{arpacf#}/\sQuote{mapacf#} row of the spec's
+#' \sQuote{parmatrix} for that polynomial; the correct internal
+#' Durbin-Levinson transform is then applied automatically. Fixing only
+#' some (not all) of the lags of a given polynomial is not supported, since
+#' the reparameterization couples all of a polynomial's lags together, and
+#' will raise an error.
 #' @param variance_targeting whether to use variance targeting rather than
 #' estimating the conditional variance intercept.
 #' @param vreg an optional xts matrix of regressors in the conditional variance

@@ -100,6 +100,80 @@ ar_to_pacf <- function(phi) coef_to_pacf(phi)
 #' @noRd
 ma_to_pacf <- function(theta) -coef_to_pacf(-theta)
 
+#' Whether an arpacf/mapacf parmatrix group is fully fixed, fully free, or absent
+#'
+#' @description To let users fix an entire AR or MA polynomial at target
+#' coefficients (see \code{\link{garch_modelspec}}) simply by setting
+#' \sQuote{value} (to the desired ar/ma coefficients, not the internal pacf
+#' parameterization) and \sQuote{estimate = 0} on every row of the relevant
+#' group, the two states \dQuote{fully fixed} (every row \sQuote{estimate ==
+#' 0}) and \dQuote{fully free} (every row \sQuote{estimate == 1}) are given
+#' different semantics for \sQuote{value} elsewhere in the package (see
+#' \code{\link{arma_coefficients}} and \code{.tmb_initialize_model()}).
+#' Fixing only \emph{some} of the lags in a group is not supported - the
+#' Durbin-Levinson reparameterization couples all lags of a given polynomial
+#' together, so there is no way to hold one lag's coefficient at a fixed
+#' target while leaving others free without either giving up the
+#' stationarity/invertibility guarantee or reintroducing a nonlinear
+#' constraint - and is rejected with an informative error.
+#' @param parmatrix a model's parmatrix \code{data.table}.
+#' @param group_name either \sQuote{"arpacf"} or \sQuote{"mapacf"}.
+#' @return one of \sQuote{"none"} (the group has no rows, i.e. that
+#' polynomial's order is zero), \sQuote{"fixed"} (every row has
+#' \sQuote{estimate == 0}) or \sQuote{"free"} (every row has
+#' \sQuote{estimate == 1}).
+#' @keywords internal
+#' @noRd
+arma_block_status <- function(parmatrix, group_name)
+{
+    group <- estimate <- NULL
+    rows <- parmatrix[group == group_name]
+    if (NROW(rows) == 0) return("none")
+    est <- rows$estimate
+    if (length(unique(est)) > 1) {
+        lag_label <- if (group_name == "arpacf") "ar" else "ma"
+        stop("\narma: partial fixing of individual ", lag_label,
+             " lags is not supported (the Durbin-Levinson reparameterization\n",
+             "couples all lags of a given polynomial together). Either fix all ",
+             group_name, " parameters (estimate = 0, value = the desired ",
+             lag_label, " coefficients) or leave them all free (estimate = 1).")
+    }
+    if (all(est == 0)) "fixed" else "free"
+}
+
+#' Validate a fixed target AR/MA polynomial is stationary/invertible
+#'
+#' @description Called whenever an entire AR or MA polynomial is fixed (see
+#' \code{\link{arma_block_status}}) to check, before transforming to the
+#' internal pacf parameterization via \code{\link{ar_to_pacf}}/
+#' \code{\link{ma_to_pacf}}, that the user-supplied target coefficients
+#' actually correspond to a stationary (AR) or invertible (MA) polynomial;
+#' \code{coef_to_pacf}'s internal numerical fallback for near-degenerate
+#' inputs would otherwise silently substitute a different value rather than
+#' erroring on a genuinely invalid target.
+#' @param target numeric vector of target AR (or MA) coefficients.
+#' @param type either \sQuote{"ar"} or \sQuote{"ma"}.
+#' @keywords internal
+#' @noRd
+validate_arma_fixed_target <- function(target, type = c("ar","ma"))
+{
+    type <- match.arg(type)
+    if (length(target) == 0) return(invisible(TRUE))
+    if (type == "ar") {
+        roots <- polyroot(c(1, -target))
+        label <- "AR"; requirement <- "stationary"
+    } else {
+        roots <- polyroot(c(1, target))
+        label <- "MA"; requirement <- "invertible"
+    }
+    if (!all(is.finite(roots)) || min(Mod(roots)) <= 1) {
+        article <- if (requirement == "invertible") "an" else "a"
+        stop("\narma: the fixed ", label, " coefficients (", paste(signif(target, 4), collapse = ", "),
+             ") do not correspond to ", article, " ", requirement, " polynomial (a root lies within or on the unit circle).")
+    }
+    invisible(TRUE)
+}
+
 #' Construct the arpacf/mapacf parmatrix rows for a model's mean equation
 #'
 #' @description Builds the \sQuote{arpacf}/\sQuote{mapacf} parameter rows

@@ -15,9 +15,14 @@ a list with elements \sQuote{ar} and \sQuote{ma}, each a numeric
 vector (possibly of length zero if that component is not present).
 }
 \description{
-Returns the AR and MA coefficients implied by the raw
-Durbin-Levinson (pacf-space) parameters used internally during estimation
-(see \code{\link{garch_modelspec}}). Stationarity of the AR polynomial and
-invertibility of the MA polynomial are guaranteed by construction and do
-not need to be checked.
+Returns the AR and MA coefficients of the estimated (or
+specified) ARMA mean equation (see \code{\link{garch_modelspec}}).
+Ordinarily these are recovered from the raw Durbin-Levinson (pacf-space)
+parameters used internally during estimation, with stationarity of the AR
+polynomial and invertibility of the MA polynomial guaranteed by
+construction. If, however, an entire AR and/or MA polynomial has been
+fixed (every \sQuote{arpacf}/\sQuote{mapacf} row has \sQuote{estimate ==
+0}; see \code{\link{garch_modelspec}}), the corresponding \sQuote{value}
+entries are themselves the target ar/ma coefficients and are returned
+as-is.
 }

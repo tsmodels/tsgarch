@@ -23,19 +23,27 @@ extract_model_values <- function(object, object_type, value_name, ...)
                     "distribution" = parmatrix[group == "distribution"]$value,
                     "arpacf" = parmatrix[group == "arpacf"]$value,
                     "mapacf" = parmatrix[group == "mapacf"]$value,
-                    "ar" = pacf_to_ar(parmatrix[group == "arpacf"]$value),
-                    "ma" = pacf_to_ma(parmatrix[group == "mapacf"]$value))
+                    # see arma_coefficients(): value is the target ar/ma
+                    # coefficients directly when the whole polynomial is
+                    # fixed, else the raw pacf parameterization
+                    "ar" = if (identical(arma_block_status(parmatrix, "arpacf"), "fixed")) parmatrix[group == "arpacf"]$value else pacf_to_ar(parmatrix[group == "arpacf"]$value),
+                    "ma" = if (identical(arma_block_status(parmatrix, "mapacf"), "fixed")) parmatrix[group == "mapacf"]$value else pacf_to_ma(parmatrix[group == "mapacf"]$value))
 
     return(value)
 }
 
 #' ARMA mean equation coefficients
 #'
-#' @description Returns the AR and MA coefficients implied by the raw
-#' Durbin-Levinson (pacf-space) parameters used internally during estimation
-#' (see \code{\link{garch_modelspec}}). Stationarity of the AR polynomial and
-#' invertibility of the MA polynomial are guaranteed by construction and do
-#' not need to be checked.
+#' @description Returns the AR and MA coefficients of the estimated (or
+#' specified) ARMA mean equation (see \code{\link{garch_modelspec}}).
+#' Ordinarily these are recovered from the raw Durbin-Levinson (pacf-space)
+#' parameters used internally during estimation, with stationarity of the AR
+#' polynomial and invertibility of the MA polynomial guaranteed by
+#' construction. If, however, an entire AR and/or MA polynomial has been
+#' fixed (every \sQuote{arpacf}/\sQuote{mapacf} row has \sQuote{estimate ==
+#' 0}; see \code{\link{garch_modelspec}}), the corresponding \sQuote{value}
+#' entries are themselves the target ar/ma coefficients and are returned
+#' as-is.
 #' @param object an object of class \dQuote{tsgarch.spec} or
 #' \dQuote{tsgarch.estimate}.
 #' @return a list with elements \sQuote{ar} and \sQuote{ma}, each a numeric
@@ -51,9 +59,17 @@ arma_coefficients <- function(object)
     parmatrix <- object$parmatrix
     order <- if (!is.null(object$spec)) object$spec$model$arma else object$model$arma
     if (is.null(order)) order <- c(0,0)
-    ar <- if (order[1] > 0) pacf_to_ar(parmatrix[group == "arpacf"]$value) else numeric(0)
-    ma <- if (order[2] > 0) pacf_to_ma(parmatrix[group == "mapacf"]$value) else numeric(0)
-    if (order[1] > 0) names(ar) <- paste0("ar", seq_len(order[1]))
-    if (order[2] > 0) names(ma) <- paste0("ma", seq_len(order[2]))
+    ar <- numeric(0)
+    ma <- numeric(0)
+    if (order[1] > 0) {
+        ar_raw <- parmatrix[group == "arpacf"]$value
+        ar <- if (identical(arma_block_status(parmatrix, "arpacf"), "fixed")) ar_raw else pacf_to_ar(ar_raw)
+        names(ar) <- paste0("ar", seq_len(order[1]))
+    }
+    if (order[2] > 0) {
+        ma_raw <- parmatrix[group == "mapacf"]$value
+        ma <- if (identical(arma_block_status(parmatrix, "mapacf"), "fixed")) ma_raw else pacf_to_ma(ma_raw)
+        names(ma) <- paste0("ma", seq_len(order[2]))
+    }
     list(ar = ar, ma = ma)
 }

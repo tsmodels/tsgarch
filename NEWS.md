@@ -26,6 +26,17 @@ length used internally is `max(garch order, arma order)`.
 displays the transformed `ar`/`ma` coefficients with their delta-method
 standard errors, rather than the raw (not directly interpretable)
 Durbin-Levinson parameters used internally during estimation.
+* An entire AR and/or MA polynomial in the ARMA mean equation can now be
+fixed at target coefficients rather than estimated: set `value` to the
+desired ar/ma coefficients (not the internal pacf parameterization) and
+`estimate = 0` on every `arpacf#`/`mapacf#` row of the relevant group in the
+spec's `parmatrix`; the correct internal Durbin-Levinson transform is then
+applied automatically wherever needed (estimation, `arma_coefficients()`,
+`predict()`, `simulate()`, `tsfilter()`), and the fixed coefficients are
+validated for stationarity/invertibility up front. Fixing only some (not
+all) of the lags of a given polynomial is not supported, since the
+reparameterization couples all of a polynomial's lags together, and raises
+an informative error, as does mixing `estimate` values within one group.
 
 # tsgarch 1.0.4
 

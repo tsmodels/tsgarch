@@ -232,6 +232,19 @@ correctly. ARMA support is available for all GARCH flavors described in
 Section \ref{sec:estimation:flavors} except `igarch` and `ewma`
 (which share the plain `garch` mean equation and TMB template).
 
+An entire AR and/or MA polynomial can instead be fixed at target
+coefficients rather than estimated, by setting `value` to the desired
+ar/ma coefficients directly (not $r^{ar}_i$/$r^{ma}_j$) and `estimate = 0`
+on every `arpacf`/`mapacf` row of the relevant polynomial in the spec's
+`parmatrix`; the corresponding raw pacf values are computed automatically.
+Fixing only some (not all) of the lags of a given polynomial is not
+supported - since $\phi_i$ depends jointly on $r^{ar}_1,\ldots,r^{ar}_p$
+(and similarly for $\theta_j$), there is no way to hold one lag's
+coefficient fixed while leaving others free without either giving up the
+stationarity/invertibility guarantee or reintroducing a nonlinear
+constraint - and raises an error, as does supplying a fixed target that is
+not itself stationary (AR) or invertible (MA).
+
 \subsection{Recursion Initialization ($\sigma^\delta_0$)}\label{sec:estimation:recursion}
 
 When estimating a GARCH model, we need to initialize the variance to some value in order to 
