@@ -823,7 +823,16 @@ plot.tsgarch.newsimpact <- function(x, y = NULL, ...)
 #' model the longer lags (beyond the first few) are the most informative,
 #' because estimation makes the first-lag Bartlett bands conservative.
 #'
-#' Three envelopes are available for panels 3/4:
+#' Three envelopes are available for panels 3/4, and they answer different
+#' questions - \code{"bartlett"} and \code{"simulate"} are \emph{null-rejection
+#' bands} (is the ACF outside the range expected under iid noise?), while
+#' \code{"parametric"} is a \emph{confidence band for the true ACF itself}
+#' (does that confidence band exclude zero?). Do not compare them visually as
+#' if they were the same kind of object: the first two are (by construction)
+#' always centered near zero with roughly constant width across lags, while
+#' \code{"parametric"} is centered on, and moves with, the point estimate's
+#' own ACF curve, which can make it look shifted well away from zero even
+#' when the diagnostic finding is unremarkable.
 #' \itemize{
 #' \item \code{"bartlett"} (default): asymptotic \eqn{\pm 1.96/\sqrt{n}} bands
 #' under the iid assumption. Valid for correctly specified standardized
@@ -832,21 +841,28 @@ plot.tsgarch.newsimpact <- function(x, y = NULL, ...)
 #' \item \code{"simulate"}: draws \code{B} independent samples of length
 #' \eqn{n} from the fitted innovation distribution (at the point estimates of
 #' \code{skew}/\code{shape}/\code{lambda}) and computes the pointwise 95\%
-#' envelope of their ACFs. This characterizes the exact sampling
-#' distribution of the ACF statistic under the fitted distribution, but
+#' envelope of their ACFs. Like \code{"bartlett"}, this characterizes the
+#' sampling distribution of the ACF statistic under the iid null and is
+#' centered near zero, but using the fitted distribution's exact shape
+#' instead of the generic asymptotic approximation. It still
 #' \emph{ignores all parameter estimation uncertainty} (both mean/variance
 #' and distributional).
 #' \item \code{"parametric"}: draws \code{B} parameter vectors from
 #' \eqn{\hat\theta + N(0, V)} with \eqn{V = }\code{vcov(object, type = vcov_type)},
 #' and for each draw re-filters the \emph{actual observed data} (a cheap
 #' forward TMB pass, no re-simulation or re-optimization) to obtain a
-#' perturbed standardized residual series and its ACF. This \emph{does}
-#' reflect parameter estimation uncertainty (including in the ARMA and GARCH
-#' parameters), at the cost of the (standard, delta-method style) asymptotic
-#' normal approximation to the sampling distribution of the estimator, and
-#' clipping of extreme draws to each parameter's box bounds. It does not
-#' capture the full simulate-then-refit sampling distribution, which is
-#' considerably more expensive to compute.
+#' perturbed standardized residual series and its ACF. Because the underlying
+#' data is held fixed and only the parameters are perturbed, this is
+#' \emph{not} a null-rejection band: it is a (delta-method style, asymptotic
+#' normal) confidence band for what the true ACF value at each lag actually
+#' is, given uncertainty in the estimated parameters (including the ARMA and
+#' GARCH parameters, unlike \code{"simulate"}), so it is naturally centered
+#' on the point estimate's own ACF rather than on zero. Read it by checking
+#' whether the band \emph{excludes zero} at a given lag, not by comparing its
+#' location to the other two envelopes. Extreme draws are clipped to each
+#' parameter's box bounds, and this does not capture the full
+#' simulate-then-refit sampling distribution, which is considerably more
+#' expensive to compute.
 #' }
 #' @returns a panel with plots for the estimated sigma value, the news impact curve
 #' and a \dQuote{QQ} plot of the standardized residuals when

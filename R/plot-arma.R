@@ -137,20 +137,27 @@
          type = "n", xlab = "Lag", ylab = "ACF", main = main)
     abline(h = 0, col = "gray60")
     if (!is.null(env_lo)) {
-        lines(lag, env_lo, col = "darkgreen", lty = 3)
-        lines(lag, env_hi, col = "darkgreen", lty = 3)
+        # "simulate" is a null-rejection band (centered near zero, like Bartlett);
+        # "parametric" is a confidence band for the true ACF itself, centered on
+        # (and shifted with) the point estimate, not on zero - see plot.tsgarch.estimate
+        # Details. Drawn with a visually distinct style so the two are not
+        # mistaken for the same kind of band.
+        env_col <- if (envelope == "simulate") "darkgreen" else "purple"
+        env_lty <- if (envelope == "simulate") 3 else 4
+        lines(lag, env_lo, col = env_col, lty = env_lty, lwd = 1.5)
+        lines(lag, env_hi, col = env_col, lty = env_lty, lwd = 1.5)
     }
     abline(h = c(-ci, ci), col = "coral", lty = 2)
     lines(lag, acfval, type = "h", lwd = 1.2, col = "steelblue")
     points(lag, acfval, pch = 19, cex = 0.7, col = "steelblue")
-    legend_labels <- c("Bartlett")
+    legend_labels <- c("Bartlett (null band)")
     legend_col <- c("coral")
     legend_lty <- c(2)
     if (!is.null(env_lo)) {
-        legend_labels <- c(legend_labels, if (envelope == "simulate") "Simulated (no param. uncertainty)" else "Parametric (with param. uncertainty)")
-        legend_col <- c(legend_col, "darkgreen")
-        legend_lty <- c(legend_lty, 3)
+        legend_labels <- c(legend_labels, if (envelope == "simulate") "Simulated (null band, no param. uncertainty)" else "Parametric 95% CI of true ACF (not a null band)")
+        legend_col <- c(legend_col, env_col)
+        legend_lty <- c(legend_lty, env_lty)
     }
-    legend("topright", legend = legend_labels, col = legend_col, lty = legend_lty, bg = "white", cex = 0.7)
+    legend("topright", legend = legend_labels, col = legend_col, lty = legend_lty, bg = "white", cex = 0.65)
     grid()
 }
