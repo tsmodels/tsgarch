@@ -6,8 +6,6 @@
 \alias{tsgarch-package}
 \title{tsgarch: Univariate GARCH Models}
 \description{
-\if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
-
 Multiple flavors of the Generalized Autoregressive Conditional Heteroskedasticity (GARCH) model with a large choice of conditional distributions. Methods for specification, estimation, prediction, filtering, simulation, statistical testing and more. Represents a partial re-write and re-think of 'rugarch', making use of automatic differentiation for estimation.
 }
 \seealso{

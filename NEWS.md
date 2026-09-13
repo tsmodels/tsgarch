@@ -1,35 +1,10 @@
-# tsgarch 1.0.6
-
-* ARMA mean equation support extended to `igarch` and `ewma` models, so that
-all 8 native GARCH flavors now accept the `arma` argument.
-* Added a new `plot()` diagnostic panel for the ARMA mean equation
-(`plot(object, type = "arma")`). The panel includes inverse AR/MA roots,
-impulse response, and ACFs of the standardized residuals `z_t` and `z_t^2`.
-The `type` argument defaults to `"garch"` and keeps the original volatility/
-news-impact/QQ panel completely unchanged. New computational helpers
-`arma_inverse_roots()`, `arma_irf()` and `arma_near_cancellation()` are
-exported for programmatic use. The residual ACF panels support three
-envelopes: the default asymptotic `"bartlett"` band, a `"simulate"` band
-from the fitted innovation distribution at the point parameter estimates
-(no parameter uncertainty), and a `"parametric"` band that perturbs the
-full parameter vector using `vcov()` and re-filters the observed data (a
-cheap forward pass, no re-optimization) to reflect parameter estimation
-uncertainty.
-* `plot(object, type = "arma")`'s `which` argument now defaults to `NULL`,
-plotting all four panels in a `2x2` layout (previously defaulted to `1:4`
-with the same effect, but `NULL` is now the documented default, consistent
-with the single-layout `type = "garch"` panel not requiring a `which`
-argument at all). 
-
-
 # tsgarch 1.0.5
 
 * Added a jointly estimated ARMA(p,q) mean equation, via a new `arma` argument
 to `garch_modelspec` (defaults to `c(0,0)`, fully backward compatible).
-Available for all GARCH flavors except `igarch` and `ewma` (which share the
-plain `garch` mean equation with no native ARMA support). The `constant`
-argument remains independent of `arma` and continues to control only whether
-the unconditional mean `mu` is estimated or fixed at zero.
+Available for all 8 GARCH flavors, including `igarch` and `ewma`. The
+`constant` argument remains independent of `arma` and continues to control
+only whether the unconditional mean `mu` is estimated or fixed at zero.
 * The AR/MA coefficients are guaranteed stationary/invertible by construction,
 via a Durbin-Levinson/Jones partial-autocorrelation (PACF) reparameterization
 of the raw optimization parameters, so no additional nonlinear constraints
@@ -61,6 +36,24 @@ validated for stationarity/invertibility up front. Fixing only some (not
 all) of the lags of a given polynomial is not supported, since the
 reparameterization couples all of a polynomial's lags together, and raises
 an informative error, as does mixing `estimate` values within one group.
+* Added a new ARMA diagnostic panel to `plot.tsgarch.estimate()`
+(`plot(object, type = "arma")`), for models with a non-zero `arma` order.
+The panel shows: inverse AR/MA roots against the unit circle (with visual
+flags for near common-factor cancellation), the impulse response function
+(plotted from lag 1, since `psi_0 = 1` identically and carries no
+information about the fitted model; the optional `cumulative` line is
+accumulated from lag 1 as well, so both stay on the same scale),
+and the ACFs of the standardized residuals `z_t` and `z_t^2`. All four
+panels are shown by default (`which = NULL`); individual panels can be
+selected via `which`. The residual ACF panels support three envelopes:
+the default asymptotic `"bartlett"` band, a `"simulate"` band from the
+fitted innovation distribution at the point parameter estimates (no
+parameter uncertainty), and a `"parametric"` band that perturbs the full
+parameter vector using `vcov()` and re-filters the observed data to reflect
+parameter estimation uncertainty. `type = "garch"` (the original
+volatility/news-impact/QQ panel) remains the default and is unchanged. New
+computational helpers `arma_inverse_roots()`, `arma_irf()` and
+`arma_near_cancellation()` are exported for programmatic use.
 
 # tsgarch 1.0.4
 

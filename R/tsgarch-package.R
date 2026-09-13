@@ -11,7 +11,7 @@
 #' @importFrom numDeriv jacobian hessian
 #' @importFrom nloptr nloptr
 #' @importFrom flextable flextable as_flextable set_caption italic fontsize separate_header add_footer_row add_footer_lines append_chunks as_chunk as_equation as_paragraph compose colformat_double set_header_labels padding bold align autofit hline width
-#' @importFrom graphics grid layout lines par
+#' @importFrom graphics grid layout lines par abline legend mtext points segments
 #' @importFrom future.apply future_lapply
 #' @importFrom future %<-%
 #' @importFrom progressr handlers progressor

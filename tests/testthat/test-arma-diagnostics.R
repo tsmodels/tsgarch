@@ -62,13 +62,6 @@ test_that(".parametric_standardized_residual_draws returns a valid n x B matrix"
     expect_false(isTRUE(all.equal(z[,1], z[,2])))
 })
 
-# Argument-validation checks below deliberately do not exercise any actual
-# plotting/graphics device: plot.tsgarch.estimate() and its internal ARMA
-# panel dispatcher both validate `type`/`which`/`envelope` (via match.arg()
-# and explicit checks) before touching par()/graphics, so these errors are
-# raised without ever opening a device. Rendering itself is verified
-# manually (see plot.tsgarch.estimate examples), not in the automated suite,
-# to avoid device-dependent plotting tests in testthat.
 test_that("plot type validation errors on invalid type", {
     spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1), arma = c(1,1))
     mod <- estimate(spec)

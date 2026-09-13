@@ -42,8 +42,13 @@ The ARMA diagnostic panel (\code{type = "arma"}) is only available for
 models estimated with a non-zero \code{arma} order. Panel 1 shows the
 inverse AR and MA roots with the unit circle; close AR/MA roots are joined
 to highlight possible common factors. Panel 2 shows the impulse response
-function in units of the innovation, so \code{psi[0] = 1} and the response
-decays to zero for a stationary model. Panels 3 and 4 show the ACFs of the
+function in units of the innovation, starting at lag 1 and decaying to zero
+for a stationary model. Lag 0 is omitted because \eqn{\psi_0 = 1}
+identically under the normalization of the MA(\eqn{\infty}) representation,
+so it says nothing about the fitted model. The optional cumulative line is
+likewise accumulated from lag 1, i.e. it excludes the contemporaneous unit
+impact, which keeps it on the same scale as the plotted \eqn{\psi_j}; add
+1 to read it as a total response through lag \eqn{k}. Panels 3 and 4 show the ACFs of the
 standardized residuals \eqn{z_t} and \eqn{z_t^2}; for a well-specified
 model the longer lags (beyond the first few) are the most informative,
 because estimation makes the first-lag Bartlett bands conservative.
@@ -92,6 +97,7 @@ expensive to compute.
 }
 \examples{
 \donttest{
+library(xts)
 data(dmbp)
 y <- xts(dmbp, as.Date(seq_len(nrow(dmbp)), origin = "1970-01-01"))
 spec <- garch_modelspec(y[1:1000,1], constant = TRUE, model = "garch",

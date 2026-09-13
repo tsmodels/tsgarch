@@ -1,0 +1,227 @@
+---
+title: "ARMA-GARCH Estimation"
+author: "Alexios Galanos"
+date: "`r Sys.Date()`"
+output: 
+    rmarkdown::html_vignette:
+        css: custom.css
+        code_folding: show
+vignette: >
+  %\VignetteIndexEntry{ARMA GARCH Estimation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+*Since version 1.0.5 joint estimation of ARMA and GARCH is available.*
+
+## The Model
+
+The observed series $y_t$ is decomposed into a conditional mean $\mu_t$ and
+an innovation $\varepsilon_t$:
+
+$$
+y_t = \mu_t + \varepsilon_t
+$$
+
+By default (`arma = c(0,0)`) $\mu_t$ reduces to either a constant $\mu$ or
+zero, controlled independently by the `constant` argument to
+`garch_modelspec`. Setting `arma = c(p,q)` instead activates a jointly
+estimated ARMA($p,q$) mean equation, in which $\mu_t$ is time-varying and
+follows the mean-adjusted recursion
+
+$$
+\mu_t = \mu + \sum_{i=1}^{p}\phi_i\left(y_{t-i}-\mu\right) + \sum_{j=1}^{q}\theta_j\varepsilon_{t-j}
+$$
+
+so that $\mu$ retains its interpretation as the unconditional mean of $y$,
+and the AR feedback term is centered on $y_{t-i}-\mu$ rather than the raw
+$y_{t-i}$. This is the same mean-adjusted form used in **rugarch**'s
+ARFIMA-X mean equation.
+
+Combining the two equations above, the innovation $\varepsilon_t$ is
+obtained recursively as
+
+$$
+\varepsilon_t = y_t - \mu_t = \left(y_t-\mu\right) - \sum_{i=1}^{p}\phi_i\left(y_{t-i}-\mu\right) - \sum_{j=1}^{q}\theta_j\varepsilon_{t-j}
+$$
+
+which only requires $\varepsilon_{t-1},\ldots,\varepsilon_{t-q}$ from
+previous time steps, so the whole recursion can be evaluated forward in a
+single pass once $\mu$, $\phi_i$ and $\theta_j$ are known. Setting
+`arma = c(0,0)` collapses both equations exactly to the constant-mean case,
+$\varepsilon_t = y_t - \mu$, matching prior (pre 1.0.5) behavior with no
+change in results.
+
+It is $\varepsilon_t$ (rather than $y_t-\mu$) that is passed on to the
+conditional variance equation of whichever GARCH flavor is chosen (see the
+GARCH Models vignette for the flavor-specific variance equations), decomposed as
+
+$$
+\varepsilon_t = \sigma_t z_t, \qquad z_t \overset{\text{iid}}{\sim} D(0,1;\ldots)
+$$
+
+with $\sigma_t$ the conditional standard deviation implied by the chosen
+GARCH variance equation, and $z_t$ an iid draw from the chosen conditional
+distribution $D$ (normal, Student-t, skew distributions, etc.), with any
+shape/skew parameters estimated jointly with everything else.
+
+The combined pre-sample/burn-in length used to initialize this recursion is
+$\max\left(\text{GARCH order}, \text{ARMA order}\right)$, so that e.g. an
+ARMA(2,2) mean equation together with a GARCH(1,1) variance equation
+initializes correctly; over that pre-sample the process is assumed to start
+at its unconditional mean with zero shocks, i.e. $y_t = \mu$ and
+$\varepsilon_t = 0$.
+
+## Stationarity and Invertibility
+
+For $\phi=\left(\phi_1,\ldots,\phi_p\right)$ and
+$\theta=\left(\theta_1,\ldots,\theta_q\right)$ to be well defined ARMA
+coefficients, the AR polynomial
+
+$$
+\Phi(z) = 1 - \phi_1 z - \cdots - \phi_p z^p
+$$
+
+must have all roots strictly outside the unit circle (stationarity), and
+the MA polynomial
+
+$$
+\Theta(z) = 1 + \theta_1 z + \cdots + \theta_q z^q
+$$
+
+must have all roots strictly outside the unit circle (invertibility).
+Equivalently, the *inverse* roots of both polynomials must lie strictly
+inside the unit circle - this is exactly what the first panel of
+`plot(object, type = "arma")` displays, and what `arma_inverse_roots()`
+computes programmatically.
+
+Rather than impose these two conditions as nonlinear inequality
+constraints on $\phi_i$ and $\theta_j$ directly during optimization (which
+would require either finite-difference Jacobians, or an autodiff-aware
+eigendecomposition of a companion matrix), `tsgarch` instead reparameterizes
+the raw quantities being optimized over as partial-autocorrelation-like
+parameters $r^{ar}_i, r^{ma}_j \in \left(-1,1\right)$, and recovers $\phi$
+and $\theta$ from them via the Durbin-Levinson / Jones recursion, which is
+guaranteed by construction to always land in the stationarity/invertibility
+region (Barndorff-Nielsen and Schou, 1973; Jones, 1980) - the same device
+used internally by `stats::arima(..., transform.pars = TRUE)`.
+
+Concretely, given raw parameters $r_1,\ldots,r_p\in\left(-1,1\right)$, the
+AR coefficients are obtained by the forward recursion
+
+$$
+\phi^{(1)}_1 = r_1, \qquad
+\phi^{(k)}_k = r_k, \qquad
+\phi^{(k)}_i = \phi^{(k-1)}_i - r_k\,\phi^{(k-1)}_{k-i} \quad \left(i=1,\ldots,k-1\right)
+$$
+
+for $k=2,\ldots,p$, with the final AR coefficients given by
+$\phi_i = \phi^{(p)}_i$. The same recursion applied to the *negated* raw
+MA parameters, with the result negated again, yields MA coefficients
+$\theta_j$ that satisfy invertibility, via the well-known AR/MA duality:
+
+$$
+\theta = -\,\text{DL}\left(-r^{ma}_1,\ldots,-r^{ma}_q\right)
+$$
+
+where $\text{DL}(\cdot)$ denotes the recursion above. Because this map is a
+smooth (indeed, polynomial) function of the raw parameters, it differentiates
+exactly under automatic differentiation, so **TMB** provides exact (not
+finite-difference) Jacobians of the whole ARMA mean equation throughout
+estimation, prediction, simulation and filtering. Only simple box
+constraints $r^{ar}_i, r^{ma}_j \in \left(-1,1\right)$ (tightened slightly
+to $\left(-0.995, 0.995\right)$ for numerical safety near the boundary) are
+needed during optimization - no nonlinear stationarity/invertibility
+constraint is ever evaluated or differentiated.
+
+The raw parameters themselves (`arpacf`/`mapacf` in the model's
+`parmatrix`) are not directly interpretable; the transformed $\phi$/$\theta$
+coefficients are what `summary()` displays, and are also available via
+`arma_coefficients()`.
+
+## Diagnostic helpers and the "ARMA(1,1) trap"
+
+Four helpers are exported for inspecting the estimated mean equation:
+
+- `arma_coefficients()` returns the transformed AR and MA coefficients
+  $\phi_i$ and $\theta_j$.
+- `arma_inverse_roots()` returns the inverse roots of $\Phi(z)$ and
+  $\Theta(z)$; all of them must lie inside the unit circle.
+- `arma_irf()` computes the impulse-response function of the mean equation
+  (how a one-unit shock to $\varepsilon_t$ propagates through $\mu_t$).
+- `arma_near_cancellation()` flags pairs of AR and MA inverse roots that
+  are closer than a chosen tolerance in the complex plane.
+
+The first three are mostly self-explanatory, but the last one is worth a
+longer warning because ARMA($1,1$) is so often used as a default without
+checking whether it is actually identified by the data.
+
+### Why near-cancellation matters
+
+For an ARMA($1,1$) with our sign convention,
+
+$$
+\Phi(z) = 1 - \phi_1 z, \qquad \Theta(z) = 1 + \theta_1 z.
+$$
+
+If the two polynomials share a common root then the AR and MA operators
+*cancel*. After cancellation the mean equation is just white noise around
+$\mu$; the model has two parameters doing the job of zero and the likelihood
+is flat along a ridge.  Even when the match is not exact, *near*-cancellation
+makes the model practically unidentifiable: the data cannot tell whether the
+observed persistence comes from the AR side, the MA side, or a mixture of both.
+
+The fitted coefficients below illustrate exactly this.  The AR coefficient
+is $\hat\phi_1 \approx -0.99$ and the MA coefficient is $\hat\theta_1 \approx
+0.99$.  Because $\hat\phi_1 \approx -\hat\theta_1$, the two polynomials
+$1 - \hat\phi_1 z$ and $1 + \hat\theta_1 z$ are almost identical, so their
+roots are almost the same.  `arma_near_cancellation()` reports the distance
+between the corresponding inverse roots.
+
+## Demo
+
+```{r}
+library(tsgarch)
+suppressMessages(library(data.table))
+suppressMessages(library(xts))
+data(nikkei)
+nikkei <- xts(nikkei$value, as.Date(nikkei$index))
+spec <- garch_modelspec(nikkei, arma = c(1,1), model = 'garch', constant = TRUE, 
+                        init = 'unconditional', distribution = 'jsu')
+mod <- estimate(spec)
+as_flextable(summary(mod))
+```
+
+The estimated AR and MA coefficients and the inverse roots:
+
+```{r}
+arma_coefficients(mod)
+arma_inverse_roots(mod)
+arma_near_cancellation(arma_inverse_roots(mod), tol = 0.1)
+```
+
+The plot method now takes in an argument `type` which dispatches to either the GARCH (default and backwards compatible)
+or ARMA plots.
+
+```{r, fig.width=7,fig.height=6}
+plot(mod)
+```
+
+```{r, fig.width=7,fig.height=6}
+plot(mod, type = "arma", which = NULL, envelope = "parametric")
+```
+
+The first panel of the ARMA plot is the inverse-root diagram.  Because the
+AR and MA inverse roots are extremely close, the plot joins them with a
+dashed segment and the legend flags "Possible common factors".  This is the
+visual cue that an ARMA($1,1$) mean equation may be over-parameterized for
+this series.
+
