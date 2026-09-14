@@ -349,18 +349,35 @@ initialize_arma_pacf <- function(y, arma, xreg = NULL)
 #' \code{\link{pacf_to_ma}}; may be length zero).
 #' @param old_conditional_mu numeric vector of length \sQuote{n_old} with the
 #' already-computed historical conditional mean.
+#' @param xtau_full numeric vector of length \sQuote{length(y_full)} with the
+#' per-period mean-regressor contribution \sQuote{x_t'tau} over the full
+#' merged series (NULL/zeros when the model has no mean regressors). The
+#' first \sQuote{n_old} entries must be the actual in-sample values since the
+#' AR lookback of the first new observation reaches back into them.
+#' @param armax logical; TRUE selects the \sQuote{armax} convention
+#' (regressor contribution enters the conditional mean at time t only and AR
+#' feedback is on \sQuote{y - mu}), FALSE the \sQuote{arma_errors}
+#' convention (the ARMA recursion runs on \sQuote{w = y - mu - x'tau}).
 #' @return a numeric vector of length \sQuote{length(y_full) - n_old} with the
 #' conditional mean for the newly appended observations only.
 #' @keywords internal
 #' @noRd
-arma_filter_extend <- function(y_full, n_old, mu, ar, ma, old_conditional_mu)
+arma_filter_extend <- function(y_full, n_old, mu, ar, ma, old_conditional_mu, xtau_full = NULL, armax = FALSE)
 {
     ar_order <- length(ar)
     ma_order <- length(ma)
     n_new <- length(y_full) - n_old
     if (n_new <= 0) return(numeric(0))
     y_full <- as.numeric(y_full)
-    z <- y_full - mu
+    if (is.null(xtau_full)) xtau_full <- rep(0, length(y_full))
+    # arma_errors runs the ARMA recursion on the regressor-adjusted
+    # deviations w = y - mu - x'tau; armax on the raw deviations y - mu with
+    # the regressor contribution added to the conditional mean at time t
+    if (armax) {
+        z <- y_full - mu
+    } else {
+        z <- y_full - mu - xtau_full
+    }
     old_eps <- head(y_full, n_old) - old_conditional_mu
     eps <- c(old_eps, rep(0, n_new))
     cond_mu <- c(old_conditional_mu, rep(mu, n_new))
@@ -379,8 +396,12 @@ arma_filter_extend <- function(y_full, n_old, mu, ar, ma, old_conditional_mu)
                 mean_t <- mean_t + ma[j] * (if (idx <= 0) 0 else eps[idx])
             }
         }
+        if (armax) mean_t <- mean_t + xtau_full[t]
         eps[t] <- z[t] - mean_t
-        cond_mu[t] <- mu + mean_t
+        # conditional_mean(t) = y(t) - eps(t), algebraically identical to
+        # mu + mean_t under arma_errors and correct under armax (same
+        # identity as the TMB templates)
+        cond_mu[t] <- y_full[t] - eps[t]
     }
     cond_mu[(n_old + 1):(n_old + n_new)]
 }

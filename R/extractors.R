@@ -10,6 +10,9 @@ extract_model_values <- function(object, object_type, value_name, ...)
     value <- switch(value_name,
                     "y" = x$target$y,
                     "vreg" = xts(x$vreg$vreg, x$target$index),
+                    # NULL fallbacks cover spec/estimate objects serialized
+                    # by package versions predating the xreg slot
+                    "xreg" = if (!is.null(x$xreg) && !is.null(x$xreg$xreg)) xts(x$xreg$xreg, x$target$index) else xts(matrix(0, ncol = 1, nrow = length(x$target$index)), x$target$index),
                     "mu" = parmatrix[group == "mu"]$value,
                     "omega" = parmatrix[group == "omega"]$value,
                     "phi" = parmatrix[group == "phi"]$value,
@@ -20,6 +23,7 @@ extract_model_values <- function(object, object_type, value_name, ...)
                     "delta" = parmatrix[group == "delta"]$value,
                     "beta" = parmatrix[group == "beta"]$value,
                     "xi" = parmatrix[group == "xi"]$value,
+                    "tau" = parmatrix[group == "tau"]$value,
                     "distribution" = parmatrix[group == "distribution"]$value,
                     "arpacf" = parmatrix[group == "arpacf"]$value,
                     "mapacf" = parmatrix[group == "mapacf"]$value,

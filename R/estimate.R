@@ -295,9 +295,16 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     # needed here.
     conditional_mu <- NULL
     arma_table <- NULL
-    if (!is.null(object$model$arma) && sum(object$model$arma) > 0) {
+    arma_order <- object$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
+    # also capture the conditional mean when the model has mean regressors
+    # with no ARMA dynamics: conditional_mean(i) = mu + xtau(i) is then
+    # time-varying and fitted()/residuals() need it
+    if (sum(arma_order) > 0 || isTRUE(object$xreg$include_xreg)) {
         # sig has already been trimmed to the actual (non-padded) length above
         conditional_mu <- tail(scaled_env$tmb$report(scaled_sol$solution)$conditional_mean, length(sig))
+    }
+    if (sum(arma_order) > 0) {
         ar_order <- object$model$arma[1]
         ma_order <- object$model$arma[2]
         arma_table <- list(

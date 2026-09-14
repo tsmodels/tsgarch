@@ -14,9 +14,23 @@
     } else {
         newvreg <- NULL
     }
+    # isTRUE() fallbacks keep this working on spec objects serialized by
+    # package versions predating the xreg slot
+    if (isTRUE(object$xreg$include_xreg)) {
+        if (is.null(newxreg)) {
+            newxreg <- xts(object$xreg$xreg, object$target$index)
+        } else {
+            newxreg <- newxreg
+        }
+    } else {
+        newxreg <- NULL
+    }
+    xreg_type <- object$xreg$xreg_type
+    if (is.null(xreg_type)) xreg_type <- "arma_errors"
     arma_order <- object$model$arma
     if (is.null(arma_order)) arma_order <- c(0,0)
-    new_spec <- garch_modelspec(y = y, model = object$model$model, constant = object$model$constant, order = object$model$order, arma = arma_order, variance_targeting = object$model$variance_targeting,
+    new_spec <- garch_modelspec(y = y, model = object$model$model, constant = object$model$constant, order = object$model$order, arma = arma_order, xreg = newxreg, xreg_type = xreg_type,
+                                variance_targeting = object$model$variance_targeting,
                                 vreg = newvreg, multiplicative = object$vreg$multiplicative, init = object$model$init, backcast_lambda = object$model$backcast_lambda,
                                 sample_n = object$model$sample_n, distribution = object$distribution)
     return(new_spec)
@@ -32,13 +46,26 @@ valid_garch_models <- function()
 # fgarch/avgarch, fgrarch/gjr, fgarch/tgarch, fgarch/ngarch, fgarch/nagarch
 
 # check and process regressors if present for predict
-.process_prediction_regressors <- function(old_regressors, new_regressors = NULL, xi = 0, h = 1, include_regressors = FALSE, maxpq = 1, regressor_argument = "newvreg")
+# missing_action: "error" (the variance regressor/newvreg policy) or
+# "zero_warn" (the mean regressor/newxreg policy: substitute a zero matrix
+# and warn when the model uses regressors but none were supplied)
+.process_prediction_regressors <- function(old_regressors, new_regressors = NULL, xi = 0, h = 1, include_regressors = FALSE, maxpq = 1,
+                                           regressor_argument = "newvreg", missing_action = c("error","zero_warn"))
 {
+    missing_action <- match.arg(missing_action)
     if (include_regressors) {
-        if (is.null(new_regressors)) stop(paste0("\n",regressor_argument," is NULL but model has a regressor in the variance."))
+        if (is.null(new_regressors)) {
+            if (missing_action == "zero_warn") {
+                warning(paste0("\n",regressor_argument," is NULL but the model was estimated with regressors; setting to zero."))
+                new_regressors <- matrix(0, nrow = h, ncol = NCOL(old_regressors))
+            } else {
+                stop(paste0("\n",regressor_argument," is NULL but model has regressors."))
+            }
+        }
         if (!is.xts(new_regressors)) new_regressors <- as.matrix(new_regressors)
         if (NROW(new_regressors) != h) stop(paste0("\n",regressor_argument," must have h rows."))
         if (NCOL(new_regressors) != NCOL(old_regressors)) stop(paste0("\n",regressor_argument," must have the same number of columns as regressors in the model."))
+        if (any(!is.finite(new_regressors))) stop(paste0("\nNA/NaN/Inf values found in ",regressor_argument,"."))
         new_v <- rbind(tail(old_regressors,maxpq), coredata(new_regressors))
     } else {
         new_v <- rbind(tail(old_regressors,maxpq), matrix(0, nrow = h, ncol = NCOL(old_regressors)))
@@ -49,13 +76,15 @@ valid_garch_models <- function()
 
 
 # check and process regressors if present for tsfilter
-.process_filter_regressors <- function(old_regressors, new_regressors = NULL, new_index, new_n, include_regressors = FALSE)
+.process_filter_regressors <- function(old_regressors, new_regressors = NULL, new_index, new_n, include_regressors = FALSE,
+                                       regressor_argument = "newvreg")
 {
     n <- length(new_index)
     if (include_regressors) {
-        if (is.null(new_regressors)) stop("\nnewvreg is NULL but model has a regressor in the variance.")
-        if (NROW(new_regressors) != n) stop("\nnewvreg must have the same number of rows as the new y vector.")
-        if (NCOL(new_regressors) != NCOL(old_regressors)) stop("\nnewvreg does not have the same number of columns as vreg in model.")
+        if (is.null(new_regressors)) stop(paste0("\n",regressor_argument," is NULL but model has regressors."))
+        if (NROW(new_regressors) != n) stop(paste0("\n",regressor_argument," must have the same number of rows as the new y vector."))
+        if (NCOL(new_regressors) != NCOL(old_regressors)) stop(paste0("\n",regressor_argument," does not have the same number of columns as the regressors in model."))
+        if (any(!is.finite(new_regressors))) stop(paste0("\nNA/NaN/Inf values found in ",regressor_argument,"."))
         # set the index of the new_regressors to that of the new y
         new_regressors <- xts(coredata(new_regressors), new_index)
         v_new <- coredata(.merge_data(old_regressors, new_regressors))

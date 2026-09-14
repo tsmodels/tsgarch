@@ -9,6 +9,7 @@ get_group_parameters <- function(object)
     parlist$alpha <- object$parmatrix[group == "alpha"]$value
     parlist$beta <- object$parmatrix[group == "beta"]$value
     parlist$xi <- object$parmatrix[group == "xi"]$value
+    parlist$tau <- object$parmatrix[group == "tau"]$value
     parlist$distribution <- object$parmatrix[group == "distribution"]$value
     arma_order <- object$spec$model$arma
     if (!is.null(arma_order) && sum(arma_order) > 0) {
@@ -47,9 +48,25 @@ setup_prediction <- function(object, h, newxreg = NULL, newvreg = NULL, forc_dat
                                         new_regressors = newvreg, xi = model_parameters$xi,
                                         h = h, include_regressors = object$spec$vreg$include_vreg,
                                         maxpq = maxpq, regressor_argument = "newvreg")
+    # mean equation regressors: warn-and-zero policy (unlike newvreg above),
+    # and the in-sample lookback is max(ar, ma) - the span of the mean
+    # recursion - rather than the GARCH maxpq used for the variance equation
+    arma_order <- object$spec$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
+    mean_maxpq <- max(arma_order)
+    include_xreg <- isTRUE(object$spec$xreg$include_xreg)
+    xreg_old <- object$spec$xreg$xreg
+    if (is.null(xreg_old)) xreg_old <- matrix(0, ncol = 1, nrow = length(object$spec$target$y_orig))
+    tau <- model_parameters$tau
+    if (length(tau) != NCOL(xreg_old)) tau <- rep(0, NCOL(xreg_old))
+    x <- .process_prediction_regressors(old_regressors = xreg_old,
+                                        new_regressors = newxreg, xi = tau,
+                                        h = h, include_regressors = include_xreg,
+                                        maxpq = mean_maxpq, regressor_argument = "newxreg",
+                                        missing_action = "zero_warn")
 
     constant <- model_parameters$omega + v
-    return(list(variance_regressors = v, model_parameters = model_parameters, forc_dates = forc_dates, garch_order = garch_order, maxpq = maxpq))
+    return(list(variance_regressors = v, mean_regressors = x, model_parameters = model_parameters, forc_dates = forc_dates, garch_order = garch_order, maxpq = maxpq))
 }
 
 #' Deterministic h-step-ahead ARMA mean forecast
@@ -64,9 +81,14 @@ setup_prediction <- function(object, h, newxreg = NULL, newvreg = NULL, forc_dat
 #' \code{rugarch:::armaf}) and the standard textbook ARMA forecast recursion
 #' (e.g. Box, Jenkins and Reinsel). Reduces to \sQuote{rep(mu, h)} when
 #' \sQuote{ar_order = ma_order = 0}, matching prior behavior exactly.
+#' @param xtau numeric vector of the per-period regressor contribution
+#' \sQuote{x_t'tau}: the last \sQuote{max(ar_order, ma_order)} in-sample
+#' values followed by the \sQuote{h} forecast-period values (as built by
+#' \code{setup_prediction()}); NULL/zeros when the model has no mean
+#' regressors.
 #' @keywords internal
 #' @noRd
-.arma_mean_forecast <- function(object, h, model_parameters)
+.arma_mean_forecast <- function(object, h, model_parameters, xtau = NULL)
 {
     ar <- model_parameters$ar
     ma <- model_parameters$ma
@@ -74,21 +96,34 @@ setup_prediction <- function(object, h, newxreg = NULL, newvreg = NULL, forc_dat
     ma_order <- length(ma)
     mu <- model_parameters$mu
     maxpq <- max(ar_order, ma_order)
+    armax <- isTRUE(object$spec$xreg$xreg_type == "armax")
+    if (is.null(xtau)) xtau <- rep(0, maxpq + h)
     if (maxpq == 0) {
-        return(rep(mu, h))
+        # no ARMA dynamics: the conditional mean is mu + x'tau (the regressor
+        # contribution is present whether or not xreg_type is armax, since
+        # the two conventions coincide when ar_order == 0)
+        return(mu + tail(xtau, h))
     }
     y_hist <- tail(as.numeric(object$spec$target$y), maxpq)
     eps_hist <- tail(as.numeric(residuals(object)), maxpq)
     if (length(y_hist) < maxpq) y_hist <- c(rep(mu, maxpq - length(y_hist)), y_hist)
     if (length(eps_hist) < maxpq) eps_hist <- c(rep(0, maxpq - length(eps_hist)), eps_hist)
-    x <- c(y_hist, rep(0, h))
+    xtau_hist <- head(xtau, maxpq)
+    xtau_f <- tail(xtau, h)
+    # x holds deviations from mu: regressor-adjusted (w = y - mu - x'tau)
+    # under arma_errors, raw (y - mu) under armax
+    if (armax) {
+        x <- c(y_hist - mu, rep(0, h))
+    } else {
+        x <- c(y_hist - mu - xtau_hist, rep(0, h))
+    }
     eps <- c(eps_hist, rep(0, h))
     for (i in 1:h) {
         idx <- maxpq + i
-        val <- mu
+        val <- if (armax) xtau_f[i] else 0
         if (ar_order > 0) {
             for (j in 1:ar_order) {
-                val <- val + ar[j] * (x[idx - j] - mu)
+                val <- val + ar[j] * x[idx - j]
             }
         }
         if (ma_order > 0) {
@@ -102,7 +137,12 @@ setup_prediction <- function(object, h, newxreg = NULL, newvreg = NULL, forc_dat
         }
         x[idx] <- val
     }
-    return(x[(maxpq + 1):(maxpq + h)])
+    if (armax) {
+        out <- mu + x[(maxpq + 1):(maxpq + h)]
+    } else {
+        out <- mu + xtau_f + x[(maxpq + 1):(maxpq + h)]
+    }
+    return(out)
 }
 
 
@@ -159,15 +199,22 @@ initialize_states <- function(object, init_states = list())
 simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
                                    sim_method = c("parametric","bootstrap"),
                                    block = 1, model_parameters,
-                                   vreg = NULL, forc_dates = NULL,
+                                   vreg = NULL, xreg = NULL, forc_dates = NULL,
                                    bootstrap = FALSE, seed = NULL)
 {
     parameter <- NULL
     if (!is.null(seed)) set.seed(seed)
     series_sim <- sigma_sim <- NULL
+    # xreg is passed to simulate() as a raw (not pre-multiplied) h-row
+    # matrix; a NULL with regressors present has already been warned about in
+    # setup_prediction(), so substitute zeros silently here to avoid a
+    # duplicate warning
+    if (isTRUE(object$spec$xreg$include_xreg) && is.null(xreg)) {
+        xreg <- matrix(0, nrow = h, ncol = NCOL(object$spec$xreg$xreg))
+    }
     if (nsim > 0) {
         if (sim_method == "bootstrap") {
-            out <- garch_bootstrap(object, h = h, nsim = nsim, block = block, vreg = tail(vreg, h), seed = seed)
+            out <- garch_bootstrap(object, h = h, nsim = nsim, block = block, vreg = tail(vreg, h), xreg = xreg, seed = seed)
             sigma_sim <- out$sigma
             colnames(sigma_sim) <- as.character(forc_dates)
             class(sigma_sim) <- "tsmodel.distribution"
@@ -204,7 +251,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
                 extra_args$series_init <- tail(as.numeric(object$spec$target$y), maxpq)
                 extra_args$resid_init <- tail(as.numeric(residuals(object)), maxpq)
             }
-            out <- do.call(simulate, c(list(object = spec, h = h, nsim = nsim, var_init = init_v, innov = zsim, innov_init = init_z, vreg = tail(vreg, h), seed = seed), extra_args))
+            out <- do.call(simulate, c(list(object = spec, h = h, nsim = nsim, var_init = init_v, innov = zsim, innov_init = init_z, vreg = tail(vreg, h), xreg = xreg, seed = seed), extra_args))
             sigma_sim <- out$sigma
             colnames(sigma_sim) <- as.character(forc_dates)
             class(sigma_sim) <- "tsmodel.distribution"
@@ -255,12 +302,12 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     # when arma = c(0,0), matching prior behavior exactly); see
     # .arma_mean_forecast() for the recursion (same algorithm as rugarch's
     # armaf/.nsgarchforecast).
-    y <- .arma_mean_forecast(object, h, model_parameters)
+    y <- .arma_mean_forecast(object, h, model_parameters, xtau = init_model$mean_regressors)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,
                                    model_parameters = model_parameters,
-                                   vreg = init_model$variance_regressors,
+                                   vreg = init_model$variance_regressors, xreg = newxreg,
                                    forc_dates = init_model$forc_dates,
                                    sim_method = sim_method, block = block, seed = seed)
     mu <- xts(y, forc_dates)
@@ -318,14 +365,19 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     } else {
         spec_copy <- object$spec
         spec_copy$parmatrix <- copy(object$parmatrix)
-        sigma <- simulate(spec_copy, nsim = 10000, h = h, var_init = init_states$variance, innov_init = init_states$std_residuals, seed = seed)
+        # only sigma is used here (the egarch variance recursion does not
+        # depend on the mean), but pass zeros for the mean regressors so a
+        # model with xreg does not emit a spurious missing-regressor warning
+        xreg_sim <- NULL
+        if (isTRUE(spec_copy$xreg$include_xreg)) xreg_sim <- matrix(0, nrow = h, ncol = NCOL(spec_copy$xreg$xreg))
+        sigma <- simulate(spec_copy, nsim = 10000, h = h, var_init = init_states$variance, innov_init = init_states$std_residuals, xreg = xreg_sim, seed = seed)
         sigma <- sqrt(as.numeric(apply(sigma$sigma^2, 2, mean)))
     }
-    y <- .arma_mean_forecast(object, h, model_parameters)
+    y <- .arma_mean_forecast(object, h, model_parameters, xtau = init_model$mean_regressors)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim, model_parameters = model_parameters,
-                                   vreg = init_model$variance_regressors, forc_dates = init_model$forc_dates, sim_method = sim_method[1], block = block, seed = seed)
+                                   vreg = init_model$variance_regressors, xreg = newxreg, forc_dates = init_model$forc_dates, sim_method = sim_method[1], block = block, seed = seed)
     mu <- xts(y, forc_dates)
     sigma <- xts(sigma, forc_dates)
     L <- list(original_series = object$spec$target$y, distribution = simd$series, sigma_sim  = simd$sigma, spec = object$spec, sigma = sigma, mean = mu)
@@ -370,12 +422,12 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     }
     sigma <- power_sigma^(1/model_parameters$delta)
     if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    y <- .arma_mean_forecast(object, h, model_parameters)
+    y <- .arma_mean_forecast(object, h, model_parameters, xtau = init_model$mean_regressors)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,
                                    model_parameters = model_parameters,
-                                   vreg = init_model$variance_regressors,
+                                   vreg = init_model$variance_regressors, xreg = newxreg,
                                    forc_dates = init_model$forc_dates,
                                    sim_method = sim_method, block = block, seed = seed)
     mu <- xts(y, forc_dates)
@@ -423,12 +475,12 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     }
     sigma <- sqrt(sigma_sqr)
     if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    y <- .arma_mean_forecast(object, h, model_parameters)
+    y <- .arma_mean_forecast(object, h, model_parameters, xtau = init_model$mean_regressors)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,
                                    model_parameters = model_parameters,
-                                   vreg = init_model$variance_regressors,
+                                   vreg = init_model$variance_regressors, xreg = newxreg,
                                    forc_dates = init_model$forc_dates,
                                    sim_method = sim_method, block = block, seed = seed)
     mu <- xts(y, forc_dates)
@@ -473,12 +525,12 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
     }
     sigma <- power_sigma^(1/model_parameters$delta)
     if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
-    y <- .arma_mean_forecast(object, h, model_parameters)
+    y <- .arma_mean_forecast(object, h, model_parameters, xtau = init_model$mean_regressors)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,
                                    model_parameters = model_parameters,
-                                   vreg = init_model$variance_regressors,
+                                   vreg = init_model$variance_regressors, xreg = newxreg,
                                    forc_dates = init_model$forc_dates,
                                    sim_method = sim_method, block = block, seed = seed)
     mu <- xts(y, forc_dates)
@@ -540,12 +592,12 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
 
     }
 
-    y <- .arma_mean_forecast(object, h, model_parameters)
+    y <- .arma_mean_forecast(object, h, model_parameters, xtau = init_model$mean_regressors)
     series_sim <- NULL
     sigma_sim <- NULL
     simd <- simulated_distribution(object, sigma = sigma, h = h, nsim = nsim,
                                    model_parameters = model_parameters,
-                                   vreg = init_model$variance_regressors,
+                                   vreg = init_model$variance_regressors, xreg = newxreg,
                                    forc_dates = init_model$forc_dates,
                                    sim_method = sim_method, block = block, seed = seed)
     mu <- xts(y, forc_dates)
@@ -560,7 +612,7 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
 }
 
 
-garch_bootstrap <- function(object, h = 2, nsim = 1, block = 1, vreg = NULL, seed = seed)
+garch_bootstrap <- function(object, h = 2, nsim = 1, block = 1, vreg = NULL, xreg = NULL, seed = seed)
 {
     z <- as.numeric(residuals(object, standardize = TRUE))
     zsim <- sample_block(x = z, h = h, nsim = nsim, block = block)
@@ -588,7 +640,7 @@ garch_bootstrap <- function(object, h = 2, nsim = 1, block = 1, vreg = NULL, see
         extra_args$series_init <- tail(as.numeric(object$spec$target$y), maxpq)
         extra_args$resid_init <- tail(as.numeric(residuals(object)), maxpq)
     }
-    b <- do.call(simulate, c(list(object = spec, h = h, nsim = nsim, var_init = init_v, innov = zsim, innov_init = init_z, vreg = vreg, seed = seed), extra_args))
+    b <- do.call(simulate, c(list(object = spec, h = h, nsim = nsim, var_init = init_v, innov = zsim, innov_init = init_z, vreg = vreg, xreg = xreg, seed = seed), extra_args))
     return(b)
 }
 

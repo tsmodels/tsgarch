@@ -145,8 +145,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // armasimvec
-Eigen::MatrixXd armasimvec(Eigen::Map<Eigen::MatrixXd>& series_sim, const Eigen::Map<Eigen::MatrixXd>& epsilon, const Eigen::Map<Eigen::VectorXd>& ar, const Eigen::Map<Eigen::VectorXd>& ma, const double mu, const int presample);
-RcppExport SEXP _tsgarch_armasimvec(SEXP series_simSEXP, SEXP epsilonSEXP, SEXP arSEXP, SEXP maSEXP, SEXP muSEXP, SEXP presampleSEXP) {
+Eigen::MatrixXd armasimvec(Eigen::Map<Eigen::MatrixXd>& series_sim, const Eigen::Map<Eigen::MatrixXd>& epsilon, const Eigen::Map<Eigen::VectorXd>& ar, const Eigen::Map<Eigen::VectorXd>& ma, const double mu, const Eigen::Map<Eigen::VectorXd>& xtau, const int armax, const int presample);
+RcppExport SEXP _tsgarch_armasimvec(SEXP series_simSEXP, SEXP epsilonSEXP, SEXP arSEXP, SEXP maSEXP, SEXP muSEXP, SEXP xtauSEXP, SEXP armaxSEXP, SEXP presampleSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -155,8 +155,10 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type ar(arSEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type ma(maSEXP);
     Rcpp::traits::input_parameter< const double >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type xtau(xtauSEXP);
+    Rcpp::traits::input_parameter< const int >::type armax(armaxSEXP);
     Rcpp::traits::input_parameter< const int >::type presample(presampleSEXP);
-    rcpp_result_gen = Rcpp::wrap(armasimvec(series_sim, epsilon, ar, ma, mu, presample));
+    rcpp_result_gen = Rcpp::wrap(armasimvec(series_sim, epsilon, ar, ma, mu, xtau, armax, presample));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -279,7 +281,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_tsgarch_fgarchfilter", (DL_FUNC) &_tsgarch_fgarchfilter, 10},
     {"_tsgarch_cgarchfilter", (DL_FUNC) &_tsgarch_cgarchfilter, 9},
     {"_tsgarch_garchsimvec", (DL_FUNC) &_tsgarch_garchsimvec, 10},
-    {"_tsgarch_armasimvec", (DL_FUNC) &_tsgarch_armasimvec, 6},
+    {"_tsgarch_armasimvec", (DL_FUNC) &_tsgarch_armasimvec, 8},
     {"_tsgarch_egarchsimvec", (DL_FUNC) &_tsgarch_egarchsimvec, 11},
     {"_tsgarch_aparchsimvec", (DL_FUNC) &_tsgarch_aparchsimvec, 12},
     {"_tsgarch_gjrsimvec", (DL_FUNC) &_tsgarch_gjrsimvec, 11},
