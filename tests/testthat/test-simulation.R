@@ -210,3 +210,23 @@ test_that("simulation: long run variance check",{
     expect_equal(mean(sim$sigma[1,]^2), unconditional(spec_egarch), tolerance = 0.1)
 
 })
+
+test_that("simulate: a non-positive implied initial variance errors rather than returning zeros",{
+    # ewma fixes omega at zero, so initv = omega/(1 - 0.999) = 0 and the
+    # variance recursion would stay at zero for every step, silently returning
+    # sigma == 0 and a series equal to mu. var_init must be supplied instead.
+    spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "ewma")
+    mod <- estimate(spec)
+    spec$parmatrix <- copy(mod$parmatrix)
+    expect_error(simulate(spec, h = 5, nsim = 2, seed = 1), "var_init")
+    sim <- simulate(spec, h = 5, nsim = 2, var_init = tail(as.numeric(sigma(mod)), 1)^2, seed = 1)
+    expect_true(all(as.matrix(sim$sigma) > 0))
+    # every other flavour has a positive implied seed and is unaffected
+    for (m in c("garch","igarch","egarch","aparch","fgarch","gjrgarch","cgarch")) {
+        sp <- garch_modelspec(y[1:1800,1], constant = TRUE, model = m)
+        mo <- suppressWarnings(estimate(sp))
+        sp$parmatrix <- copy(mo$parmatrix)
+        s <- suppressWarnings(simulate(sp, h = 5, nsim = 2, seed = 1))
+        expect_true(all(as.matrix(s$sigma) > 0), info = m)
+    }
+})

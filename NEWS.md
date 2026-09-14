@@ -133,6 +133,20 @@ and AIC/BIC off by one parameter's worth) and `garch_profile` re-fit an
 igarch model. Both now re-specify from the retained user-facing
 `model$model_name`. Filtered `sigma` is unchanged; filtered `ewma`
 AIC/BIC shift accordingly.
+* Fixed `tsprofile()` profiling the wrong mean equation: its inner
+`garch_modelspec()` call passed no `arma`, so the data were simulated from
+the full ARMA model while every re-estimation fitted a constant-mean
+model, and the ARMA parameters never appeared in the profile at all.
+Regressors in the mean equation are now refused explicitly (as `vreg`
+already was), since the simulation step does not carry them into the
+simulated sample.
+* `simulate()` now raises an error instead of silently returning zeros when
+the implied initial variance is not positive and finite. For an `ewma`
+specification `omega` is fixed at zero, so the seed
+`omega/(1 - 0.999)` was zero and the variance recursion stayed at zero for
+every step, returning `sigma` identically zero and a series equal to `mu`.
+Supply `var_init` for such models; `predict()` always did, and every other
+flavour has a positive implied seed and is unaffected.
 * `tsequation()` (and the `as_flextable` summary footer built from it)
 now renders the conditional mean equation `eq_mean` first in the
 equation block, covering the constant, ARMA terms and mean regressors

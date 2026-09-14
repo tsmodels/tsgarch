@@ -33,6 +33,14 @@ tsprofile.tsgarch.spec <- function(object, nsim = 100, sizes = c(800, 1000, 1500
     if (object$vreg$include_vreg) {
         stop("\nexternal regressors in the variance equation (vreg) are not supported.")
     }
+    # mean equation regressors are refused rather than silently profiled: the
+    # simulation below does not carry xreg into the simulated sample, so the
+    # data would be generated with no regressor contribution while each
+    # re-estimation fitted tau against the original regressor matrix, i.e. the
+    # profile would measure a model that was never simulated
+    if (isTRUE(object$xreg$include_xreg)) {
+        stop("\nexternal regressors in the mean equation (xreg) are not supported.")
+    }
     value <- parameter <- actual <- NULL
     spec <- .spec2newspec(object)
     spec$parmatrix$value <- object$parmatrix$value
@@ -74,8 +82,11 @@ tsprofile.tsgarch.spec <- function(object, nsim = 100, sizes = c(800, 1000, 1500
             s <- xts(sim$series[i,1:sizes[j]], as.Date(1:sizes[j]))
             model_name <- object$model$model_name
             if (is.null(model_name)) model_name <- object$model$model
+            arma_order <- object$model$arma
+            if (is.null(arma_order)) arma_order <- c(0,0)
             spec_new <- garch_modelspec(s, model = model_name, distribution  = object$distribution,
                                         order = object$model$order, constant = object$model$constant,
+                                        arma = arma_order,
                                         variance_targeting = object$model$variance_targeting,
                                         init = object$model$init, backcast_lambda = object$model$backcast_lambda,
                                         sample_n = object$model$sample_n, vreg = v, multiplicative = object$vreg$multiplicative)

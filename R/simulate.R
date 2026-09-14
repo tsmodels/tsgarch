@@ -115,6 +115,14 @@
     return(xreg)
 }
 
+.validate_sim_initv <- function(initv)
+{
+    if (any(!is.finite(initv)) || any(initv <= 0)) {
+        stop("\nthe implied initial variance is not positive and finite; this can happen when the variance intercept is fixed at zero (e.g. ewma), which has no positive implied starting variance - supply a positive var_init.")
+    }
+    return(invisible(initv))
+}
+
 .simulate_garch <- function(object, h = 1000, seed  = NULL, nsim = 1, var_init = NULL, innov = NULL, innov_init = NULL,
                             vreg = NULL, xreg = NULL, burn = 0, ...)
 {
@@ -170,6 +178,7 @@
     } else {
         initv <- var_init
     }
+    .validate_sim_initv(initv)
 
     if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
@@ -353,6 +362,7 @@
     } else {
         initv <- var_init^(delta/2)
     }
+    .validate_sim_initv(initv)
     order <- as.integer(object$model$order)
     sigma_sim <- sigma_power_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
@@ -450,6 +460,7 @@
     } else {
         initv <- var_init
     }
+    .validate_sim_initv(initv)
 
     sigma_sim <- sigma_squared_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
@@ -546,6 +557,7 @@
     } else {
         initv <- var_init^(delta/2)
     }
+    .validate_sim_initv(initv)
 
     sigma_sim <- sigma_power_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
@@ -658,6 +670,7 @@
             initv <- var_init[,2]
         }
     }
+    .validate_sim_initv(initv)
     sigma_sim <- sigma_sqr_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     permanent_component_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     transitory_component_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
@@ -762,6 +775,7 @@
     } else {
         initv <- var_init
     }
+    .validate_sim_initv(initv)
 
     if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
