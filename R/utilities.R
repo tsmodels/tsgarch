@@ -427,11 +427,11 @@ check_xreg <- function(xreg, valid_index)
     if (NROW(xreg) != n) {
         stop("\nxreg does not have the same number of rows as y")
     }
-    if (!all.equal(index(xreg),valid_index)) {
+    if (!isTRUE(all.equal(index(xreg),valid_index))) {
         stop("\nxreg time index does not match that of y")
     }
-    if (any(is.na(xreg))) {
-        stop("\nNAs found in xreg object")
+    if (any(!is.finite(coredata(xreg)))) {
+        stop("\nNA/NaN/Inf values found in xreg object")
     }
     if (is.null(colnames(xreg))) {
         colnames(xreg) <- paste0("x",1:ncol(xreg))

@@ -96,16 +96,23 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     map <- lapply(split(parmatrix[,list(P = 1:.N * include), by = "group"], by = "group", keep.by = FALSE, drop = T), function(x) as.factor(x$P))
     parameters <- lapply(split(parmatrix[,list(value, group)], by = "group", keep.by = FALSE), function(x) as.numeric(x$value))
     cmodel <- spec$model_options
+    # specs serialized by an earlier version have a length-8 cmodel (no
+    # armax flag) and no $xreg slot; cmodel(8) on a length-8 IVECTOR is an
+    # out-of-bounds read in C++, so pad the flag and default x here
+    if (length(cmodel) < 9) cmodel <- c(cmodel, 0L)
     # augment data with max(p,q) vectors
     y <- c(rep(0, cmodel[1]), as.numeric(spec$target$y))
     v <- spec$vreg$vreg
     v <- rbind(matrix(0, ncol = ncol(v), nrow = cmodel[1]), v)
+    x <- spec$xreg$xreg
+    if (is.null(x)) x <- matrix(0, ncol = 1, nrow = NROW(spec$target$y))
+    x <- rbind(matrix(0, ncol = ncol(x), nrow = cmodel[1]), x)
     pscale <- parmatrix$scale
     model <- spec$model$model
     if (model == "igarch") {
         model <- "garch"
     }
-    data <- list(y = y, v = v, backcast_lambda = spec$model$backcast_lambda, samplen = spec$model$sample_n, initmethod = spec$model$init, pscale = pscale, cmodel = cmodel, model = model)
+    data <- list(y = y, v = v, x = x, backcast_lambda = spec$model$backcast_lambda, samplen = spec$model$sample_n, initmethod = spec$model$init, pscale = pscale, cmodel = cmodel, model = model)
     return(list(fun = garch_fun, grad = garch_grad, hess = garch_hess, data = data, parameters = parameters, map = map))
 }
 

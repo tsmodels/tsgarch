@@ -52,12 +52,14 @@ setup_garch_constraints <- function(spec, model_init, ...)
             tmb_jac$parameters$mu <- NULL
             tmb_jac$parameters$arpacf <- NULL
             tmb_jac$parameters$mapacf <- NULL
+            tmb_jac$parameters$tau <- NULL
             tmb_jac$parameters$omega <- NULL
             tmb_jac$parameters$xi <- NULL
             tmb_jac$map <- model_init$map
             tmb_jac$map$mu <- NULL
             tmb_jac$map$arpacf <- NULL
             tmb_jac$map$mapacf <- NULL
+            tmb_jac$map$tau <- NULL
             tmb_jac$map$omega <- NULL
             tmb_jac$map$xi <- NULL
             tmb_jac$data$pscale <- model_init$data$pscale[which(spec$parmatrix$group %in% .group)]
@@ -75,12 +77,14 @@ setup_garch_constraints <- function(spec, model_init, ...)
             tmb_jac$parameters$mu <- NULL
             tmb_jac$parameters$arpacf <- NULL
             tmb_jac$parameters$mapacf <- NULL
+            tmb_jac$parameters$tau <- NULL
             tmb_jac$parameters$omega <- NULL
             tmb_jac$parameters$xi <- NULL
             tmb_jac$map <- model_init$map
             tmb_jac$map$mu <- NULL
             tmb_jac$map$arpacf <- NULL
             tmb_jac$map$mapacf <- NULL
+            tmb_jac$map$tau <- NULL
             tmb_jac$map$omega <- NULL
             tmb_jac$map$xi <- NULL
             tmb_jac$data$pscale <- model_init$data$pscale[which(spec$parmatrix$group %in% .group)]

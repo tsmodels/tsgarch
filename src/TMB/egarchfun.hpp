@@ -18,6 +18,8 @@ Type egarchfun(objective_function<Type>* obj) {
     // (-1,1), so no additional nonlinear constraint is required.
     PARAMETER_VECTOR(arpacf);
     PARAMETER_VECTOR(mapacf);
+    // mean-equation regressor coefficients
+    PARAMETER_VECTOR(tau);
     PARAMETER(omega);
     PARAMETER_VECTOR(alpha);
     PARAMETER_VECTOR(gamma);
@@ -28,7 +30,9 @@ Type egarchfun(objective_function<Type>* obj) {
     DATA_VECTOR(pscale);
     // variance regressors
     DATA_MATRIX(v);
-    // model flags [maxpq arch_order garch_order variance_targeting multiplicative distribution_no ar_order ma_order]
+    // mean equation regressors
+    DATA_MATRIX(x);
+    // model flags [maxpq arch_order garch_order variance_targeting multiplicative distribution_no ar_order ma_order armax]
     DATA_IVECTOR(cmodel);
     const int timesteps = y.rows();
     vector<Type> regressors(timesteps);
@@ -67,6 +71,12 @@ Type egarchfun(objective_function<Type>* obj) {
     } else {
         k += ma_order;
     }
+    // tau rows always number exactly x.cols() (>=1: the dummy column/row
+    // convention matches the arpacf/mapacf dummy convention), so no
+    // zero-column special case is needed here
+    const int mx = x.cols();
+    for(j = 0;j<mx;j++) { tau(j) *= pscale(j + k); }
+    k += mx;
     omega *= pscale(k);
     k += 1;
     for(j = 0;j<cmodel(1);j++) {
@@ -108,17 +118,26 @@ Type egarchfun(objective_function<Type>* obj) {
     // i.e. the pre-ARMA behavior). arma_ar/arma_ma are guaranteed stationary/invertible.
     vector<Type> arma_ar = garchextra::pacf_to_ar(arpacf);
     vector<Type> arma_ma = garchextra::pacf_to_ma(mapacf);
-    vector<Type> z = y.array() - mu;
-    // y's pre-sample rows (indices < cmodel(0)) are zero-padded by the R
-    // wrapper, which would otherwise leak z(presample) = 0 - mu = -mu into
-    // the AR feedback for the first ar_order real observations. Force the
-    // pre-sample z (and residuals, already zero below) to 0, i.e. "the
-    // process starts at its unconditional mean with zero shocks".
+    vector<Type> xtau = x * tau;
+    const int armax = cmodel(8);
+    vector<Type> z(timesteps);
+    if (armax > 0) {
+        z = y.array() - mu;
+    } else {
+        z = y.array() - mu - xtau.array();
+    }
+    // y's and x's pre-sample rows (indices < cmodel(0)) are zero-padded by
+    // the R wrapper, which would otherwise leak z(presample) = 0 - mu = -mu
+    // into the AR feedback for the first ar_order real observations (and
+    // xtau = 0 there in any case). Force the pre-sample z (and residuals,
+    // already zero below) to 0, i.e. "the process starts at its
+    // unconditional mean with zero shocks".
     for (int i = 0; i < cmodel(0); i++) z(i) = Type(0.0);
     vector<Type> residuals(timesteps);
     residuals.setZero();
     // conditional_mean(i) is the model's fitted conditional mean of y at
-    // time i (i.e. mu + the AR/MA deviation term), so that
+    // time i (i.e. mu + the regressor contribution + the AR/MA deviation
+    // term), so that
     // residuals(i) = y(i) - conditional_mean(i) always holds exactly - the
     // same relationship used by fitted()/residuals() on the R side. Reduces
     // to a constant mu everywhere when ar_order = ma_order = 0. Pre-sample
@@ -134,8 +153,12 @@ Type egarchfun(objective_function<Type>* obj) {
         for (j = 0; j < ma_order; j++) {
             mean_i += arma_ma(j) * residuals(i - j - 1);
         }
+        if (armax > 0) mean_i += xtau(i);
         residuals(i) = z(i) - mean_i;
-        conditional_mean(i) = mu + mean_i;
+        // y(i) - residuals(i) is algebraically identical to mu + mean_i
+        // under arma_errors and is the correct conditional mean under
+        // armax (where xtau enters the mean recursion itself)
+        conditional_mean(i) = y(i) - residuals(i);
     }
     // variance and arch initialization based on user choice
     vector<Type> tmp_block = residuals.tail(timesteps - cmodel(0));
