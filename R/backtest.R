@@ -67,6 +67,15 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
         use_vreg <- FALSE
         vreg <- NULL
     }
+    if (isTRUE(object$xreg$include_xreg)) {
+        use_xreg <- TRUE
+        xreg <- xts(object$xreg$xreg, object$target$index)
+    } else {
+        use_xreg <- FALSE
+        xreg <- NULL
+    }
+    xreg_type <- object$xreg$xreg_type
+    if (is.null(xreg_type)) xreg_type <- "arma_errors"
     start_date <- index(data)[start]
     end <- min(NROW(data), end)
     end_date <- index(data)[end - 1]
@@ -101,6 +110,12 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
         prog_trace <- progressor(length(seqdates))
     }
     i <- 1
+    # captured as globals by future_lapply; NULL fallbacks cover spec objects
+    # created by older package versions which lack these fields
+    model_name <- object$model$model_name
+    if (is.null(model_name)) model_name <- object$model$model
+    arma_order <- object$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
     b %<-% future_lapply(1:length(seqdates), function(i) {
         if (trace) prog_trace()
         y_train <- data[paste0("/", seqdates[i])]
@@ -109,7 +124,13 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
         } else {
             vreg_train <- NULL
         }
-        spec <- garch_modelspec(y_train, constant = object$model$constant, order = object$model$order,
+        if (use_xreg) {
+            xreg_train <- xreg[index(y_train)]
+        } else {
+            xreg_train <- NULL
+        }
+        spec <- garch_modelspec(y_train, model = model_name, constant = object$model$constant, order = object$model$order,
+                                arma = arma_order, xreg = xreg_train, xreg_type = xreg_type,
                                 variance_targeting = object$model$variance_targeting, vreg = vreg_train,
                                 multiplicative = object$vreg$multiplicative, init = object$model$init,
                                 backcast_lambda = object$model$backcast_lambda, sample_n = object$model$sample_n,
@@ -130,9 +151,14 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
         } else {
             vreg_test <- NULL
         }
+        if (use_xreg) {
+            xreg_test <- xreg[M[[1]]$forecast_dates]
+        } else {
+            xreg_test <- NULL
+        }
         # actual
         P <- vector(mode = "list", length = rolls)
-        tmp <- predict(mod, h = M[[1]]$h[1], newvreg = vreg_test, forc_dates = M[[1]]$forecast_date, nsim = 0)
+        tmp <- predict(mod, h = M[[1]]$h[1], newxreg = xreg_test, newvreg = vreg_test, forc_dates = M[[1]]$forecast_date, nsim = 0)
         if (rolls > 1 & rolling) {
             y_test <- data[M[[1]]$forecast_dates]
             nh <- length(M[[1]]$h)
@@ -156,13 +182,23 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
                 } else {
                     newvreg <- NULL
                 }
-                f <- tsfilter(mod, y = updated_y, newvreg = newvreg)
+                if (use_xreg) {
+                    newxreg <- xreg[paste0(seqdates[i],"/",roll_dates)][-1,]
+                } else {
+                    newxreg <- NULL
+                }
+                f <- tsfilter(mod, y = updated_y, newxreg = newxreg, newvreg = newvreg)
                 if (use_vreg) {
                     vreg_test <- vreg[M[[j]]$forecast_dates]
                 } else {
                     vreg_test <- NULL
                 }
-                tmp <- predict(f, h = M[[j]]$h[1], newvreg = vreg_test, forc_dates = M[[j]]$forecast_dates, nsim = 0)
+                if (use_xreg) {
+                    xreg_test <- xreg[M[[j]]$forecast_dates]
+                } else {
+                    xreg_test <- NULL
+                }
+                tmp <- predict(f, h = M[[j]]$h[1], newxreg = xreg_test, newvreg = vreg_test, forc_dates = M[[j]]$forecast_dates, nsim = 0)
                 y_test <- data[M[[j]]$forecast_dates]
                 nh <- length(M[[j]]$h)
                 P[[j]] <- data.table("estimation_date" = rep(seqdates[i], nh),

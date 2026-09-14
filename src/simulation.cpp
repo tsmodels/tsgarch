@@ -49,26 +49,40 @@ List garchsimvec(Eigen::Map<Eigen::MatrixXd>& epsilon, Eigen::Map<Eigen::MatrixX
 // overlaid by armaxsim using those same innovations - see
 // rugarch's src/garchsim.cpp: msgarchsim() + marmaxsim()):
 //   x_t = mu + sum_i ar_i * (x_{t-i} - mu) + sum_j ma_j * eps_{t-j} + eps_t
-// AR feedback uses the (already-simulated, mu-seeded) series itself so that
-// the joint stochastic dependence between the mean and variance processes
-// is preserved; MA feedback and the current-period shock use the same
-// eps_t driving the variance recursion, exactly as in the joint ARMA-GARCH
-// data-generating process. series_sim's pre-sample columns (< presample)
-// must be seeded to mu by the caller so that the AR lookback term vanishes
-// there (x_{t-i} - mu = 0), matching a "start from the unconditional mean"
-// convention.
+// When the model has mean regressors, xtau_t = x_t'tau (a VectorXd covering
+// all T columns, including the pre-sample ones) enters the recursion in one
+// of two conventions selected by the armax flag:
+//   armax = 1 (armax):       x_t = mu + xtau_t + sum_i ar_i*(x_{t-i} - mu)
+//                                  + sum_j ma_j*eps_{t-j} + eps_t
+//   armax = 0 (arma_errors): x_t = mu + xtau_t
+//                                  + sum_i ar_i*(x_{t-i} - mu - xtau_{t-i})
+//                                  + sum_j ma_j*eps_{t-j} + eps_t
+// i.e. under arma_errors the AR feedback is on the regressor-adjusted
+// deviation. AR feedback uses the (already-simulated, seeded) series itself
+// so that the joint stochastic dependence between the mean and variance
+// processes is preserved; MA feedback and the current-period shock use the
+// same eps_t driving the variance recursion, exactly as in the joint
+// ARMA-GARCH data-generating process. series_sim's pre-sample columns
+// (< presample) must be seeded by the caller so that the AR lookback term
+// vanishes there (mu + xtau under arma_errors, mu under armax), matching a
+// "start from the unconditional mean" convention.
 // [[Rcpp::export(.armasimvec)]]
 Eigen::MatrixXd armasimvec(Eigen::Map<Eigen::MatrixXd>& series_sim, const Eigen::Map<Eigen::MatrixXd>& epsilon,
                            const Eigen::Map<Eigen::VectorXd>& ar, const Eigen::Map<Eigen::VectorXd>& ma,
-                           const double mu, const int presample) {
+                           const double mu, const Eigen::Map<Eigen::VectorXd>& xtau, const int armax,
+                           const int presample) {
     const int T = (int) series_sim.cols();
     const int ar_order = (int) ar.size();
     const int ma_order = (int) ma.size();
     int i, j;
     for (i = presample; i < T; i++) {
-        series_sim.col(i).setConstant(mu);
+        series_sim.col(i).setConstant(mu + xtau(i));
         for (j = 0; j < ar_order; j++) {
-            series_sim.col(i) += ar(j) * (series_sim.col(i - j - 1).array() - mu).matrix();
+            if (armax > 0) {
+                series_sim.col(i) += ar(j) * (series_sim.col(i - j - 1).array() - mu).matrix();
+            } else {
+                series_sim.col(i) += ar(j) * (series_sim.col(i - j - 1).array() - mu - xtau(i - j - 1)).matrix();
+            }
         }
         for (j = 0; j < ma_order; j++) {
             series_sim.col(i) += ma(j) * epsilon.col(i - j - 1);

@@ -22,28 +22,51 @@
 #' ARMA pre-sample from real history (see \code{predict.R}'s
 #' \sQuote{simulated_distribution()}) rather than the unconditional mean /
 #' zero shocks default.
+#' @param xreg optional matrix of mean equation regressors with
+#' \sQuote{h + burn} rows (already validated by the calling
+#' \sQuote{.simulate_<model>} function); multiplied internally by tau.
 #' @return the (possibly ARMA-adjusted) simulated series matrix.
 #' @keywords internal
 #' @noRd
-.arma_simulate_overlay <- function(object, simc, mu, maxpq, arma_order, nsim, extra_args = list())
+.arma_simulate_overlay <- function(object, simc, mu, maxpq, arma_order, nsim, extra_args = list(), xreg = NULL)
 {
-    if (sum(arma_order) == 0) {
+    group <- NULL
+    include_xreg <- isTRUE(object$xreg$include_xreg)
+    armax <- isTRUE(object$xreg$xreg_type == "armax")
+    if (sum(arma_order) == 0 && !include_xreg) {
         return(simc$series)
     }
     arma_coef <- arma_coefficients(object)
     ar <- as.numeric(arma_coef$ar)
     ma <- as.numeric(arma_coef$ma)
     series_sim <- simc$series
-    # seed the pre-sample series: defaults to the unconditional mean (so the
-    # AR feedback term (x_{t-i} - mu) vanishes there, i.e. "start from the
-    # unconditional mean"), unless the caller supplies the actual last
-    # observed values via extra_args$series_init.
+    # xtau covers all T = maxpq + h columns: the pre-sample columns take the
+    # actual last in-sample x'tau values (the same dates as a supplied
+    # series_init), the remaining columns the supplied regressor values
+    # (zeros when the model has no regressors)
+    tau <- object$parmatrix[group == "tau"]$value
+    xreg_old <- object$xreg$xreg
+    if (is.null(xreg_old)) xreg_old <- matrix(0, ncol = 1, nrow = max(1, NROW(object$target$y_orig)))
+    if (length(tau) != NCOL(xreg_old)) tau <- rep(0, NCOL(xreg_old))
+    xtau_insample <- if (maxpq > 0) as.numeric(tail(as.matrix(xreg_old), maxpq) %*% tau) else numeric(0)
+    if (include_xreg && !is.null(xreg)) {
+        xtau_new <- as.numeric(as.matrix(xreg) %*% tau)
+    } else {
+        xtau_new <- rep(0, ncol(series_sim) - maxpq)
+    }
+    xtau_full <- c(xtau_insample, xtau_new)
+    # seed the pre-sample series so the AR lookback term vanishes there:
+    # under arma_errors that is mu + x'tau (w = y - mu - x'tau = 0), under
+    # armax it is mu (y - mu = 0) - unless the caller supplies the actual
+    # last observed values via extra_args$series_init, which are used as-is
+    # under both conventions.
     if (maxpq > 0) {
         if (!is.null(extra_args$series_init)) {
             if (length(extra_args$series_init) != maxpq) stop(paste0("\nseries_init must be of length max(garch order, arma order) : ", maxpq))
             series_sim[,seq_len(maxpq)] <- matrix(extra_args$series_init, ncol = maxpq, nrow = nsim, byrow = TRUE)
         } else {
-            series_sim[,seq_len(maxpq)] <- mu
+            seed <- if (armax) rep(mu, maxpq) else mu + xtau_insample
+            series_sim[,seq_len(maxpq)] <- matrix(seed, ncol = maxpq, nrow = nsim, byrow = TRUE)
         }
     }
     # the pre-sample columns of simc$epsilon may default to a deterministic,
@@ -64,15 +87,49 @@
             ma_epsilon[,seq_len(maxpq)] <- 0
         }
     }
-    .armasimvec(series_sim = series_sim, epsilon = ma_epsilon, ar = ar, ma = ma, mu = mu, presample = maxpq)
+    .armasimvec(series_sim = series_sim, epsilon = ma_epsilon, ar = ar, ma = ma, mu = mu,
+                xtau = xtau_full, armax = as.integer(armax), presample = maxpq)
+}
+
+# validate the simulate() mean-regressor argument: a matrix/xts of h + burn
+# rows by NCOL(xreg) columns (deliberately unlike the legacy vreg argument,
+# which is a pre-multiplied vector - see AGENTS.md). NULL with regressors in
+# the model warns and substitutes zeros.
+.process_simulation_xreg <- function(object, xreg, h)
+{
+    include_xreg <- isTRUE(object$xreg$include_xreg)
+    ncols <- if (!is.null(object$xreg$xreg)) NCOL(object$xreg$xreg) else 1L
+    if (include_xreg) {
+        if (is.null(xreg)) {
+            warning("\nxreg is NULL but the model was specified with mean regressors; setting to zero.")
+            xreg <- matrix(0, nrow = h, ncol = ncols)
+        }
+        if (!is.xts(xreg)) xreg <- as.matrix(xreg)
+        if (NROW(xreg) != h) stop("\nxreg must have h + burn rows.")
+        if (NCOL(xreg) != ncols) stop("\nxreg must have the same number of columns as the mean regressors in the model.")
+        if (any(!is.finite(xreg))) stop("\nNA/NaN/Inf values found in xreg.")
+        xreg <- coredata(xreg)
+    } else {
+        xreg <- matrix(0, nrow = h, ncol = ncols)
+    }
+    return(xreg)
+}
+
+.validate_sim_initv <- function(initv)
+{
+    if (any(!is.finite(initv)) || any(initv <= 0)) {
+        stop("\nthe implied initial variance is not positive and finite; this can happen when the variance intercept is fixed at zero (e.g. ewma), which has no positive implied starting variance - supply a positive var_init.")
+    }
+    return(invisible(initv))
 }
 
 .simulate_garch <- function(object, h = 1000, seed  = NULL, nsim = 1, var_init = NULL, innov = NULL, innov_init = NULL,
-                            vreg = NULL, burn = 0, ...)
+                            vreg = NULL, xreg = NULL, burn = 0, ...)
 {
     if (!is.null(seed)) set.seed(seed)
     extra_args <- list(...)
     h <- h + burn
+    xreg <- .process_simulation_xreg(object, xreg, h)
     parameter <- group <- NULL
     arma_order <- object$model$arma
     if (is.null(arma_order)) arma_order <- c(0,0)
@@ -121,6 +178,7 @@
     } else {
         initv <- var_init
     }
+    .validate_sim_initv(initv)
 
     if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
@@ -147,7 +205,7 @@
     }
     simc <- .garchsimvec(z = z, epsilon = epsilon, sigma_sqr_sim = sigma_sqr_sim, variance_intercept = variance_intercept, order = order, init = init, alpha = alpha, beta = beta, mu = mu, presample = maxpq)
     sigma <- simc$sigma
-    series <- .arma_simulate_overlay(object, simc, mu, maxpq, arma_order, nsim, extra_args)
+    series <- .arma_simulate_overlay(object, simc, mu, maxpq, arma_order, nsim, extra_args, xreg = xreg)
     if ((maxpq + burn) > 0) {
         sigma <- sigma[,-seq_len(maxpq + burn), drop = FALSE]
         series <- series[,-seq_len(maxpq + burn), drop = FALSE]
@@ -161,10 +219,11 @@
 }
 
 .simulate_egarch <- function(object, h = 1000, seed  = NULL, nsim = 1, var_init = NULL, innov = NULL, innov_init = NULL,
-                             vreg = NULL, burn = 0, ...)
+                             vreg = NULL, xreg = NULL, burn = 0, ...)
 {
     if (!is.null(seed)) set.seed(seed)
     h <- h + burn
+    xreg <- .process_simulation_xreg(object, xreg, h)
     extra_args <- list(...)
     parameter <- group <- NULL
     arma_order <- object$model$arma
@@ -231,7 +290,7 @@
 
     simc <- .egarchsimvec(z = z, sigma_log_sim = sigma_log_sim, variance_intercept = variance_intercept, init = init, alpha = alpha, gamma = gamma, beta = beta, kappa = kappa, mu = mu, order = order, presample = maxpq)
     sigma <- simc$sigma
-    series <- .arma_simulate_overlay(object, simc, mu, maxpq, arma_order, nsim, extra_args)
+    series <- .arma_simulate_overlay(object, simc, mu, maxpq, arma_order, nsim, extra_args, xreg = xreg)
     if ((maxpq + burn) > 0) {
         sigma <- sigma[,-seq_len(maxpq + burn), drop = FALSE]
         series <- series[,-seq_len(maxpq + burn), drop = FALSE]
@@ -245,9 +304,10 @@
 }
 
 .simulate_aparch <- function(object, h = 1000, seed  = NULL, nsim = 1, var_init = NULL, innov = NULL, innov_init = NULL,
-                            vreg = NULL, burn = 0, ...)
+                            vreg = NULL, xreg = NULL, burn = 0, ...)
 {
     h <- h + burn
+    xreg <- .process_simulation_xreg(object, xreg, h)
     if (!is.null(seed)) set.seed(seed)
     extra_args <- list(...)
     parameter <- group <- NULL
@@ -302,6 +362,7 @@
     } else {
         initv <- var_init^(delta/2)
     }
+    .validate_sim_initv(initv)
     order <- as.integer(object$model$order)
     sigma_sim <- sigma_power_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
@@ -331,7 +392,7 @@
     simc <- .aparchsimvec(epsilon = epsilon, sigma_power_sim = sigma_power_sim, z = z, variance_intercept = variance_intercept,
                           init = init, alpha = alpha, gamma = gamma, beta = beta, delta = delta, mu = mu, order = order, presample = maxpq)
     sigma <- simc$sigma
-    series <- .arma_simulate_overlay(object, simc, mu, maxpq, arma_order, nsim, extra_args)
+    series <- .arma_simulate_overlay(object, simc, mu, maxpq, arma_order, nsim, extra_args, xreg = xreg)
     if ((maxpq + burn) > 0) {
         sigma <- sigma[,-seq_len(maxpq + burn), drop = FALSE]
         series <- series[,-seq_len(maxpq + burn), drop = FALSE]
@@ -345,9 +406,10 @@
 }
 
 .simulate_gjrgarch <- function(object, h = 1000, seed  = NULL, nsim = 1, var_init = NULL, innov = NULL, innov_init = NULL,
-                             vreg = NULL, burn = 0, ...)
+                             vreg = NULL, xreg = NULL, burn = 0, ...)
 {
     h <- h + burn
+    xreg <- .process_simulation_xreg(object, xreg, h)
     if (!is.null(seed)) set.seed(seed)
     extra_args <- list(...)
     parameter <- group <- NULL
@@ -398,6 +460,7 @@
     } else {
         initv <- var_init
     }
+    .validate_sim_initv(initv)
 
     sigma_sim <- sigma_squared_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
@@ -421,7 +484,7 @@
     simc <- .gjrsimvec(epsilon = epsilon, sigma_sqr_sim = sigma_squared_sim, z = z, variance_intercept = variance_intercept, order = order, init = init, alpha = alpha, gamma = gamma, beta = beta, mu = mu, presample = maxpq)
 
     sigma <- simc$sigma
-    series <- .arma_simulate_overlay(object, simc, mu, maxpq, arma_order, nsim, extra_args)
+    series <- .arma_simulate_overlay(object, simc, mu, maxpq, arma_order, nsim, extra_args, xreg = xreg)
 
     if ((maxpq + burn) > 0) {
         sigma <- sigma[,-seq_len(maxpq + burn), drop = FALSE]
@@ -436,9 +499,10 @@
 }
 
 .simulate_fgarch <- function(object, h = 1000, seed  = NULL, nsim = 1, var_init = NULL, innov = NULL, innov_init = NULL,
-                             vreg = NULL, burn = 0, ...)
+                             vreg = NULL, xreg = NULL, burn = 0, ...)
 {
     h <- h + burn
+    xreg <- .process_simulation_xreg(object, xreg, h)
     if (!is.null(seed)) set.seed(seed)
     extra_args <- list(...)
     parameter <- group <- NULL
@@ -493,6 +557,7 @@
     } else {
         initv <- var_init^(delta/2)
     }
+    .validate_sim_initv(initv)
 
     sigma_sim <- sigma_power_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
@@ -524,7 +589,7 @@
     simc <- .fgarchsimvec(epsilon = epsilon, sigma_power_sim = sigma_power_sim, z = z, variance_intercept = variance_intercept, init = init,
                           alpha = alpha, gamma = gamma, eta = eta, beta = beta, delta = delta, mu = mu, order = order, presample = maxpq)
     sigma <- simc$sigma
-    series <- .arma_simulate_overlay(object, simc, mu, maxpq, arma_order, nsim, extra_args)
+    series <- .arma_simulate_overlay(object, simc, mu, maxpq, arma_order, nsim, extra_args, xreg = xreg)
     if ((maxpq + burn) > 0) {
         sigma <- sigma[,-seq_len(maxpq + burn), drop = FALSE]
         series <- series[,-seq_len(maxpq + burn), drop = FALSE]
@@ -538,9 +603,10 @@
 }
 
 .simulate_cgarch <- function(object, h = 1000, seed  = NULL, nsim = 1, var_init = NULL, innov = NULL, innov_init = NULL,
-                             vreg = NULL, burn = 0, ...)
+                             vreg = NULL, xreg = NULL, burn = 0, ...)
 {
     h <- h + burn
+    xreg <- .process_simulation_xreg(object, xreg, h)
     if (!is.null(seed)) set.seed(seed)
     extra_args <- list(...)
     parameter <- group <- NULL
@@ -604,6 +670,7 @@
             initv <- var_init[,2]
         }
     }
+    .validate_sim_initv(initv)
     sigma_sim <- sigma_sqr_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     permanent_component_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     transitory_component_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
@@ -637,7 +704,7 @@
     sigma <- sigma_sim
     permanent_component <- permanent_component_sim
     transitory_component <- transitory_component_sim
-    series <- .arma_simulate_overlay(object, list(series = series_sim, epsilon = epsilon), mu, maxpq, arma_order, nsim, extra_args)
+    series <- .arma_simulate_overlay(object, list(series = series_sim, epsilon = epsilon), mu, maxpq, arma_order, nsim, extra_args, xreg = xreg)
     if ((maxpq + burn) > 0) {
         sigma <- sigma[,-seq_len(maxpq + burn), drop = FALSE]
         permanent_component <- permanent_component[,-seq_len(maxpq + burn), drop = FALSE]
@@ -658,13 +725,16 @@
 
 
 .simulate_igarch <- function(object, h = 1000, seed  = NULL, nsim = 1, var_init = NULL, innov = NULL, innov_init = NULL,
-                             vreg = NULL, burn = 0, ...)
+                             vreg = NULL, xreg = NULL, burn = 0, ...)
 {
     h <- h + burn
+    xreg <- .process_simulation_xreg(object, xreg, h)
     if (!is.null(seed)) set.seed(seed)
     extra_args <- list(...)
     parameter <- group <- NULL
-    maxpq <- max(object$model$order)
+    arma_order <- object$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
+    maxpq <- max(object$model$order, arma_order)
     mu <- object$parmatrix[parameter == "mu"]$value
     omega <- object$parmatrix[parameter == "omega"]$value
     alpha <- object$parmatrix[group == "alpha"]$value
@@ -705,6 +775,7 @@
     } else {
         initv <- var_init
     }
+    .validate_sim_initv(initv)
 
     if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
@@ -731,7 +802,7 @@
     }
     simc <- .garchsimvec(z = z, epsilon = epsilon, sigma_sqr_sim = sigma_sqr_sim, variance_intercept = variance_intercept, order = order, init = init, alpha = alpha, beta = beta, mu = mu, presample = maxpq)
     sigma <- simc$sigma
-    series <- simc$series
+    series <- .arma_simulate_overlay(object, simc, mu, maxpq, arma_order, nsim, extra_args, xreg = xreg)
     if ((maxpq + burn) > 0) {
         sigma <- sigma[,-seq_len(maxpq + burn), drop = FALSE]
         series <- series[,-seq_len(maxpq + burn), drop = FALSE]

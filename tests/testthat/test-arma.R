@@ -495,3 +495,58 @@ test_that("arma: fixed target coefficients are not cumulatively re-transformed a
     mod2 <- estimate(spec)
     expect_equal(arma_coefficients(mod)$ar, arma_coefficients(mod2)$ar)
 })
+
+test_that("arma: bootstrap predictive distribution is centered on the ARMA mean forecast, not mu", {
+    # persistent AR(1) mean + garch(1,1) errors; the last observation is
+    # placed far from mu so the 1-step mean forecast and mu are far apart
+    # (otherwise the test cannot discriminate the two centerings)
+    set.seed(99)
+    n <- 1500
+    mu_true <- 0.5
+    phi <- 0.8
+    sigma2 <- eps <- yy <- numeric(n)
+    sigma2[1] <- 0.2
+    for (i in 2:n) {
+        sigma2[i] <- 0.05 + 0.1 * eps[i - 1]^2 + 0.85 * sigma2[i - 1]
+        eps[i] <- rnorm(1) * sqrt(sigma2[i])
+        yy[i] <- mu_true + phi * (yy[i - 1] - mu_true) + eps[i]
+    }
+    yy[n] <- mu_true + 4
+    ys <- xts(yy, as.Date(seq_along(yy), origin = "1970-01-01"))
+    spec <- garch_modelspec(ys, model = "garch", constant = TRUE, order = c(1,1), arma = c(1,0))
+    mod <- estimate(spec)
+    mu <- mod$parmatrix[parameter == "mu"]$value
+    for (m in c("parametric", "bootstrap")) {
+        p <- predict(mod, h = 5, nsim = 3000, sim_method = m, seed = 42)
+        mc_mean1 <- mean(p$distribution[,1])
+        # sanity: the 1-step mean forecast must be far from mu
+        expect_true(abs(as.numeric(p$mean)[1] - mu) > 1)
+        expect_true(abs(mc_mean1 - as.numeric(p$mean)[1]) < 0.1)
+        expect_true(abs(mc_mean1 - as.numeric(p$mean)[1]) < abs(mc_mean1 - mu))
+    }
+})
+
+test_that("arma: variance_targeting constant_variance uses ARMA innovations eps^2 (estimate and filter agree with TMB)", {
+    spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1),
+                            arma = c(1,1), variance_targeting = TRUE)
+    mod <- estimate(spec)
+    expect_equal(as.numeric(unconditional(mod)), mean(as.numeric(residuals(mod))^2), tolerance = 1e-6)
+    expect_equal(as.numeric(mod$target_omega), as.numeric(unconditional(mod)) * (1 - as.numeric(persistence(mod))), tolerance = 1e-6)
+
+    # same consistency after a tsfilter() round-trip on the spec (filter.R copy)
+    spec_f <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1),
+                              arma = c(1,1), variance_targeting = TRUE)
+    spec_f$parmatrix <- copy(mod$parmatrix)
+    f <- tsfilter(spec_f)
+    expect_equal(f$constant_variance, mean((as.numeric(f$spec$target$y_orig) - as.numeric(f$conditional_mu))^2), tolerance = 1e-8)
+    expect_equal(as.numeric(unconditional(f)), mean(as.numeric(residuals(f))^2), tolerance = 1e-6)
+    expect_equal(as.numeric(f$target_omega), as.numeric(unconditional(f)) * (1 - as.numeric(persistence(f))), tolerance = 1e-6)
+})
+
+test_that("arma: constant_variance is unchanged (mean (y - mu)^2) when arma = c(0,0)", {
+    spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "garch", order = c(1,1),
+                            arma = c(0,0), variance_targeting = TRUE)
+    mod <- estimate(spec)
+    pm <- mod$parmatrix[parameter == "mu"]
+    expect_equal(mod$constant_variance, mean((mod$spec$target$y_orig - pm$value * pm$scale)^2))
+})

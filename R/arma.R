@@ -174,37 +174,49 @@ validate_arma_fixed_target <- function(target, type = c("ar","ma"))
     invisible(TRUE)
 }
 
-#' Construct the arpacf/mapacf parmatrix rows for a model's mean equation
+#' Construct the full [M] parmatrix block for a model's mean equation
 #'
-#' @description Builds the \sQuote{arpacf}/\sQuote{mapacf} parameter rows
-#' shared by every \sQuote{.parameters_<model>} initializer (see
-#' R/initialization.R), holding the raw Durbin-Levinson (partial
-#' autocorrelation) parameters rather than the AR/MA coefficients themselves.
-#' Any value in \sQuote{(-1,1)} maps (inside the TMB template) to AR
-#' coefficients in the stationarity region and MA coefficients in the
-#' invertibility region, so no additional nonlinear constraint is required.
-#' The actual ar/ma coefficients implied by these raw values are available
-#' separately via \code{\link{arma_coefficients}}.
+#' @description Builds the \sQuote{arpacf}/\sQuote{mapacf}/\sQuote{tau}
+#' parameter rows shared by every \sQuote{.parameters_<model>} initializer
+#' (see R/initialization.R). The arpacf/mapacf rows hold the raw
+#' Durbin-Levinson (partial autocorrelation) parameters rather than the AR/MA
+#' coefficients themselves; any value in \sQuote{(-1,1)} maps (inside the TMB
+#' template) to AR coefficients in the stationarity region and MA coefficients
+#' in the invertibility region, so no additional nonlinear constraint is
+#' required. The actual ar/ma coefficients implied by these raw values are
+#' available separately via \code{\link{arma_coefficients}}. The
+#' \sQuote{tau} rows hold the mean-equation regressor coefficients
+#' (\sQuote{tau1..taum} when \code{xreg} is present, one fixed dummy row
+#' otherwise, matching the arpacf/mapacf dummy convention and keeping the
+#' parmatrix row count aligned with the always >= 1 column count of the
+#' regressor matrix passed to TMB). All starting values (ar/ma pacf and tau)
+#' come from a single joint \code{stats::arima(..., xreg = )} fit so they are
+#' mutually consistent. The +/-100 bounds on tau match the existing xi
+#' handling; users whose regressors are on a very different scale from y may
+#' need to widen these bounds in the spec's parmatrix.
 #' @param y numeric vector, the (not necessarily demeaned) target series;
 #' only used, together with \code{mu}, to generate \code{stats::arima}-based
-#' starting values when \sQuote{sum(arma) > 0}.
+#' starting values.
 #' @param mu the (scalar) constant/unconditional mean value.
 #' @param arma length 2 integer vector \sQuote{c(ar, ma)}.
+#' @param xreg optional matrix of mean-equation regressors (ncol = number of
+#' \sQuote{tau} parameters); \code{NULL} for none.
 #' @return a \code{data.table} with the same columns as the rest of a
 #' \sQuote{parmatrix} (parameter, value, lower, upper, estimate, scale,
 #' group, equation, symbol), with \sQuote{ar_order} (or 1, as a fixed dummy
-#' row when \sQuote{ar_order = 0}) rows of group \sQuote{arpacf} followed by
-#' \sQuote{ma_order} (or 1 dummy) rows of group \sQuote{mapacf}.
+#' row when \sQuote{ar_order = 0}) rows of group \sQuote{arpacf}, followed by
+#' \sQuote{ma_order} (or 1 dummy) rows of group \sQuote{mapacf}, followed by
+#' \sQuote{ncol(xreg)} (or 1 dummy) rows of group \sQuote{tau}.
 #' @keywords internal
 #' @noRd
-arma_parmatrix_rows <- function(y, mu, arma)
+arma_parmatrix_rows <- function(y, mu, arma, xreg = NULL)
 {
     ar_order <- arma[1]
     ma_order <- arma[2]
-    if (sum(arma) > 0) {
-        arma_pacf <- initialize_arma_pacf(y - mu, arma)
+    if (sum(arma) > 0 || !is.null(xreg)) {
+        arma_pacf <- initialize_arma_pacf(y - mu, arma, xreg)
     } else {
-        arma_pacf <- list(ar = numeric(0), ma = numeric(0))
+        arma_pacf <- list(ar = numeric(0), ma = numeric(0), tau = NULL)
     }
     if (ar_order == 0) {
         ar_rows <- data.table("parameter" = "arpacf1", value = 0,
@@ -230,7 +242,20 @@ arma_parmatrix_rows <- function(y, mu, arma)
                               equation = "[M]",
                               symbol = paste0("r^{ma}_",1:ma_order))
     }
-    rbind(ar_rows, ma_rows)
+    if (is.null(xreg)) {
+        tau_rows <- data.table("parameter" = "tau1", value = 0,
+                               lower = -100, upper = 100, estimate = 0,
+                               scale = 1, group = "tau", equation = "[M]",
+                               symbol = "\\tau_1")
+    } else {
+        m <- NCOL(xreg)
+        tau_rows <- data.table("parameter" = paste0("tau",1:m),
+                               value = arma_pacf$tau, lower = -100, upper = 100,
+                               estimate = 1, scale = 1, group = "tau",
+                               equation = "[M]",
+                               symbol = paste0("\\tau_",1:m))
+    }
+    rbind(ar_rows, ma_rows, tau_rows)
 }
 
 #' Initial values for the ARMA mean equation parameters
@@ -241,21 +266,36 @@ arma_parmatrix_rows <- function(y, mu, arma)
 #' @param y numeric vector (already demeaned if a constant is separately
 #' estimated).
 #' @param arma length 2 integer vector \sQuote{c(ar, ma)}.
-#' @return a list with elements \sQuote{ar} and \sQuote{ma}, each a numeric
-#' vector of raw (pacf-space) starting values bounded away from +/-1.
+#' @param xreg optional matrix of mean-equation regressors; when non-NULL a
+#' single joint \code{stats::arima(y, xreg = xreg)} fit supplies mutually
+#' consistent warm starts for both the ar/ma pacf block and the tau block.
+#' @return a list with elements \sQuote{ar}, \sQuote{ma} and \sQuote{tau}:
+#' the first two numeric vectors of raw (pacf-space) starting values bounded
+#' away from +/-1, \sQuote{tau} a numeric vector of regressor-coefficient
+#' starting values (\code{NULL} when \code{xreg} is \code{NULL}).
 #' @keywords internal
 #' @noRd
-initialize_arma_pacf <- function(y, arma)
+initialize_arma_pacf <- function(y, arma, xreg = NULL)
 {
     ar <- arma[1]
     ma <- arma[2]
     ar_pacf <- if (ar > 0) rep(0.01, ar) else numeric(0)
     ma_pacf <- if (ma > 0) rep(0.01, ma) else numeric(0)
+    tau <- NULL
+    has_xreg <- !is.null(xreg)
+    if (has_xreg) {
+        xreg <- coredata(xreg)
+        # OLS fallback for the tau starts (also the source of the tau starts
+        # when sum(arma) == 0 and no arima fit is run at all)
+        ols <- try(qr.solve(crossprod(xreg), crossprod(xreg, as.numeric(y))), silent = TRUE)
+        tau <- if (!inherits(ols, "try-error") && all(is.finite(ols))) as.numeric(ols) else rep(0, NCOL(xreg))
+    }
     if (sum(arma) == 0) {
-        return(list(ar = ar_pacf, ma = ma_pacf))
+        return(list(ar = ar_pacf, ma = ma_pacf, tau = tau))
     }
     fit <- try(stats::arima(as.numeric(y), order = c(ar, 0, ma), include.mean = FALSE,
-                             method = "ML", transform.pars = TRUE), silent = TRUE)
+                            xreg = if (has_xreg) xreg else NULL,
+                            method = "ML", transform.pars = TRUE), silent = TRUE)
     if (!inherits(fit, "try-error")) {
         cf <- stats::coef(fit)
         if (ar > 0) {
@@ -272,8 +312,18 @@ initialize_arma_pacf <- function(y, arma)
                 if (!inherits(tmp, "try-error") && all(is.finite(tmp))) ma_pacf <- tmp
             }
         }
+        if (has_xreg) {
+            # arima names the regressor coefficients after the xreg colnames,
+            # which check_xreg() guarantees are set (x1..xm when absent);
+            # index them positionally (the trailing ar+ma coefficients)
+            # rather than by name for robustness. For xreg_type = "armax"
+            # this is the arma_errors-form estimate and serves only as a
+            # warm start - no conversion is attempted.
+            tau_cf <- as.numeric(tail(cf, NCOL(xreg)))
+            if (all(is.finite(tau_cf))) tau <- tau_cf
+        }
     }
-    list(ar = ar_pacf, ma = ma_pacf)
+    list(ar = ar_pacf, ma = ma_pacf, tau = tau)
 }
 
 #' Extend the ARMA conditional mean with newly observed data
@@ -299,18 +349,35 @@ initialize_arma_pacf <- function(y, arma)
 #' \code{\link{pacf_to_ma}}; may be length zero).
 #' @param old_conditional_mu numeric vector of length \sQuote{n_old} with the
 #' already-computed historical conditional mean.
+#' @param xtau_full numeric vector of length \sQuote{length(y_full)} with the
+#' per-period mean-regressor contribution \sQuote{x_t'tau} over the full
+#' merged series (NULL/zeros when the model has no mean regressors). The
+#' first \sQuote{n_old} entries must be the actual in-sample values since the
+#' AR lookback of the first new observation reaches back into them.
+#' @param armax logical; TRUE selects the \sQuote{armax} convention
+#' (regressor contribution enters the conditional mean at time t only and AR
+#' feedback is on \sQuote{y - mu}), FALSE the \sQuote{arma_errors}
+#' convention (the ARMA recursion runs on \sQuote{w = y - mu - x'tau}).
 #' @return a numeric vector of length \sQuote{length(y_full) - n_old} with the
 #' conditional mean for the newly appended observations only.
 #' @keywords internal
 #' @noRd
-arma_filter_extend <- function(y_full, n_old, mu, ar, ma, old_conditional_mu)
+arma_filter_extend <- function(y_full, n_old, mu, ar, ma, old_conditional_mu, xtau_full = NULL, armax = FALSE)
 {
     ar_order <- length(ar)
     ma_order <- length(ma)
     n_new <- length(y_full) - n_old
     if (n_new <= 0) return(numeric(0))
     y_full <- as.numeric(y_full)
-    z <- y_full - mu
+    if (is.null(xtau_full)) xtau_full <- rep(0, length(y_full))
+    # arma_errors runs the ARMA recursion on the regressor-adjusted
+    # deviations w = y - mu - x'tau; armax on the raw deviations y - mu with
+    # the regressor contribution added to the conditional mean at time t
+    if (armax) {
+        z <- y_full - mu
+    } else {
+        z <- y_full - mu - xtau_full
+    }
     old_eps <- head(y_full, n_old) - old_conditional_mu
     eps <- c(old_eps, rep(0, n_new))
     cond_mu <- c(old_conditional_mu, rep(mu, n_new))
@@ -329,8 +396,12 @@ arma_filter_extend <- function(y_full, n_old, mu, ar, ma, old_conditional_mu)
                 mean_t <- mean_t + ma[j] * (if (idx <= 0) 0 else eps[idx])
             }
         }
+        if (armax) mean_t <- mean_t + xtau_full[t]
         eps[t] <- z[t] - mean_t
-        cond_mu[t] <- mu + mean_t
+        # conditional_mean(t) = y(t) - eps(t), algebraically identical to
+        # mu + mean_t under arma_errors and correct under armax (same
+        # identity as the TMB templates)
+        cond_mu[t] <- y_full[t] - eps[t]
     }
     cond_mu[(n_old + 1):(n_old + n_new)]
 }

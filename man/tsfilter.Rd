@@ -15,7 +15,10 @@
 
 \item{y}{an xts vector of new values to filter. Can also be NULL in which case the}
 
-\item{newxreg}{not currently used,}
+\item{newxreg}{mean equation regressors with the same number of rows as y.
+This can be either a numeric or xts matrix. Only needed if the model was
+estimated with regressors in the mean equation; if NULL in that case a
+zero matrix is substituted with a warning.}
 
 \item{newvreg}{variance regressors with the same number of rows as y. This can be either
 a numeric or xts matrix. Only needed if the model was estimated with regressors in the

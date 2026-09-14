@@ -566,6 +566,14 @@ tsequation.tsgarch.estimate <- function(object, ...)
                                         multiplicative = object$spec$vreg$multiplicative,
                                         distribution = object$spec$distribution,
                                         variance_targeting = object$spec$model$variance_targeting))
+    s <- 0
+    if (isTRUE(object$spec$xreg$include_xreg)) s <- NCOL(object$spec$xreg$xreg)
+    xreg_type <- object$spec$xreg$xreg_type
+    if (is.null(xreg_type)) xreg_type <- "arma_errors"
+    arma_order <- object$spec$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
+    out <- c(list(eq_mean = .equation_mean(arma = arma_order, constant = object$spec$model$constant,
+                                           s = s, xreg_type = xreg_type)), out)
     return(out)
 }
 
@@ -941,7 +949,10 @@ plot.tsgarch.estimate <- function(x, y = NULL, type = c("garch", "arma"),
 #' @param y an xts vector of new values to filter. Can also be NULL in which case the
 #` original object is returned (if of class \dQuote{tsgarch.estimate}), or the existing
 #` data filtered (if of class \dQuote{tsgarch.spec}). See details.
-#' @param newxreg not currently used,
+#' @param newxreg mean equation regressors with the same number of rows as y.
+#' This can be either a numeric or xts matrix. Only needed if the model was
+#' estimated with regressors in the mean equation; if NULL in that case a
+#' zero matrix is substituted with a warning.
 #' @param newvreg variance regressors with the same number of rows as y. This can be either
 #' a numeric or xts matrix. Only needed if the model was estimated with regressors in the
 #' variance equation.
@@ -988,7 +999,11 @@ tsfilter.tsgarch.spec <- function(object, y = NULL, newxreg = NULL, newvreg = NU
 #' @description Prediction function for class \dQuote{tsgarch.estimate}.
 #' @param object an object of class \dQuote{tsgarch.estimate}.
 #' @param h the forecast horizon.
-#' @param newxreg not currently used,
+#' @param newxreg mean equation regressors with rows equal to h. This can be
+#' either a numeric or xts matrix. Only needed if the model was estimated
+#' with regressors in the mean equation; if NULL in that case a zero matrix
+#' is substituted with a warning (note the asymmetry with \code{newvreg},
+#' which still errors when missing).
 #' @param newvreg variance regressors rows equal to h. This can be either
 #' a numeric or xts matrix. Only needed if the model was estimated with regressors in the
 #' variance equation.
@@ -1177,6 +1192,12 @@ omega.tsgarch.spec <- function(object, ...)
 #' model for the purpose of continuing the modeled series from some fixed point).
 #' @param vreg an optional vector of length h representing any pre-multiplied
 #' variance regressors to use in the simulation.
+#' @param xreg an optional matrix (or xts) of mean equation regressors with
+#' h + burn rows and \code{NCOL(xreg)} columns matching the specification.
+#' Unlike \code{vreg} this is not pre-multiplied: the matrix is multiplied
+#' internally by the model's tau coefficients. If the spec was built with
+#' \code{xreg} and this argument is NULL, a zero matrix is substituted with a
+#' warning.
 #' @param burn burn in. Will be discarded before returning the output.
 #' @param ... for aparch, fgarch, egarch and gjrgarch models, an optional
 #' vector of length max(q,p) with values for initializing the ARCH equation and
@@ -1206,26 +1227,32 @@ omega.tsgarch.spec <- function(object, ...)
 #'
 #'
 simulate.tsgarch.spec <- function(object, nsim = 1, seed  = NULL, h = 1000, var_init = NULL,
-                                  innov = NULL, innov_init = NULL, vreg = NULL, burn = 0, ...)
+                                  innov = NULL, innov_init = NULL, vreg = NULL, xreg = NULL, burn = 0, ...)
 {
+    # a spec taken from an estimate object (mod$spec) carries parmatrix = NULL;
+    # assigning NULL to the value column below would silently drop it and crash
+    # inside the C++ simulator, so fail clearly instead
+    if (is.null(object$parmatrix) || is.null(object$parmatrix$value)) {
+        stop("\nobject has no parmatrix values to simulate from; if the spec was taken from an estimated model, assign the estimated parmatrix first, e.g. spec$parmatrix <- copy(mod$parmatrix).")
+    }
     new_spec <- .spec2newspec(object)
     new_spec$parmatrix$value <- object$parmatrix$value
 
     out <- switch(new_spec$model$model,
                   "garch" = .simulate_garch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                            innov_init = innov_init, vreg = vreg, burn = burn, ...),
+                                            innov_init = innov_init, vreg = vreg, xreg = xreg, burn = burn, ...),
                   "egarch" = .simulate_egarch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                              innov_init = innov_init, vreg = vreg, burn = burn, ...),
+                                              innov_init = innov_init, vreg = vreg, xreg = xreg, burn = burn, ...),
                   "aparch" = .simulate_aparch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                              innov_init = innov_init, vreg = vreg, burn = burn, ...),
+                                              innov_init = innov_init, vreg = vreg, xreg = xreg, burn = burn, ...),
                   "gjrgarch" = .simulate_gjrgarch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                              innov_init = innov_init, vreg = vreg, burn = burn, ...),
+                                              innov_init = innov_init, vreg = vreg, xreg = xreg, burn = burn, ...),
                   "fgarch" = .simulate_fgarch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                                  innov_init = innov_init, vreg = vreg, burn = burn, ...),
+                                                  innov_init = innov_init, vreg = vreg, xreg = xreg, burn = burn, ...),
                   "cgarch" = .simulate_cgarch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                              innov_init = innov_init, vreg = vreg, burn = burn, ...),
+                                              innov_init = innov_init, vreg = vreg, xreg = xreg, burn = burn, ...),
                   "igarch" = .simulate_igarch(new_spec, h = h, seed = seed, nsim = nsim, var_init = var_init, innov = innov,
-                                              innov_init = innov_init, vreg = vreg, burn = burn, ...))
+                                              innov_init = innov_init, vreg = vreg, xreg = xreg, burn = burn, ...))
 
     class(out) <- "tsgarch.simulate"
     return(out)

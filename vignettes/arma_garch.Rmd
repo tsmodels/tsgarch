@@ -80,6 +80,112 @@ initializes correctly; over that pre-sample the process is assumed to start
 at its unconditional mean with zero shocks, i.e. $y_t = \mu$ and
 $\varepsilon_t = 0$.
 
+## Regressors in the Mean Equation (ARMAX)
+
+Regressors can also enter the conditional mean via the `xreg` argument to
+`garch_modelspec`, with coefficients named `tau1`, `tau2`, ... in the
+`parmatrix` ($\tau_k$; the symbol $\xi$ is already used in this package
+for the variance equation regressors). Two conventions are available
+through `xreg_type`. The default, `"arma_errors"`, runs the ARMA
+recursion on the regressor-adjusted deviations
+
+$$
+y_t - \mu - \sum_{k=1}^{s}\tau_k x_{k,t}
+= \sum_{i=1}^{p}\phi_i\left(y_{t-i} - \mu - \sum_{k=1}^{s}\tau_k x_{k,t-i}\right)
++ \varepsilon_t + \sum_{j=1}^{q}\theta_j\varepsilon_{t-j}
+$$
+
+matching `stats::arima(xreg = )` and the sibling **tsarma** package, so
+that $\tau_k$ is the long-run marginal effect of $x_{k,t}$. The
+alternative, `"armax"` (the **rugarch** convention), adds the regressor
+contribution to the conditional mean at time $t$ only,
+
+$$
+y_t = \mu + \sum_{i=1}^{p}\phi_i\left(y_{t-i}-\mu\right)
++ \sum_{k=1}^{s}\tau_k x_{k,t} + \varepsilon_t
++ \sum_{j=1}^{q}\theta_j\varepsilon_{t-j}
+$$
+
+so that $\tau_k$ is the impact effect and the long-run effect of a
+sustained change is $\tau_k/\left(1-\sum_i\phi_i\right)$. The two
+conventions differ only by the lagged-regressor term inside the AR
+feedback and are algebraically identical whenever $p = 0$.
+
+`xreg` must be an xts matrix aligned with `y`: same number of rows,
+matching time index, no `NA`/`NaN`/`Inf` values, and full column rank
+(including against the constant when `constant = TRUE`) - violations are
+rejected at specification time. Because the recursion consumes a
+regressor value at every step, `predict()` and `simulate()` require
+future values (`newxreg` with `h` rows, `xreg` with `h + burn` rows
+respectively), and `tsfilter()` requires `newxreg` covering the appended
+observations; if the model was specified with `xreg` but no future
+values are supplied, a zero matrix is substituted with a warning rather
+than an error.
+
+A short demo with a day-of-week effect in the Nikkei returns:
+
+```{r}
+library(tsgarch)
+suppressMessages(library(xts))
+data(nikkei)
+nikkei <- xts(nikkei$value, as.Date(nikkei$index))
+monday <- xts(as.numeric(weekdays(index(nikkei)) == "Monday"), index(nikkei))
+colnames(monday) <- "monday"
+spec_x <- garch_modelspec(nikkei, arma = c(1,1), xreg = monday,
+                          xreg_type = "arma_errors", model = 'garch',
+                          constant = TRUE, init = 'unconditional',
+                          distribution = 'jsu')
+mod_x <- estimate(spec_x)
+coef(mod_x)["tau1"]
+```
+
+Forecasting requires the future regressor values:
+
+```{r}
+newx <- xts(matrix(as.numeric(weekdays(index(nikkei)[NROW(nikkei)] + 1:10) == "Monday"),
+                   ncol = 1), index(nikkei)[NROW(nikkei)] + 1:10)
+colnames(newx) <- "monday"
+predict(mod_x, h = 10, newxreg = newx)$mean
+```
+
+### Which convention should I use?
+
+Written out in levels for an AR(1) mean equation, `arma_errors` is
+
+$$
+y_t = \mu\left(1-\phi_1\right) + \phi_1 y_{t-1} + \tau_1 x_{1,t} - \phi_1\tau_1 x_{1,t-1} + \varepsilon_t
+$$
+
+and `armax` is the same expression without the final regressor lag. Both are
+restrictions of the autoregressive distributed lag model
+$y_t = c + \phi_1 y_{t-1} + \beta_0 x_{1,t} + \beta_1 x_{1,t-1} + \varepsilon_t$:
+`arma_errors` imposes $\beta_1 = -\phi_1\beta_0$ and `armax` imposes
+$\beta_1 = 0$. Neither is nested in the other.
+
+The difference that matters in practice is propagation. Under `arma_errors`
+a one period blip in a regressor shifts $y_t$ by $\tau_k$ and nothing
+afterwards, because the ARMA dynamics apply only to the error; $\tau_k$ is
+both the impact and the total effect. Under `armax` the same blip is carried
+forward by the autoregressive term as $\tau_k, \phi_1\tau_k,
+\phi_1^2\tau_k,\ldots$, so $\tau_k$ is the impact effect and
+$\tau_k/\left(1-\sum_i\phi_i\right)$ the cumulative one. Event and calendar
+dummies usually suit the former, covariates whose influence builds and
+decays with the series the latter. With no AR terms the two are identical,
+so the choice only matters when the mean equation has autoregressive
+dynamics and the regressor is itself persistent.
+
+Since `armax` with both $x_{k,t}$ and $x_{k,t-1}$ as separate `xreg` columns
+spans the unrestricted model, the restriction each convention imposes can be
+tested directly by fitting that larger model and inspecting $\hat\beta_1$.
+Simpler still, the likelihood discriminates sharply between the two: in a
+Monte Carlo experiment reported in the GARCH Models vignette the correctly
+specified convention had the higher likelihood in every one of 1000
+replications. That is worth doing rather than guessing, because choosing
+wrongly biases the autoregressive coefficient by roughly $\pm 0.36$ on a
+true value of 0.6, and depending on how persistent the regressor is, the
+error may land on $\tau$ or on $\phi$ - so a plausible looking regressor
+coefficient is no evidence that the convention is right.
+
 ## Stationarity and Invertibility
 
 For $\phi=\left(\phi_1,\ldots,\phi_p\right)$ and

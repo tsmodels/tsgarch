@@ -1,7 +1,9 @@
 .filter.tsgarch.spec <- function(object, y = NULL, newxreg = NULL, newvreg = NULL, ...)
 {
     if (!is.null(y)) {
-        valid_data <- .check_y_filter(object, y = y, newvreg = newvreg)
+        valid_data <- .check_y_filter(object, y = y, newvreg = newvreg, newxreg = newxreg)
+        newvreg <- valid_data$newvreg
+        newxreg <- valid_data$newxreg
     }
     parameter <- group <- value <- NULL
     newspec <- .spec2newspec(object, y = NULL, newxreg = NULL, newvreg = NULL)
@@ -34,17 +36,27 @@
     spec <- newspec
     spec$parmatrix <- NULL
     spec$model$var_initial <- var_initial
-    constant_variance <- mean((newspec$target$y_orig - (parmatrix[parameter == "mu"]$value * parmatrix[parameter == "mu"]$scale))^2)
-    parmatrix[parameter == "omega", value := target_omega]
-    # return the ll_vector
-    llvector <- -1.0 * log(tmb$report(pars)$ll_vector)
     # conditional_mean(t), only reported by the "garch" TMB template when
     # arma > c(0,0) (see garchfun.hpp); used to seed subsequent incremental
     # tsfilter() calls (see .filter.tsgarch.estimate() / arma_filter_extend()).
     conditional_mu <- NULL
-    if (!is.null(newspec$model$arma) && sum(newspec$model$arma) > 0) {
+    # also capture the conditional mean when the model has mean regressors
+    # with no ARMA dynamics (conditional_mean = mu + x'tau is time-varying)
+    if ((!is.null(newspec$model$arma) && sum(newspec$model$arma) > 0) || isTRUE(newspec$xreg$include_xreg)) {
         conditional_mu <- tail(env$tmb$report(pars)$conditional_mean, length(sig))
     }
+    # the variance target is the unconditional variance of the ARMA
+    # innovations eps = y - conditional_mu over the full sample (see
+    # vignettes/garch_models.Rmd, "Variance Targeting"); fall back to the
+    # constant-mean deviation when no ARMA mean equation is present
+    if (!is.null(conditional_mu)) {
+        constant_variance <- mean((as.numeric(newspec$target$y_orig) - conditional_mu)^2)
+    } else {
+        constant_variance <- mean((newspec$target$y_orig - (parmatrix[parameter == "mu"]$value * parmatrix[parameter == "mu"]$scale))^2)
+    }
+    parmatrix[parameter == "omega", value := target_omega]
+    # return the ll_vector
+    llvector <- -1.0 * log(tmb$report(pars)$ll_vector)
     out <- list(parmatrix = parmatrix, scaled_hessian = hessian,
                 scaled_scores = scores,
                 parameter_scale = rep(1, length(pars)),
@@ -90,6 +102,12 @@
     alpha <- extract_model_values(object, object_type = "estimate", value_name = "alpha")
     beta <- extract_model_values(object, object_type = "estimate", value_name = "beta")
     xi <- extract_model_values(object, object_type = "estimate", value_name = "xi")
+    tau <- extract_model_values(object, object_type = "estimate", value_name = "tau")
+    x_orig <- extract_model_values(object, object_type = "estimate", value_name = "xreg")
+    # older objects may lack tau rows entirely; pad to the regressor column
+    # count so the matrix product below is always conformable
+    if (length(tau) != NCOL(x_orig)) tau <- rep(0, NCOL(x_orig))
+    armax <- isTRUE(object$spec$xreg$xreg_type == "armax")
     dpars <- extract_model_values(object, object_type = "estimate", value_name = "distribution")
     omega <- omega(object)
     arma_order <- object$spec$model$arma
@@ -102,7 +120,7 @@
         ar <- numeric(0)
         ma <- numeric(0)
     }
-    L <- list(v_orig = v_orig, mu = mu, alpha = alpha, beta = beta, xi = xi, dpars = dpars, omega = omega, ar = ar, ma = ma)
+    L <- list(v_orig = v_orig, mu = mu, alpha = alpha, beta = beta, xi = xi, tau = tau, x_orig = x_orig, armax = armax, dpars = dpars, omega = omega, ar = ar, ma = ma)
     if (model == "egarch" | model == "gjrgarch") {
         gamma <- extract_model_values(object, object_type = "estimate", value_name = "gamma")
         L$gamma <- gamma
@@ -129,7 +147,7 @@
     return(L)
 }
 
-.check_y_filter <- function(object, y = NULL, newvreg = NULL)
+.check_y_filter <- function(object, y = NULL, newvreg = NULL, newxreg = NULL)
 {
     if (!is.null(y)) {
         index_new_y <- index(y)
@@ -142,21 +160,43 @@
             if (object$vreg$include_vreg) {
                 newvreg <- as.matrix(newvreg)
                 if (NROW(newvreg) != NROW(y)) stop('\nnewvreg must have the same number of rows as y.')
+                if (any(!is.finite(newvreg))) stop('\nNA/NaN/Inf values found in newvreg.')
             } else {
                 newvreg <- NULL
             }
         } else {
             if (object$vreg$include_vreg) {
-                newvreg <- as.matrix(0, ncol = ncol(object$vreg$vreg), nrow = NROW(y))
+                newvreg <- matrix(0, nrow = NROW(y), ncol = ncol(object$vreg$vreg))
                 warning('\nnewvreg is NULL but model object uses variance regressors...setting to zero.')
             } else {
                 newvreg <- NULL
             }
         }
+        # mean equation regressors follow the same warn-and-zero policy;
+        # isTRUE() keeps the check working on objects serialized by package
+        # versions predating the xreg slot
+        include_xreg <- isTRUE(object$xreg$include_xreg)
+        if (!is.null(newxreg)) {
+            if (include_xreg) {
+                newxreg <- as.matrix(newxreg)
+                if (NROW(newxreg) != NROW(y)) stop('\nnewxreg must have the same number of rows as y.')
+                if (any(!is.finite(newxreg))) stop('\nNA/NaN/Inf values found in newxreg.')
+            } else {
+                newxreg <- NULL
+            }
+        } else {
+            if (include_xreg) {
+                newxreg <- matrix(0, nrow = NROW(y), ncol = ncol(object$xreg$xreg))
+                warning('\nnewxreg is NULL but model object uses mean regressors...setting to zero.')
+            } else {
+                newxreg <- NULL
+            }
+        }
     } else {
         newvreg <- NULL
+        newxreg <- NULL
     }
-    return(list(y = y, newvreg = newvreg))
+    return(list(y = y, newvreg = newvreg, newxreg = newxreg))
 }
 
 .filter.tsgarch.estimate <- function(object, y = NULL, newxreg = NULL, newvreg = NULL, ...)
@@ -172,9 +212,10 @@
     if (!is.xts(y)) stop("\ny must be an xts vector")
     if (!is.null(y)) {
         # this provides stricter checks than .merge_data
-        valid_data <- .check_y_filter(object$spec, y = y, newvreg = newvreg)
+        valid_data <- .check_y_filter(object$spec, y = y, newvreg = newvreg, newxreg = newxreg)
         y <- valid_data$y
         newvreg <- valid_data$newvreg
+        newxreg <- valid_data$newxreg
     }
     maxpq <- max(object$spec$model$order)
     spec <- object$spec
@@ -187,7 +228,11 @@
     model <- c(maxpq, spec$model$order, as.integer(spec$vreg$multiplicative))
     L <- .filter_model_values(object)
     v_new <- .process_filter_regressors(old_regressors = L$v_orig, new_regressors = newvreg, new_index = index(y), new_n = new_n,
-                                        include_regressors = spec$vreg$include_vreg)
+                                        include_regressors = spec$vreg$include_vreg, regressor_argument = "newvreg")
+    x_new <- .process_filter_regressors(old_regressors = L$x_orig, new_regressors = newxreg, new_index = index(y), new_n = new_n,
+                                        include_regressors = isTRUE(spec$xreg$include_xreg), regressor_argument = "newxreg")
+    # per-period mean regressor contribution over the full merged series
+    xtau_full <- as.numeric(x_new %*% L$tau)
     initstate <- init_var
     # special initialization for 2 component
     if (object$spec$model$model == "cgarch") {
@@ -206,10 +251,13 @@
         if (is.null(old_conditional_mu)) {
             stop("\nobject does not carry conditional_mu but has arma > c(0,0); re-fit/re-filter the base object with the updated tsgarch version.")
         }
-        new_conditional_mu <- arma_filter_extend(as.numeric(y_new), length(old_conditional_mu), L$mu, L$ar, L$ma, old_conditional_mu)
+        new_conditional_mu <- arma_filter_extend(as.numeric(y_new), length(old_conditional_mu), L$mu, L$ar, L$ma, old_conditional_mu,
+                                                 xtau_full = xtau_full, armax = L$armax)
         full_conditional_mu <- c(old_conditional_mu, new_conditional_mu)
     } else {
-        full_conditional_mu <- rep(L$mu, NROW(y_new))
+        # regression with GARCH errors and no ARMA dynamics still has a
+        # time-varying conditional mean through x'tau
+        full_conditional_mu <- rep(L$mu, NROW(y_new)) + xtau_full
     }
     full_residuals <- as.numeric(y_new) - full_conditional_mu
     residuals <- tail(full_residuals, n + maxpq)
@@ -245,7 +293,7 @@
         if (maxpq > 0) sigma <- sigma[-seq_len(maxpq)]
     }
     object$sigma <- c(object$sigma, sigma)
-    if (sum(arma_order) > 0) object$conditional_mu <- full_conditional_mu
+    if (sum(arma_order) > 0 || isTRUE(spec$xreg$include_xreg)) object$conditional_mu <- full_conditional_mu
     # create filter object for spec input
     good <- rep(1, NROW(y_new))
     if (any(is.na(y_new))) {
@@ -264,6 +312,7 @@
     object$spec$target$index <- index(y_new)
     object$spec$target$good <- good
     object$spec$vreg$vreg <- v_new
+    object$spec$xreg$xreg <- x_new
     object$nobs <- length(y_new)
     return(object)
 }

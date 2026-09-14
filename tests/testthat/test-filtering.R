@@ -209,3 +209,35 @@ test_that("filter from spec (fgarch) append with initial conditions: check resul
     expect_length(as.numeric(filt$spec$target$y), 1801)
     expect_equal(filt$nobs, 1801)
 })
+
+test_that("filter from spec (ewma) preserves the fixed omega restriction",{
+    ewma_spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "ewma",
+                                 order = c(1,1), distribution = "norm")
+    ewma_mod <- estimate(ewma_spec)
+    spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "ewma",
+                            order = c(1,1), distribution = "norm")
+    spec$parmatrix <- copy(ewma_mod$parmatrix)
+    filt <- tsfilter(spec)
+    expect_equal(filt$npars, ewma_mod$npars)
+    expect_equal(summary(filt)$AIC, summary(ewma_mod)$AIC)
+    expect_false("omega" %in% names(coef(filt)))
+    expect_equal(filt$loglik, ewma_mod$loglik)
+    expect_equal(filt$sigma, ewma_mod$sigma)
+})
+
+test_that("filter from spec (garch/igarch) unaffected by model_name fix",{
+    spec <- copy(global_spec_garch)
+    spec$parmatrix <- copy(global_mod_garch$parmatrix)
+    filt <- tsfilter(spec)
+    expect_equal(summary(filt)$AIC, summary(global_mod_garch)$AIC)
+    expect_equal(filt$npars, global_mod_garch$npars)
+    igarch_spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "igarch",
+                                   order = c(1,1), distribution = "norm")
+    igarch_mod <- estimate(igarch_spec)
+    spec <- copy(igarch_spec)
+    spec$parmatrix <- copy(igarch_mod$parmatrix)
+    filt <- tsfilter(spec)
+    expect_equal(summary(filt)$AIC, summary(igarch_mod)$AIC)
+    expect_equal(filt$npars, igarch_mod$npars)
+    expect_equal(filt$sigma, igarch_mod$sigma)
+})

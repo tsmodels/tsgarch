@@ -1,5 +1,5 @@
 initialize_parameters <- function(model = "garch", y, constant = 0.0,
-                                  order = c(1,1), arma = c(0,0), variance_targeting = FALSE,
+                                  order = c(1,1), arma = c(0,0), xreg = NULL, variance_targeting = FALSE,
                                   vreg = NULL, multiplicative = TRUE,
                                   init = c("unconditional","sample","backcast"),
                                   backcast_lambda = 0.7, sample_n = 10,
@@ -7,7 +7,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
 {
     switch(model,
            "garch" = .parameters_garch(y = y, constant = constant,
-                                       order = order, arma = arma,
+                                       order = order, arma = arma, xreg = xreg,
                                        variance_targeting = variance_targeting,
                                        vreg = vreg,
                                        multiplicative = multiplicative,
@@ -16,7 +16,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                                        sample_n = sample_n,
                                        distribution = distribution),
            "egarch" = .parameters_egarch(y = y, constant = constant,
-                                         order = order, arma = arma,
+                                         order = order, arma = arma, xreg = xreg,
                                          variance_targeting = variance_targeting,
                                          vreg = vreg,
                                          multiplicative = multiplicative,
@@ -25,7 +25,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                                          sample_n = sample_n,
                                          distribution = distribution),
            "aparch" = .parameters_aparch(y = y, constant = constant,
-                                         order = order, arma = arma,
+                                         order = order, arma = arma, xreg = xreg,
                                          variance_targeting = variance_targeting,
                                          vreg = vreg,
                                          multiplicative = multiplicative,
@@ -34,7 +34,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                                          sample_n = sample_n,
                                          distribution = distribution),
            "gjrgarch" = .parameters_gjrgarch(y = y, constant = constant,
-                                         order = order, arma = arma,
+                                         order = order, arma = arma, xreg = xreg,
                                          variance_targeting = variance_targeting,
                                          vreg = vreg,
                                          multiplicative = multiplicative,
@@ -43,7 +43,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                                          sample_n = sample_n,
                                          distribution = distribution),
            "fgarch" = .parameters_fgarch(y = y, constant = constant,
-                                             order = order, arma = arma,
+                                             order = order, arma = arma, xreg = xreg,
                                              variance_targeting = variance_targeting,
                                              vreg = vreg,
                                              multiplicative = multiplicative,
@@ -52,7 +52,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                                              sample_n = sample_n,
                                              distribution = distribution),
            "cgarch" = .parameters_cgarch(y = y, constant = constant,
-                                         order = order, arma = arma,
+                                         order = order, arma = arma, xreg = xreg,
                                          variance_targeting = variance_targeting,
                                          vreg = vreg,
                                          multiplicative = multiplicative,
@@ -61,7 +61,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                                          sample_n = sample_n,
                                          distribution = distribution),
            "igarch" = .parameters_igarch(y = y, constant = constant,
-                                         order = order, arma = arma,
+                                         order = order, arma = arma, xreg = xreg,
                                          variance_targeting = variance_targeting,
                                          vreg = vreg,
                                          multiplicative = multiplicative,
@@ -70,7 +70,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                                          sample_n = sample_n,
                                          distribution = distribution),
            "ewma" = .parameters_ewma(y = y, constant = constant,
-                                         order = order, arma = arma,
+                                         order = order, arma = arma, xreg = xreg,
                                          variance_targeting = variance_targeting,
                                          vreg = vreg,
                                          multiplicative = multiplicative,
@@ -80,7 +80,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                                          distribution = distribution))
 }
 
-.parameters_garch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0),
+.parameters_garch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0), xreg = NULL,
                               variance_targeting = FALSE,
                               vreg = NULL, multiplicative = TRUE,
                               init = c("unconditional","sample","backcast"),
@@ -103,7 +103,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             estimate = ifelse(constant, 1, 0),
                             scale = 1, group = "mu", equation = "[M]",
                             symbol = "\\mu")
-    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma))
+    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma, xreg))
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = var_y * 0.01,
                                   lower = 1e-12, upper = var_y/0.01,
@@ -175,7 +175,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
 }
 
 
-.parameters_egarch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0),
+.parameters_egarch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0), xreg = NULL,
                                variance_targeting = FALSE,
                                vreg = NULL, multiplicative = TRUE,
                                init = c("unconditional","sample","backcast"),
@@ -196,7 +196,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             lower =  -1.0 * abs(mu) * 100, upper = abs(mu) * 100,
                             estimate = ifelse(constant, 1, 0), scale = 1,
                             group = "mu", equation = "[M]", symbol = "\\mu")
-    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma))
+    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma, xreg))
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = log(var_y) * 0.01,
                                   lower = -10, upper = 10, estimate = 1,
@@ -269,7 +269,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
     return(parmatrix)
 }
 
-.parameters_aparch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0),
+.parameters_aparch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0), xreg = NULL,
                                variance_targeting = FALSE,
                                vreg = NULL, multiplicative = TRUE,
                                init = c("unconditional","sample","backcast"),
@@ -291,7 +291,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             lower =  -1.0 * abs(mu) * 100, upper = abs(mu) * 100,
                             estimate = ifelse(constant, 1, 0), scale = 1,
                             group = "mu", equation = "[M]", symbol = "\\mu")
-    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma))
+    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma, xreg))
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = var_y * 0.01,
                                   lower = 1e-12, upper = var_y/0.01,
@@ -379,7 +379,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
 }
 
 
-.parameters_gjrgarch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0),
+.parameters_gjrgarch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0), xreg = NULL,
                                variance_targeting = FALSE,
                                vreg = NULL, multiplicative = TRUE,
                                init = c("unconditional","sample","backcast"),
@@ -400,7 +400,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             lower =  -1.0 * abs(mu) * 100, upper = abs(mu) * 100,
                             estimate = ifelse(constant, 1, 0), scale = 1,
                             group = "mu", equation = "[M]", symbol = "\\mu")
-    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma))
+    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma, xreg))
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = var_y * 0.01,
                                   lower = 1e-12, upper = var_y/0.01,
@@ -481,7 +481,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
     return(parmatrix)
 }
 
-.parameters_fgarch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0),
+.parameters_fgarch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0), xreg = NULL,
                                variance_targeting = FALSE,
                                vreg = NULL, multiplicative = TRUE,
                                init = c("unconditional","sample","backcast"),
@@ -503,7 +503,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             lower =  -1.0 * abs(mu) * 100, upper = abs(mu) * 100,
                             estimate = ifelse(constant, 1, 0), scale = 1,
                             group = "mu", equation = "[M]", symbol = "\\mu")
-    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma))
+    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma, xreg))
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = var_y * 0.01,
                                   lower = 1e-12, upper = var_y/0.01,
@@ -602,7 +602,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
     return(parmatrix)
 }
 
-.parameters_cgarch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0),
+.parameters_cgarch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0), xreg = NULL,
                               variance_targeting = FALSE,
                               vreg = NULL, multiplicative = TRUE,
                               init = c("unconditional","sample","backcast"),
@@ -625,7 +625,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             estimate = ifelse(constant, 1, 0),
                             scale = 1, group = "mu", equation = "[M]",
                             symbol = "\\mu")
-    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma))
+    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma, xreg))
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = var_y * 0.01,
                                   lower = 1e-12, upper = var_y/0.01,
@@ -710,7 +710,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
 }
 
 
-.parameters_igarch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0),
+.parameters_igarch <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0), xreg = NULL,
                               variance_targeting = FALSE,
                               vreg = NULL, multiplicative = TRUE,
                               init = c("unconditional","sample","backcast"),
@@ -733,7 +733,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             estimate = ifelse(constant, 1, 0),
                             scale = 1, group = "mu", equation = "[M]",
                             symbol = "\\mu")
-    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma))
+    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma, xreg))
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = var_y * 0.01,
                                   lower = 1e-12, upper = var_y/0.01,
@@ -819,7 +819,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
     return(parmatrix)
 }
 
-.parameters_ewma <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0),
+.parameters_ewma <- function(y, constant = FALSE, order = c(1,1), arma = c(0,0), xreg = NULL,
                                variance_targeting = FALSE,
                                vreg = NULL, multiplicative = TRUE,
                                init = c("unconditional","sample","backcast"),
@@ -842,7 +842,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
                             estimate = ifelse(constant, 1, 0),
                             scale = 1, group = "mu", equation = "[M]",
                             symbol = "\\mu")
-    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma))
+    parmatrix <- rbind(parmatrix, arma_parmatrix_rows(y, mu, arma, xreg))
     parmatrix <- rbind(parmatrix,
                        data.table("parameter" = "omega", value = var_y * 0.01,
                                   lower = 1e-12, upper = var_y/0.01,
@@ -924,7 +924,7 @@ initialize_parameters <- function(model = "garch", y, constant = 0.0,
     return(parmatrix)
 }
 
-.parameters_realgarch <- function(y, constant = FALSE, order = c(1,1),
+.parameters_realgarch <- function(y, constant = FALSE, order = c(1,1), xreg = NULL,
                                variance_targeting = FALSE,
                                vreg = NULL, multiplicative = TRUE,
                                init = c("unconditional","sample","backcast"),

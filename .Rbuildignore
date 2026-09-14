@@ -10,3 +10,5 @@ README.md
 ^\.positai$
 ^\.claude$
 ^\.devin$
+^AGENTS\.md$
+^experiments$

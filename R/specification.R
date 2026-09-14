@@ -31,6 +31,20 @@
 #' some (not all) of the lags of a given polynomial is not supported, since
 #' the reparameterization couples all of a polynomial's lags together, and
 #' will raise an error.
+#' @param xreg an optional xts matrix of regressors in the conditional mean
+#' equation, whose coefficients are named \sQuote{tau1}, \sQuote{tau2}, ... in the parmatrix.
+#' @param xreg_type the convention used for the regressor contribution:
+#' \sQuote{arma_errors} (the default, matching \code{stats::arima}'s xreg
+#' semantics) runs the AR/MA recursion on \sQuote{w_t = y_t - mu - x_t'tau} so
+#' tau is the long-run marginal effect; \sQuote{armax} (the rugarch
+#' convention) adds \sQuote{x_t'tau} to the conditional mean at time t only,
+#' so tau is the impact effect. The two are algebraically identical whenever
+#' the AR order is zero. The regressors enter the likelihood in
+#' \code{estimate}, and are also used by \code{tsfilter}, \code{predict}
+#' (via \code{newxreg}), \code{simulate} (via \code{xreg}) and
+#' \code{garch_backtest}; when a model was specified with \code{xreg} but the
+#' future regressors are not supplied, a zero matrix is substituted with a
+#' warning.
 #' @param variance_targeting whether to use variance targeting rather than
 #' estimating the conditional variance intercept.
 #' @param vreg an optional xts matrix of regressors in the conditional variance
@@ -57,7 +71,8 @@
 #'
 #'
 garch_modelspec <- function(y, model = "garch", constant = FALSE,
-                            order = c(1,1), arma = c(0,0), variance_targeting = FALSE,
+                            order = c(1,1), arma = c(0,0), xreg = NULL,
+                            xreg_type = c("arma_errors","armax"), variance_targeting = FALSE,
                             vreg = NULL, multiplicative = FALSE,
                             init = c("unconditional","sample","backcast"),
                             backcast_lambda = 0.7, sample_n = 10,
@@ -129,14 +144,29 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
     } else {
         multiplicative <- FALSE
     }
+    # 3b. check mean-equation regressors
+    xreg_type <- match.arg(xreg_type[1], choices = c("arma_errors","armax"))
+    if (!is.null(xreg)) {
+        xreg <- check_xreg(xreg, index(y))
+        # reject a rank-deficient design (including a constant column when the
+        # constant is also estimated, which would be collinear with mu)
+        xmat <- cbind(if (constant) rep(1, NROW(y)) else NULL, coredata(xreg))
+        if (qr(xmat)$rank < NCOL(xmat)) stop("\nxreg is rank deficient (or, with constant = TRUE, contains a column collinear with the constant).")
+    }
     # 4. populate specification object
-    # cmodel: [maxpq, arch, garch, variance_targeting, multiplicative, distribution, ar, ma]
+    # cmodel: [maxpq, arch, garch, variance_targeting, multiplicative, distribution, ar, ma, armax]
     # maxpq is the overall pre-sample burn-in length, covering both the variance
-    # recursion (garch order) and the mean recursion (arma order).
+    # recursion (garch order) and the mean recursion (arma order); the last flag
+    # selects the armax (impact-effect) vs arma_errors (long-run) convention for
+    # the mean-equation regressors.
     cmodel <- c(max(order, arma), order[1], order[2], as.integer(variance_targeting),
                 as.integer(multiplicative), distribution_class(distribution),
-                arma[1], arma[2])
+                arma[1], arma[2], as.integer(xreg_type == "armax"))
     spec$model$model <- model
+    # retain the user-facing model name separately since "ewma" is coerced to
+    # "igarch" below, and re-specification helpers (e.g. tsbacktest) must be
+    # able to recover the original choice
+    spec$model$model_name <- model
     spec$model$order <- order
     spec$model$arma <- arma
     spec$model$variance_targeting <- variance_targeting
@@ -152,10 +182,18 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
         spec$vreg$include_vreg <- TRUE
         spec$vreg$multiplicative <- multiplicative
     }
+    if (is.null(xreg)) {
+        spec$xreg$xreg <- matrix(0, ncol = 1, nrow = NROW(y))
+        spec$xreg$include_xreg <- FALSE
+    } else {
+        spec$xreg$xreg <- coredata(xreg)
+        spec$xreg$include_xreg <- TRUE
+    }
+    spec$xreg$xreg_type <- xreg_type
     spec$distribution <- distribution
     # 5. populate parameters
     parmatrix <- initialize_parameters(model, y, constant = constant,
-                                       order = order, arma = arma,
+                                       order = order, arma = arma, xreg = xreg,
                                        variance_targeting = variance_targeting,
                                        vreg = vreg,
                                        multiplicative = multiplicative,

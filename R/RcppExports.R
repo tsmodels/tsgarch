@@ -29,8 +29,8 @@
     .Call(`_tsgarch_garchsimvec`, epsilon, sigma_sqr_sim, z, variance_intercept, init, alpha, beta, mu, order, presample)
 }
 
-.armasimvec <- function(series_sim, epsilon, ar, ma, mu, presample) {
-    .Call(`_tsgarch_armasimvec`, series_sim, epsilon, ar, ma, mu, presample)
+.armasimvec <- function(series_sim, epsilon, ar, ma, mu, xtau, armax, presample) {
+    .Call(`_tsgarch_armasimvec`, series_sim, epsilon, ar, ma, mu, xtau, armax, presample)
 }
 
 .egarchsimvec <- function(z, sigma_log_sim, variance_intercept, init, alpha, gamma, beta, kappa, mu, order, presample) {
