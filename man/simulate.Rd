@@ -14,6 +14,7 @@
   innov = NULL,
   innov_init = NULL,
   vreg = NULL,
+  xreg = NULL,
   burn = 0,
   ...
 )
@@ -43,6 +44,13 @@ model for the purpose of continuing the modeled series from some fixed point).}
 
 \item{vreg}{an optional vector of length h representing any pre-multiplied
 variance regressors to use in the simulation.}
+
+\item{xreg}{an optional matrix (or xts) of mean equation regressors with
+h + burn rows and \code{NCOL(xreg)} columns matching the specification.
+Unlike \code{vreg} this is not pre-multiplied: the matrix is multiplied
+internally by the model's tau coefficients. If the spec was built with
+\code{xreg} and this argument is NULL, a zero matrix is substituted with a
+warning.}
 
 \item{burn}{burn in. Will be discarded before returning the output.}
 

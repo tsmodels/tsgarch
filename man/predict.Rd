@@ -24,7 +24,11 @@
 
 \item{h}{the forecast horizon.}
 
-\item{newxreg}{not currently used,}
+\item{newxreg}{mean equation regressors with rows equal to h. This can be
+either a numeric or xts matrix. Only needed if the model was estimated
+with regressors in the mean equation; if NULL in that case a zero matrix
+is substituted with a warning (note the asymmetry with \code{newvreg},
+which still errors when missing).}
 
 \item{newvreg}{variance regressors rows equal to h. This can be either
 a numeric or xts matrix. Only needed if the model was estimated with regressors in the

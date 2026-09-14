@@ -63,7 +63,7 @@ by the same author, with key differences summarized below:
     implemented.
 
 -   does not implement joint ARFIMA-GARCH estimation, but does allow for a
-    jointly estimated ARMA($p,q$) mean equation (see
+    jointly estimated ARMA($p,q$)-X mean equation (see
     Section \ref{sec:estimation:arma}) in addition to the constant. With so
     many options for modelling the conditional mean beyond low order ARMA
     dynamics, many of which are available in the **tsmodels** framework, it
@@ -77,9 +77,9 @@ by the same author, with key differences summarized below:
     efficient for small sized datasets. Additionally, the ARCH-in-mean model
     is no longer available, as it was found to have very limited value
     within the **tsmodels** framework or in general, this author's
-    experience. A separate
-    [tsarma](https://github.com/tsmodels/tsarma) package for ARMA(p,q)-X
-    models is however available.
+    experience. The sibling
+    [tsarma](https://github.com/tsmodels/tsarma) package remains available
+    for standalone ARMA(p,q)-X modelling outside the GARCH setting.
 
 -   makes use of automatic differentiation (autodiff) during
     estimation, via the
@@ -198,6 +198,56 @@ conditional variance equation of whichever GARCH flavor was chosen. Setting
 exactly to the pre-existing constant-mean behavior. The `constant`
 argument remains independent of `arma`: it controls only whether $\mu$
 is estimated or fixed at zero.
+
+Regressors $x_{k,t}$ ($k = 1,\ldots,s$) can additionally enter the
+conditional mean, via the `xreg` argument to `garch_modelspec`, with
+coefficients $\tau_k$ (named `tau1`, `tau2`, ... in the `parmatrix`). The
+`xreg_type` argument selects between two conventions. The default,
+`xreg_type = "arma_errors"`, applies the ARMA recursion to the
+regressor-adjusted deviations:
+
+\begin{equation}
+y_t - \mu - \sum_{k=1}^{s}\tau_k x_{k,t}
+= \sum_{i=1}^{p}\phi_i\left(y_{t-i} - \mu - \sum_{k=1}^{s}\tau_k x_{k,t-i}\right)
++ \varepsilon_t + \sum_{j=1}^{q}\theta_j\varepsilon_{t-j}
+\label{eq:armax_errors}
+\end{equation}
+
+This is the convention of `stats::arima(xreg = )` and of the sibling
+**tsarma** package: the regressors are filtered by the AR polynomial,
+$\tau_k$ is the long-run marginal effect of $x_{k,t}$ on $y_t$, and
+$E\left[y_t\right] = \mu + \sum_k \tau_k E\left[x_{k,t}\right]$, so
+$\mu$ retains its interpretation as the unconditional mean of $y$ net
+of the regressor contribution. The alternative, `xreg_type = "armax"`,
+is the **rugarch** convention:
+
+\begin{equation}
+y_t = \mu + \sum_{i=1}^{p}\phi_i\left(y_{t-i}-\mu\right)
++ \sum_{k=1}^{s}\tau_k x_{k,t} + \varepsilon_t
++ \sum_{j=1}^{q}\theta_j\varepsilon_{t-j}
+\label{eq:armax}
+\end{equation}
+
+Here the regressors are not filtered by the AR polynomial, so $\tau_k$
+is the impact (contemporaneous) effect and the long-run effect of a
+sustained change in $x_{k,t}$ is
+$\tau_k/\left(1 - \sum_i \phi_i\right)$. The two conventions differ
+only by the lagged-regressor term $\sum_k\tau_k x_{k,t-i}$ inside the
+AR feedback, and are therefore algebraically identical whenever
+$p = 0$; the choice of `xreg_type` only matters when the mean equation
+has AR dynamics. Note that **tsarma** writes these coefficients
+$\xi_k$; that symbol is already used in this package for the variance
+equation regressors (see the "External Regressors" equations of each
+flavor below), hence $\tau_k$ here. In both conventions it is again
+$\varepsilon_t$ - not $y_t - \mu$ - that is passed on to the
+conditional variance equation, exactly as in the pure ARMA case.
+
+Because the recursion consumes $x_{k,t}$ at every time step,
+forecasting and simulation require future regressor values
+(`newxreg` in `predict()`, `xreg` in `simulate()`), and `tsfilter()`
+likewise requires `newxreg` covering the appended observations. When
+the model includes `xreg` but the future values are not supplied, a
+zero matrix is substituted with a warning.
 
 Stationarity of the AR polynomial and invertibility of the MA polynomial
 are required for $\phi$ and $\theta$ to be well defined, but rather than

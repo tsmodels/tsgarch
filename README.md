@@ -2,7 +2,7 @@
 # tsgarch <img src="man/figures/logo.png" align="right" height="139" alt="" />
 
 [![R-CMD-check](https://github.com/tsmodels/tsgarch/actions/workflows/rcmdcheck.yaml/badge.svg)](https://github.com/tsmodels/tsgarch/actions/workflows/rcmdcheck.yaml)
-[![Last-changedate](https://img.shields.io/badge/last%20change-2026--09--12-yellowgreen.svg)](/commits/master)
+[![Last-changedate](https://img.shields.io/badge/last%20change-2026--09--14-yellowgreen.svg)](/commits/master)
 [![packageversion](https://img.shields.io/badge/Package%20version-1.0.5-orange.svg?style=flat-square)](commits/master)
 [![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/tsgarch)](https://cran.r-project.org/package=tsgarch)
 
@@ -12,22 +12,22 @@
   Multiplicative Component GARCH and Realized GARCH are not currently
   implemented.
 - it does not implement joint ARFIMA-GARCH estimation, but does allow
-  for a jointly estimated ARMA(p,q) mean equation (via the `arma`
-  argument to `garch_modelspec`) in addition to the constant. With so
-  many options for modelling the conditional mean beyond low order ARMA
-  dynamics, many of which are available in the **tsmodels** framework,
-  it was decided to keep this package’s mean equation support
-  deliberately limited rather than pursue full joint estimation of
-  arbitrary mean dynamics with the variance equation. For a fully
-  general mean equation, the 2 step estimation approach, whereby the
-  residuals of the conditional mean are passed to the variance dynamics
-  estimation, remains available and may be more flexible in what can be
-  achieved, even if potentially less efficient for small sized datasets.
-  Additionally, the ARCH-in-mean model is no longer available, as it was
-  found to have very limited value within the **tsmodels** framework or
-  in this author’s experience. A separate
-  [tsarma](https://github.com/tsmodels/tsarma) package for ARMA(p,q)-X
-  models is however available.
+  for a jointly estimated ARMA(p,q)-X mean equation (via the `arma` and
+  `xreg` arguments to `garch_modelspec`) in addition to the constant
+  (since version 1.0.5). With so many options for modelling the
+  conditional mean beyond low order ARMA dynamics, many of which are
+  available in the **tsmodels** framework, it was decided to keep this
+  package’s mean equation support deliberately limited rather than
+  pursue full joint estimation of arbitrary mean dynamics with the
+  variance equation. For a fully general mean equation, the 2 step
+  estimation approach, whereby the residuals of the conditional mean are
+  passed to the variance dynamics estimation, remains available and may
+  be more flexible in what can be achieved, even if potentially less
+  efficient for small sized datasets. Additionally, the ARCH-in-mean
+  model is no longer available, as it was found to have very limited
+  value within the **tsmodels** framework or in this author’s
+  experience. A separate [tsarma](https://github.com/tsmodels/tsarma)
+  package for ARMA(p,q)-X models is however available.
 - it makes use of automatic differentiation (autodiff) during
   estimation, via the [TMB](https://CRAN.R-project.org/package=TMB)
   package. This is in line with similar approaches in other models

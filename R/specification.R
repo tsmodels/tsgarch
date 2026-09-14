@@ -32,14 +32,19 @@
 #' the reparameterization couples all of a polynomial's lags together, and
 #' will raise an error.
 #' @param xreg an optional xts matrix of regressors in the conditional mean
-#' equation, whose coefficients are named \sQuote{tau1..taum} in the parmatrix.
+#' equation, whose coefficients are named \sQuote{tau1}, \sQuote{tau2}, ... in the parmatrix.
 #' @param xreg_type the convention used for the regressor contribution:
 #' \sQuote{arma_errors} (the default, matching \code{stats::arima}'s xreg
 #' semantics) runs the AR/MA recursion on \sQuote{w_t = y_t - mu - x_t'tau} so
 #' tau is the long-run marginal effect; \sQuote{armax} (the rugarch
 #' convention) adds \sQuote{x_t'tau} to the conditional mean at time t only,
 #' so tau is the impact effect. The two are algebraically identical whenever
-#' the AR order is zero. Currently used by \code{estimate} only.
+#' the AR order is zero. The regressors enter the likelihood in
+#' \code{estimate}, and are also used by \code{tsfilter}, \code{predict}
+#' (via \code{newxreg}), \code{simulate} (via \code{xreg}) and
+#' \code{garch_backtest}; when a model was specified with \code{xreg} but the
+#' future regressors are not supplied, a zero matrix is substituted with a
+#' warning.
 #' @param variance_targeting whether to use variance targeting rather than
 #' estimating the conditional variance intercept.
 #' @param vreg an optional xts matrix of regressors in the conditional variance
