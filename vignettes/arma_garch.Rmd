@@ -148,6 +148,39 @@ colnames(newx) <- "monday"
 predict(mod_x, h = 10, newxreg = newx)$mean
 ```
 
+### Which convention should I use?
+
+Written out in levels for an AR(1) mean equation, `arma_errors` is
+
+$$
+y_t = \mu\left(1-\phi_1\right) + \phi_1 y_{t-1} + \tau_1 x_{1,t} - \phi_1\tau_1 x_{1,t-1} + \varepsilon_t
+$$
+
+and `armax` is the same expression without the final regressor lag. Both are
+restrictions of the autoregressive distributed lag model
+$y_t = c + \phi_1 y_{t-1} + \beta_0 x_{1,t} + \beta_1 x_{1,t-1} + \varepsilon_t$:
+`arma_errors` imposes $\beta_1 = -\phi_1\beta_0$ and `armax` imposes
+$\beta_1 = 0$. Neither is nested in the other.
+
+The difference that matters in practice is propagation. Under `arma_errors`
+a one period blip in a regressor shifts $y_t$ by $\tau_k$ and nothing
+afterwards, because the ARMA dynamics apply only to the error; $\tau_k$ is
+both the impact and the total effect. Under `armax` the same blip is carried
+forward by the autoregressive term as $\tau_k, \phi_1\tau_k,
+\phi_1^2\tau_k,\ldots$, so $\tau_k$ is the impact effect and
+$\tau_k/\left(1-\sum_i\phi_i\right)$ the cumulative one. Event and calendar
+dummies usually suit the former, covariates whose influence builds and
+decays with the series the latter. With no AR terms the two are identical,
+so the choice only matters when the mean equation has autoregressive
+dynamics and the regressor is itself persistent.
+
+Since `armax` with both $x_{k,t}$ and $x_{k,t-1}$ as separate `xreg` columns
+spans the unrestricted model, the restriction each convention imposes can be
+tested directly by fitting that larger model and inspecting $\hat\beta_1$.
+See the GARCH Models vignette for the fuller discussion, including how
+misspecifying the convention distorts the estimated persistence rather than
+the regressor coefficient.
+
 ## Stationarity and Invertibility
 
 For $\phi=\left(\phi_1,\ldots,\phi_p\right)$ and

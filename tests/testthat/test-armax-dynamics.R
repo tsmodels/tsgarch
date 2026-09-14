@@ -78,11 +78,17 @@ test_that("tsfilter: incremental and full-sample filtering agree (both conventio
                      info = paste("fitted batch", xt))
         # sigma over the newly filtered segment: agreement with the
         # full-sample spec filter is exact here. The early in-sample region
-        # differs between the two paths (the TMB path re-initializes the
-        # variance recursion from its own initial_variance while the
-        # estimate path chains off the stored sigma history) - a
-        # pre-existing transient unrelated to xreg, identical for xreg-free
-        # models, decaying to zero well before the filtered segment.
+        # differs, but not because the two code paths disagree - on an
+        # identical sample they are bit-identical. The cause is that the
+        # recursion seed (init = "unconditional", i.e. the mean of the
+        # squared residuals) is computed over whatever sample is being
+        # filtered, so seeding from 1000 observations and appending 200 is
+        # not the same as filtering 1200 in one pass. The resulting
+        # difference in sigma^2 decays at exactly beta per period (the ARCH
+        # term is unaffected, since the residuals are identical), so it is a
+        # geometric transient that is numerically dead long before the
+        # filtered segment. Unrelated to xreg, and present for xreg-free
+        # models too.
         expect_equal(tail(as.numeric(sigma(f_inc)), n_new), tail(as.numeric(sigma(f_full)), n_new),
                      tolerance = 1e-8, info = paste("sigma new segment", xt))
         expect_equal(tail(as.numeric(sigma(f_all)), n_new), tail(as.numeric(sigma(f_full)), n_new),

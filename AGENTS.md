@@ -87,6 +87,33 @@ numeric vector of length `h` (i.e. `v %*% xi`), whereas the mean equation
 pre-multiplied internally. The latter follows tsarma and `predict()`'s
 `newxreg`, and unlike the former it can actually be validated.
 
+## Filtering forward vs filtering from scratch (not a bug)
+
+Filtering new observations onto an estimated object and filtering the whole
+extended sample in one pass do not give identical `sigma` over the early
+part of the sample. This is expected and has been traced:
+
+- On an *identical* sample the two routes are bit-identical
+  (`max|sigma(estimate) - sigma(spec filter)| == 0` exactly), and the newly
+  appended segment agrees to machine epsilon, so the code paths do not
+  disagree.
+- The difference comes entirely from the recursion seed. With
+  `init = "unconditional"` the seed is the mean of the squared residuals
+  over whatever sample is present, so 1000 observations give a different
+  seed than 1200 (e.g. 0.2780 vs 0.2539 on `dmbp`).
+- That seed difference decays as `beta^t` *exactly* - measured to eight
+  decimal places - because the ARCH term is unaffected (the residuals are
+  identical across routes). It is ~4% of sigma at t=1, ~0.3% by t=25, and at
+  machine zero by t=200.
+- Any sample-dependent initialisation has this property; it is the documented
+  design (see the "Recursion Initialization" section of
+  `vignettes/garch_models.Rmd`). The mean equation has no such transient at
+  all: `fitted()`/`residuals()` agree to machine precision across the whole
+  sample under both `xreg_type` conventions.
+
+So when comparing a forward-filtered object against a from-scratch filter,
+compare the appended segment, or allow for the early transient.
+
 ## Parked discussions
 
 - `.spec2newspec()` (`R/utilities.R`) rebuilds a spec using
