@@ -34,10 +34,6 @@
     spec <- newspec
     spec$parmatrix <- NULL
     spec$model$var_initial <- var_initial
-    constant_variance <- mean((newspec$target$y_orig - (parmatrix[parameter == "mu"]$value * parmatrix[parameter == "mu"]$scale))^2)
-    parmatrix[parameter == "omega", value := target_omega]
-    # return the ll_vector
-    llvector <- -1.0 * log(tmb$report(pars)$ll_vector)
     # conditional_mean(t), only reported by the "garch" TMB template when
     # arma > c(0,0) (see garchfun.hpp); used to seed subsequent incremental
     # tsfilter() calls (see .filter.tsgarch.estimate() / arma_filter_extend()).
@@ -45,6 +41,18 @@
     if (!is.null(newspec$model$arma) && sum(newspec$model$arma) > 0) {
         conditional_mu <- tail(env$tmb$report(pars)$conditional_mean, length(sig))
     }
+    # the variance target is the unconditional variance of the ARMA
+    # innovations eps = y - conditional_mu over the full sample (see
+    # vignettes/garch_models.Rmd, "Variance Targeting"); fall back to the
+    # constant-mean deviation when no ARMA mean equation is present
+    if (!is.null(conditional_mu)) {
+        constant_variance <- mean((as.numeric(newspec$target$y_orig) - conditional_mu)^2)
+    } else {
+        constant_variance <- mean((newspec$target$y_orig - (parmatrix[parameter == "mu"]$value * parmatrix[parameter == "mu"]$scale))^2)
+    }
+    parmatrix[parameter == "omega", value := target_omega]
+    # return the ll_vector
+    llvector <- -1.0 * log(tmb$report(pars)$ll_vector)
     out <- list(parmatrix = parmatrix, scaled_hessian = hessian,
                 scaled_scores = scores,
                 parameter_scale = rep(1, length(pars)),

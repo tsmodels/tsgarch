@@ -137,6 +137,10 @@ garch_modelspec <- function(y, model = "garch", constant = FALSE,
                 as.integer(multiplicative), distribution_class(distribution),
                 arma[1], arma[2])
     spec$model$model <- model
+    # retain the user-facing model name separately since "ewma" is coerced to
+    # "igarch" below, and re-specification helpers (e.g. tsbacktest) must be
+    # able to recover the original choice
+    spec$model$model_name <- model
     spec$model$order <- order
     spec$model$arma <- arma
     spec$model$variance_targeting <- variance_targeting

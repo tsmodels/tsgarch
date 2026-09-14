@@ -566,14 +566,29 @@ garch_bootstrap <- function(object, h = 2, nsim = 1, block = 1, vreg = NULL, see
     zsim <- sample_block(x = z, h = h, nsim = nsim, block = block)
     spec <- object$spec
     spec$parmatrix <- copy(object$parmatrix)
-    maxpq <- max(spec$model$order)
+    arma_order <- spec$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
+    # combined pre-sample length (see .simulate_garch()); tail(...)
+    # below then naturally uses more genuine history when the ARMA
+    # order exceeds the GARCH order, in the correct chronological
+    # (oldest-to-most-recent) order already expected by simulate().
+    maxpq <- max(spec$model$order, arma_order)
     init_v <- tail(as.numeric(object$sigma), maxpq)^2
     init_z <- tail(z, maxpq)
     # if model == cgarch must provide a matrix for var_init
     if (object$spec$model$model == "cgarch") {
         init_v <- cbind(init_v, tail(object$permanent_component, maxpq))
     }
-    b <- simulate(spec, h = h, nsim = nsim, var_init = init_v, innov = zsim, innov_init = init_z, vreg = vreg, seed = seed)
+    extra_args <- list()
+    if (sum(arma_order) > 0) {
+        # continue the ARMA mean recursion from the actual last
+        # observed values/residuals rather than the unconditional
+        # mean, so the simulated bands are centered consistently
+        # with the analytic point forecast in .arma_mean_forecast().
+        extra_args$series_init <- tail(as.numeric(object$spec$target$y), maxpq)
+        extra_args$resid_init <- tail(as.numeric(residuals(object)), maxpq)
+    }
+    b <- do.call(simulate, c(list(object = spec, h = h, nsim = nsim, var_init = init_v, innov = zsim, innov_init = init_z, vreg = vreg, seed = seed), extra_args))
     return(b)
 }
 

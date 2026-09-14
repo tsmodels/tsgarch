@@ -54,6 +54,26 @@ parameter estimation uncertainty. `type = "garch"` (the original
 volatility/news-impact/QQ panel) remains the default and is unchanged. New
 computational helpers `arma_inverse_roots()`, `arma_irf()` and
 `arma_near_cancellation()` are exported for programmatic use.
+* Fixed `tsbacktest()` silently refitting the wrong model inside its
+rolling windows: the inner `garch_modelspec()` call previously passed
+neither `model` nor `arma`, so e.g. an `egarch` spec was backtested as a
+vanilla `garch` and any ARMA mean equation was dropped. The spec now
+records the user-facing model name in `model$model_name` (necessary
+because `ewma` is coerced to `igarch` internally) and the backtest refits
+each window with the original model and ARMA order.
+* Fixed `predict(..., sim_method = "bootstrap")` ignoring the ARMA mean
+equation: `garch_bootstrap()` now uses the combined pre-sample length
+`max(garch order, arma order)` and passes `series_init`/`resid_init` to
+`simulate()`, so the bootstrap predictive distribution is centered on the
+ARMA mean forecast rather than on the unconditional mean `mu`.
+* Fixed `constant_variance` under `variance_targeting = TRUE` being
+computed as the mean squared deviation from the constant `mu` instead of
+the unconditional variance of the ARMA innovations `eps = y -
+conditional_mu` (see the "Variance Targeting" section of
+`vignettes/garch_models.Rmd`); the R-side `unconditional()`/`target_omega`
+now agree with the TMB-side variance target when `arma != c(0,0)`. Both
+the `estimate()` and `tsfilter()` code paths were fixed; non-ARMA models
+are numerically unchanged.
 
 # tsgarch 1.0.4
 

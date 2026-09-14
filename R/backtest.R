@@ -101,6 +101,12 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
         prog_trace <- progressor(length(seqdates))
     }
     i <- 1
+    # captured as globals by future_lapply; NULL fallbacks cover spec objects
+    # created by older package versions which lack these fields
+    model_name <- object$model$model_name
+    if (is.null(model_name)) model_name <- object$model$model
+    arma_order <- object$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
     b %<-% future_lapply(1:length(seqdates), function(i) {
         if (trace) prog_trace()
         y_train <- data[paste0("/", seqdates[i])]
@@ -109,7 +115,8 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
         } else {
             vreg_train <- NULL
         }
-        spec <- garch_modelspec(y_train, constant = object$model$constant, order = object$model$order,
+        spec <- garch_modelspec(y_train, model = model_name, constant = object$model$constant, order = object$model$order,
+                                arma = arma_order,
                                 variance_targeting = object$model$variance_targeting, vreg = vreg_train,
                                 multiplicative = object$vreg$multiplicative, init = object$model$init,
                                 backcast_lambda = object$model$backcast_lambda, sample_n = object$model$sample_n,

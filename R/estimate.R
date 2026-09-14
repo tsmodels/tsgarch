@@ -160,7 +160,16 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     spec <- object
     spec$parmatrix <- NULL
     spec$model$var_initial <- scaled_solution$var_initial
-    constant_variance <- mean((object$target$y_orig - (parmatrix[parameter == "mu"]$value * parmatrix[parameter == "mu"]$scale))^2)
+    conditional_mu <- scaled_solution$conditional_mu
+    # the variance target is the unconditional variance of the ARMA
+    # innovations eps = y - conditional_mu over the full sample (see
+    # vignettes/garch_models.Rmd, "Variance Targeting"); fall back to the
+    # constant-mean deviation when no ARMA mean equation is present
+    if (!is.null(conditional_mu)) {
+        constant_variance <- mean((as.numeric(object$target$y_orig) - conditional_mu)^2)
+    } else {
+        constant_variance <- mean((object$target$y_orig - (parmatrix[parameter == "mu"]$value * parmatrix[parameter == "mu"]$scale))^2)
+    }
     persistence_table <- scaled_solution$persistence_table
     variance_target_table <- scaled_solution$variance_target_table
     kappa_table <- scaled_solution$kappa_table
@@ -192,7 +201,7 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
                 # extra degree of freedom for the init_variance
                 npars = NROW(parmatrix[estimate == 1]) + 1,
                 spec = spec,
-                conditional_mu = scaled_solution$conditional_mu,
+                conditional_mu = conditional_mu,
                 arma_summary = scaled_solution$arma_table)
     if (keep_tmb) out$tmb <- tmb
     class(out) <- "tsgarch.estimate"
