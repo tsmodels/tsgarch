@@ -1,26 +1,60 @@
 # tsgarch 1.0.5
 
-* Added a jointly estimated ARMA(p,q) mean equation, via a new `arma` argument
-to `garch_modelspec` (defaults to `c(0,0)`, fully backward compatible).
-Available for all 8 GARCH flavors, including `igarch` and `ewma`. The
-`constant` argument remains independent of `arma` and continues to control
-only whether the unconditional mean `mu` is estimated or fixed at zero.
+* Added a jointly estimated ARMA(p,q)-X mean equation, via new `arma`, `xreg`
+and `xreg_type` arguments to `garch_modelspec` (defaulting to `c(0,0)` and
+`NULL` respectively, so fully backward compatible). Available for all 8
+GARCH flavors, including `igarch` and `ewma`. The `constant` argument
+remains independent of both the ARMA order and the regressors, and continues
+to control only whether the unconditional mean `mu` is estimated or fixed at
+zero.
+* Regressors enter the conditional mean through `xreg` (an xts matrix aligned
+to `y`), with `xreg_type` selecting between two conventions: `xreg_type =
+"arma_errors"` (the default) runs the ARMA recursion on
+`y_t - mu - x_t'tau`, so `tau` is the long-run marginal effect - this
+matches `stats::arima`'s `xreg` semantics and the sibling **tsarma**
+package; `xreg_type = "armax"` (the **rugarch** convention) adds
+`x_t'tau` to the conditional mean at time `t` only, so `tau` is the
+impact effect and the long-run effect is `tau/(1 - sum(phi))`. The two
+are algebraically identical whenever the AR order is zero. Both are
+restrictions of the same distributed lag model and neither nests the other;
+see the "ARMA Mean Equation" section of `vignettes/garch_models.Rmd` for
+guidance on choosing between them. The coefficients are named `tau1`,
+`tau2`, ... in the `parmatrix` (`xi` is already the variance-regressor
+coefficient in this package; note that **tsarma** calls its mean-equation
+coefficients `xi`, which is `tsgarch`'s `tau`). An `xreg` containing
+`NA`/`NaN`/`Inf` values, or which is rank deficient (including a constant
+column when `constant = TRUE`), is rejected at specification time.
+* Mean regressors are supported throughout the model lifecycle:
+`estimate`, `tsfilter` (via `newxreg`), `predict` (via `newxreg`, and
+both parametric and bootstrap predictive distributions), `simulate`
+(via `xreg`, a raw matrix with `h + burn` rows - unlike the legacy
+`vreg` argument which is a pre-multiplied vector) and `garch_backtest`
+(sliced per rolling window). When the model includes `xreg` but the
+future regressors are not supplied, a zero matrix is substituted with a
+warning; the variance-regressor argument `newvreg` in `predict()`
+deliberately retains its existing hard-error behaviour. Note that future
+regressors are treated as a single deterministic path shared across all
+simulated paths, so regressor uncertainty is not propagated into the
+predictive distribution.
 * The AR/MA coefficients are guaranteed stationary/invertible by construction,
 via a Durbin-Levinson/Jones partial-autocorrelation (PACF) reparameterization
 of the raw optimization parameters, so no additional nonlinear constraints
 are required; exact (autodiff, not finite-difference) Jacobians of the ARMA
 mean equation are available throughout via TMB. The transformed AR/MA
 coefficients can be extracted with the new `arma_coefficients()` function.
-* `fitted()` now returns the genuinely time-varying conditional mean when an
-ARMA mean equation is specified (previously always a constant `mu`, now
-completing the documented "vector the size of y" contract), and `residuals()`
-is now always exactly `y - fitted(object)` for every model, including a fix
-for models with no ARMA (a small, purely internal simplification with no
-behavior change there).
-* `predict()`, `simulate()` and `tsfilter()` are all ARMA-aware: point
-forecasts, simulated paths and incremental filtering all correctly account
-for the AR/MA dynamics in the mean equation. The combined pre-sample/burn-in
-length used internally is `max(garch order, arma order)`.
+* `fitted()` now returns the genuinely time-varying conditional mean whenever
+the mean equation has ARMA dynamics or regressors (previously always a
+constant `mu`, now completing the documented "vector the size of y"
+contract), and `residuals()` is now always exactly `y - fitted(object)` for
+every model, including a fix for models with no ARMA (a small, purely
+internal simplification with no behavior change there). A pure regression
+with GARCH errors (`arma = c(0,0)` with `xreg`) therefore reports the
+regression fit rather than a constant.
+* `predict()`, `simulate()` and `tsfilter()` all account for the full
+ARMA-X mean equation: point forecasts, simulated paths and incremental
+filtering correctly reflect both the AR/MA dynamics and the regressor
+contribution. The combined pre-sample/burn-in length used internally is
+`max(garch order, arma order)`.
 * `summary()` (and its console `print()`/`as_flextable()` methods) now
 displays the transformed `ar`/`ma` coefficients with their delta-method
 standard errors, rather than the raw (not directly interpretable)
@@ -74,28 +108,6 @@ conditional_mu` (see the "Variance Targeting" section of
 now agree with the TMB-side variance target when `arma != c(0,0)`. Both
 the `estimate()` and `tsfilter()` code paths were fixed; non-ARMA models
 are numerically unchanged.
-* Added support for regressors in the conditional mean equation, via new
-`xreg` (an xts matrix aligned to `y`) and `xreg_type` arguments to
-`garch_modelspec`. Two conventions are available: `xreg_type =
-"arma_errors"` (the default) runs the ARMA recursion on
-`y_t - mu - x_t'tau`, so `tau` is the long-run marginal effect - this
-matches `stats::arima`'s `xreg` semantics and the sibling **tsarma**
-package; `xreg_type = "armax"` (the **rugarch** convention) adds
-`x_t'tau` to the conditional mean at time `t` only, so `tau` is the
-impact effect and the long-run effect is `tau/(1 - sum(phi))`. The two
-are algebraically identical whenever the AR order is zero. The
-coefficients are named `tau1`, `tau2`, ... in the `parmatrix` (`xi` is already
-the variance-regressor coefficient in this package; note that **tsarma**
-calls its mean-equation coefficients `xi`, which is `tsgarch`'s `tau`).
-* Mean regressors are supported throughout the model lifecycle:
-`estimate`, `tsfilter` (via `newxreg`), `predict` (via `newxreg`, and
-both parametric and bootstrap predictive distributions), `simulate`
-(via `xreg`, a raw matrix with `h + burn` rows - unlike the legacy
-`vreg` argument which is a pre-multiplied vector) and `garch_backtest`
-(sliced per rolling window). When the model includes `xreg` but the
-future regressors are not supplied, a zero matrix is substituted with a
-warning; the variance-regressor argument `newvreg` in `predict()`
-deliberately retains its existing hard-error behaviour.
 * Fixed `simulate()` for `igarch`/`ewma` models with `arma != c(0,0)`
 dropping the ARMA mean equation entirely - the simulated series was
 just `mu + eps`. The ARMA overlay is now applied, which also corrects
