@@ -124,6 +124,19 @@ parmatrix onto the spec first.
 and its time-index match check, which previously never fired because
 `all.equal()` returns a description string rather than `FALSE`, now
 works as intended.
+* Fixed spec re-specification dropping the `ewma` restriction:
+`garch_modelspec` coerces `model = "ewma"` to `igarch` internally (the
+difference is only the fixed `omega` parmatrix row), and both
+`.spec2newspec()` and `garch_profile()` rebuilt specs from the coerced
+name, so a filtered `ewma` model carried a spurious free `omega` (npars
+and AIC/BIC off by one parameter's worth) and `garch_profile` re-fit an
+igarch model. Both now re-specify from the retained user-facing
+`model$model_name`. Filtered `sigma` is unchanged; filtered `ewma`
+AIC/BIC shift accordingly.
+* `tsequation()` (and the `as_flextable` summary footer built from it)
+now renders the conditional mean equation `eq_mean` first in the
+equation block, covering the constant, ARMA terms and mean regressors
+under both `xreg_type` conventions.
 
 # tsgarch 1.0.4
 

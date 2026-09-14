@@ -566,6 +566,14 @@ tsequation.tsgarch.estimate <- function(object, ...)
                                         multiplicative = object$spec$vreg$multiplicative,
                                         distribution = object$spec$distribution,
                                         variance_targeting = object$spec$model$variance_targeting))
+    s <- 0
+    if (isTRUE(object$spec$xreg$include_xreg)) s <- NCOL(object$spec$xreg$xreg)
+    xreg_type <- object$spec$xreg$xreg_type
+    if (is.null(xreg_type)) xreg_type <- "arma_errors"
+    arma_order <- object$spec$model$arma
+    if (is.null(arma_order)) arma_order <- c(0,0)
+    out <- c(list(eq_mean = .equation_mean(arma = arma_order, constant = object$spec$model$constant,
+                                           s = s, xreg_type = xreg_type)), out)
     return(out)
 }
 

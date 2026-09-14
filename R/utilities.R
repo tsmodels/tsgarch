@@ -29,7 +29,9 @@
     if (is.null(xreg_type)) xreg_type <- "arma_errors"
     arma_order <- object$model$arma
     if (is.null(arma_order)) arma_order <- c(0,0)
-    new_spec <- garch_modelspec(y = y, model = object$model$model, constant = object$model$constant, order = object$model$order, arma = arma_order, xreg = newxreg, xreg_type = xreg_type,
+    model_name <- object$model$model_name
+    if (is.null(model_name)) model_name <- object$model$model
+    new_spec <- garch_modelspec(y = y, model = model_name, constant = object$model$constant, order = object$model$order, arma = arma_order, xreg = newxreg, xreg_type = xreg_type,
                                 variance_targeting = object$model$variance_targeting,
                                 vreg = newvreg, multiplicative = object$vreg$multiplicative, init = object$model$init, backcast_lambda = object$model$backcast_lambda,
                                 sample_n = object$model$sample_n, distribution = object$distribution)
@@ -466,21 +468,4 @@ check_xreg <- function(xreg, valid_index)
         colnames(xreg) <- paste0("x",1:ncol(xreg))
     }
     return(xreg)
-}
-
-check_newxreg <- function(newdata, xnames, h = 1, forc_dates = NULL)
-{
-    if (!is.null(xnames)) {
-        if (any(!colnames(newdata) %in% xnames)) {
-            stop("\nexpected colnames for newdata are missing")
-        } else {
-            newdata <- newdata[,xnames]
-        }
-    }
-    if (!is.xts(newdata)) {
-        if (!is.null(forc_dates) & length(forc_dates) == NROW(newdata)) {
-            newdata <- xts(newdata, forc_dates)
-        }
-    }
-    return(newdata)
 }

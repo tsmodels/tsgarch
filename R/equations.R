@@ -17,6 +17,57 @@
     return(out)
 }
 
+.equation_mean <- function(arma = c(0,0), constant = TRUE, s = 0, xreg_type = "arma_errors")
+{
+    terms <- NULL
+    if (constant) terms <- c(terms, "\\mu")
+    eq_reg <- NULL
+    if (s == 1) {
+        eq_reg <- "\\tau_1 x_{1,t}"
+    } else if (s > 1) {
+        eq_reg <- paste0("\\sum_{k=1}^{",s,"}\\tau_k x_{k,t}")
+    }
+    eq_ar <- NULL
+    if (arma[1] > 0) {
+        if (xreg_type == "arma_errors") {
+            ar_dev <- function(lag) {
+                d <- paste0("y_{t-",lag,"}")
+                if (constant) d <- paste0(d," - \\mu")
+                if (s == 1) {
+                    d <- paste0(d," - \\tau_1 x_{1,t-",lag,"}")
+                } else if (s > 1) {
+                    d <- paste0(d," - \\sum_{k=1}^{",s,"}\\tau_k x_{k,t-",lag,"}")
+                }
+                return(d)
+            }
+            if (arma[1] == 1) {
+                eq_ar <- paste0("\\phi_1\\left(",ar_dev(1),"\\right)")
+            } else {
+                eq_ar <- paste0("\\sum_{i=1}^{",arma[1],"}\\phi_i\\left(",ar_dev("i"),"\\right)")
+            }
+        } else {
+            if (arma[1] == 1) {
+                eq_ar <- paste0("\\phi_1\\left(y_{t-1}",if (constant) " - \\mu" else "","\\right)")
+            } else {
+                eq_ar <- paste0("\\sum_{i=1}^{",arma[1],"}\\phi_i\\left(y_{t-i}",if (constant) " - \\mu" else "","\\right)")
+            }
+        }
+    }
+    eq_ma <- NULL
+    if (arma[2] == 1) {
+        eq_ma <- "\\theta_1\\varepsilon_{t-1}"
+    } else if (arma[2] > 1) {
+        eq_ma <- paste0("\\sum_{j=1}^{",arma[2],"}\\theta_j\\varepsilon_{t-j}")
+    }
+    if (xreg_type == "arma_errors") {
+        terms <- c(terms, eq_reg, eq_ar, eq_ma)
+    } else {
+        terms <- c(terms, eq_ar, eq_reg, eq_ma)
+    }
+    if (is.null(terms)) return("\\mu_t = 0")
+    return(paste0("\\mu_t = ",paste(terms, collapse = " + ")))
+}
+
 .equation_regressors <- function(vreg = NULL, variance_targeting = FALSE)
 {
     eq2 <- eq1 <- NULL

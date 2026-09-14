@@ -72,7 +72,9 @@ tsprofile.tsgarch.spec <- function(object, nsim = 100, sizes = c(800, 1000, 1500
                 v <- NULL
             }
             s <- xts(sim$series[i,1:sizes[j]], as.Date(1:sizes[j]))
-            spec_new <- garch_modelspec(s, model = object$model$model, distribution  = object$distribution,
+            model_name <- object$model$model_name
+            if (is.null(model_name)) model_name <- object$model$model
+            spec_new <- garch_modelspec(s, model = model_name, distribution  = object$distribution,
                                         order = object$model$order, constant = object$model$constant,
                                         variance_targeting = object$model$variance_targeting,
                                         init = object$model$init, backcast_lambda = object$model$backcast_lambda,
