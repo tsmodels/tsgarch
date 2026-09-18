@@ -48,12 +48,4 @@ inst/.DS_Store
 *.Rproj
 .positai
 /.devin
-/.claude/
-/.instructions/
-/.windsurf/
-/.cursor/
 /experiments/
-AGENTS.md
-AGENTS.local.md
-AGENT.md
-CLAUDE.md

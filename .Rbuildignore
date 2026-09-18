@@ -8,15 +8,6 @@ README.md
 ^logo\.png$
 ^revdep$
 ^\.positai$
-^\.claude$
 ^\.devin$
-^AGENTS\.md$
 ^experiments$
 ^\.devin/
-^\.claude/
-^\.instructions$
-^\.windsurf$
-^\.cursor$
-^AGENTS\.local\.md$
-^AGENT\.md$
-^CLAUDE\.md$
