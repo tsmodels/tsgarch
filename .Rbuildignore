@@ -12,3 +12,11 @@ README.md
 ^\.devin$
 ^AGENTS\.md$
 ^experiments$
+^\.devin/
+^\.claude/
+^\.instructions$
+^\.windsurf$
+^\.cursor$
+^AGENTS\.local\.md$
+^AGENT\.md$
+^CLAUDE\.md$
