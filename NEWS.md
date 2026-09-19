@@ -190,6 +190,22 @@ investigation.
 so a vector shorter than the pre-sample is padded now rather than
 collapsed onto its first element, which had put the lag 1 initialization
 into every lag slot.
+* `simulate()` now reproduces a fitted `egarch` model exactly, as the other
+flavors already did. Its pre-sample branch added `alpha_j z_{t-j}` built
+from the synthetic pre-sample innovations, where the likelihood contributes
+nothing at all: pre-sample residuals are zeroed in the template, so the
+standardized residual there is identically zero and only the `gamma_j` term
+survives. The simulation matches now, which takes the discrepancy against a
+fitted model's `sigma` from around 9e-3 to machine precision. Free running
+`egarch` simulations shift accordingly over their first
+`max(order, arma)` steps. The test that was supposed to cover this had
+copied the `garch` fixtures throughout, so `egarch` simulation was in
+practice never validated; it now fits an `egarch` model.
+* An `egarch` simulation took its ARCH initialization from the first
+`order[1]` pre-sample columns instead of all `max(order, arma)` of them.
+With more than one simulated path this left the paths differing from one
+another even when handed identical innovations. All flavors now agree
+across identical paths, which is checked directly.
 
 # tsgarch 1.0.4
 

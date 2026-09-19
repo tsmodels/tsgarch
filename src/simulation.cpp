@@ -115,7 +115,11 @@ List egarchsimvec(const Eigen::MatrixXd& z, Eigen::MatrixXd& sigma_log_sim, cons
         if (order(0) > 0) {
             for(j = 0; j < order(0); j++) {
                 if((maxpq + j) >= i) {
-                    sigma_log_sim.col(i) += alpha(j) * z.col(i - j - 1) + gamma(j) * init.col(j);
+                    // the estimator's counterpart is alpha(j) * Type(0.0) + gamma(j) * initial_arch(j)
+                    // (egarchfun.hpp) and that zero is not arbitrary: pre-sample residuals are zeroed
+                    // in the template, so the standardized residual there is identically zero; the
+                    // synthetic pre-sample z must not enter the alpha term or a fit can never be reproduced
+                    sigma_log_sim.col(i) += gamma(j) * init.col(j);
                 } else {
                     sigma_log_sim.col(i).array() += alpha(j) * z.col(i - j - 1).array() + gamma(j) * (z.col(i - j - 1).array().abs() - kappa);
                 }

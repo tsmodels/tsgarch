@@ -158,17 +158,24 @@ test_that("cgarch(2,1) simulation: validate algoritm",{
 })
 
 test_that("egarch(1,1) simulation: validate algoritm",{
-    spec <- copy(global_spec_garch)
-    spec$parmatrix <- copy(global_mod_garch$parmatrix)
-    v <- c(as.numeric(y[1:1800,2]) * coef(global_mod_garch)["xi1"])
-    z <- matrix(as.numeric(residuals(global_mod_garch, standardize = TRUE)), nrow = 1)
+    # this copied the garch globals throughout, so egarch was never actually
+    # validated here; it now builds and fits an egarch spec
+    local_spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "egarch",
+                                  order = c(1,1), arma = c(0,0), vreg = y[1:1800,2],
+                                  distribution = "norm")
+    local_mod <- suppressWarnings(estimate(local_spec))
+    spec <- copy(local_spec)
+    spec$parmatrix <- copy(local_mod$parmatrix)
+    v <- c(as.numeric(y[1:1800,2]) * coef(local_mod)["xi1"])
+    z <- matrix(as.numeric(residuals(local_mod, standardize = TRUE)), nrow = 1)
+    maxpq <- max(local_spec$model$order, local_spec$model$arma)
     # use fixed innovation and replicate the initial conditions to guarantee a deterministic
     # simulation which serves to validate the algorithm for correctness and reproducability
     sim <- simulate(spec, nsim = 1, h = length(spec$target$y_orig),
-                    var_init = global_mod_garch$var_initial,
-                    innov = z, vreg = v,
-                    arch_initial = global_mod_garch$arch_initial)
-    expect_equal(sim$sigma[1,], global_mod_garch$sigma, tolerance = 0.001)
+                    var_init = local_mod$var_initial,
+                    innov = z, vreg = v, innov_init = rep(1, maxpq),
+                    arch_initial = local_mod$arch_initial)
+    expect_equal(sim$sigma[1,], local_mod$sigma)
 })
 
 test_that("simulate norm: same seed same output",{
@@ -343,4 +350,18 @@ test_that("fgarch(2,3) simulation: validate algoritm",{
                     innov = z, vreg = v, innov_init = rep(1, maxpq),
                     arch_initial = local_mod$arch_initial)
     expect_equal(sim$sigma[1,], local_mod$sigma)
+})
+
+test_that("simulate: identical innovation rows give identical sigma rows across flavours",{
+    set.seed(1); one <- rnorm(60)
+    Z <- matrix(rep(one, 3), nrow = 3, byrow = TRUE)
+    for (m in c("garch","egarch","gjrgarch","aparch","fgarch","cgarch")) {
+        spec <- suppressWarnings(garch_modelspec(y[1:500,1], constant = TRUE, model = m,
+                                  order = c(1,1), arma = c(2,1), distribution = "norm"))
+        maxpq <- max(spec$model$order, spec$model$arma)
+        ii <- seq(0.7, by = -1.4, length.out = maxpq)
+        sg <- suppressWarnings(simulate(spec, nsim = 3, h = 60, innov = Z, innov_init = ii)$sigma)
+        expect_equal(sg[1,], sg[2,], info = m)
+        expect_equal(sg[1,], sg[3,], info = m)
+    }
 })

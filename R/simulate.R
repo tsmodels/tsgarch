@@ -300,7 +300,10 @@
         init <- extra_args$arch_initial
         init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
     } else {
-        init <- (abs(z[,seq_len(order[1]), drop = FALSE]) - kappa)
+        init <- (abs(z[,seq_len(maxpq), drop = FALSE]) - kappa)
+        # the byrow re-wrap below is deliberately the inverse of the
+        # column-major z[,seq_len(maxpq)] <- innov_init scatter, so the
+        # source must span maxpq columns (not a transpose bug)
         init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
     }
 
