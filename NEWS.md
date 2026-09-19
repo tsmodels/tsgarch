@@ -165,6 +165,31 @@ length now. Such a specification also predates the `arpacf`, `mapacf` and
 now evaluated at the solution the optimizer returns, rather than at TMB's
 default of whichever point it last happened to evaluate. The two coincide
 for the solver in use, so reported standard errors are unchanged.
+* Fixed the pre-sample initialization of the ARCH recursion for the
+asymmetric flavors (`egarch`, `gjrgarch`, `aparch`, `fgarch`). The test
+deciding whether a lag lookback falls inside the pre-sample compared it
+against the ARCH order rather than against the pre-sample length, and the
+two coincide only when the ARCH order is the largest of the GARCH and ARMA
+orders. Observations just past the pre-sample therefore took a zeroed
+residual in place of the initial ARCH value, in the likelihood and in
+`simulate()` alike. Both now test the pre-sample length, in the TMB
+templates and in the Rcpp simulation recursions. This was already
+reachable through a GARCH order with `q > p`, and the new ARMA order made
+it reachable at the default `order = c(1,1)`, since the pre-sample spans
+the mean recursion as well as the variance one. `logLik` and the
+coefficients consequently shift for these four flavors whenever
+`max(order, arma)` exceeds the ARCH order; `order = c(1,1)` with no ARMA
+order is arithmetically unchanged, and `garch`, `igarch` and `ewma` are
+unaffected at every order, their pre-sample ARCH input being constant. A
+deterministic replication of a fitted model through `simulate()` now
+recovers its `sigma` to machine precision for `gjrgarch`, `aparch` and
+`fgarch` in these configurations, where the discrepancy previously reached
+5e-2. `egarch` improves but remains inexact, and is still under
+investigation.
+* `arch_initial` is indexed by ARCH lag when passed back into `simulate()`,
+so a vector shorter than the pre-sample is padded now rather than
+collapsed onto its first element, which had put the lag 1 initialization
+into every lag slot.
 
 # tsgarch 1.0.4
 

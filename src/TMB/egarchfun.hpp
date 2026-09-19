@@ -215,7 +215,10 @@ Type egarchfun(objective_function<Type>* obj) {
     for(int i = cmodel(0);i<timesteps;i++){
         log_sigma_squared(i) += variance_intercept(i);
         for(j = 0;j<cmodel(1);j++){
-            if ((cmodel(1) + j) >= i) {
+            // a lookback lands in the pre-sample whenever (cmodel(0) + j) >= i:
+            // the boundary is the pre-sample length, not the ARCH order, and the
+            // two coincide only when cmodel(1) equals cmodel(0)
+            if ((cmodel(0) + j) >= i) {
                 log_sigma_squared(i) += alpha(j) * Type(0.0) + gamma(j) * initial_arch(j);
             } else {
                 log_sigma_squared(i) += alpha(j) * std_residuals(i - j - 1) + gamma(j) * (fabs(std_residuals(i - j - 1)) - kappa);

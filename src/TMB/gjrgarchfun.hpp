@@ -219,7 +219,10 @@ Type gjrgarchfun(objective_function<Type>* obj) {
     for(int i = cmodel(0);i<timesteps;i++){
         sigma_squared(i) += variance_intercept(i);
         for(j = 0;j<cmodel(1);j++){
-            if((cmodel(1) + j) >= i ) {
+            // a lookback lands in the pre-sample whenever (cmodel(0) + j) >= i:
+            // the boundary is the pre-sample length, not the ARCH order, and the
+            // two coincide only when cmodel(1) equals cmodel(0)
+            if((cmodel(0) + j) >= i ) {
                 indicator = CppAD::CondExpLe(residuals(i - j - 1), Type(0.0), Type(1.0), Type(0.0));
                 negative_indicator(i - j - 1) = indicator;
                 sigma_squared(i) += alpha(j) * residuals_squared(i - j - 1) + gamma(j) * initial_arch(j);

@@ -91,6 +91,24 @@
                 xtau = xtau_full, armax = as.integer(armax), presample = maxpq)
 }
 
+# init.col(j) in the simulation recursions is indexed by ARCH lag j, not by
+# pre-sample column, so only the first order[1] entries are ever read and
+# the remaining columns merely fill the pre-sample block. A short per-lag
+# vector is therefore padded rather than collapsed onto its first entry,
+# which would put lag 1's initialization into every lag slot. Anything
+# longer than maxpq (the nsim x p matrix derived from innov_init) keeps the
+# previous behaviour, since it is not a per-lag vector.
+.expand_arch_initial <- function(init, maxpq, nsim)
+{
+    init <- as.numeric(init)
+    if (length(init) > maxpq) {
+        init <- rep(init[1], maxpq)
+    } else if (length(init) < maxpq) {
+        init <- c(init, rep(init[length(init)], maxpq - length(init)))
+    }
+    matrix(init, ncol = maxpq, nrow = nsim, byrow = TRUE)
+}
+
 # validate the simulate() mean-regressor argument: a matrix/xts of h + burn
 # rows by NCOL(xreg) columns (deliberately unlike the legacy vreg argument,
 # which is a pre-multiplied vector - see AGENTS.md). NULL with regressors in
@@ -197,8 +215,7 @@
 
     if (!is.null(extra_args$arch_initial)) {
         init <- extra_args$arch_initial
-        if (length(init) != maxpq) init <- rep(init[1], maxpq)
-        init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+        init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
     } else {
         init <- epsilon[,seq_len(maxpq), drop = FALSE]^2
         init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
@@ -281,8 +298,7 @@
 
     if (!is.null(extra_args$arch_initial)) {
         init <- extra_args$arch_initial
-        if (length(init) != maxpq) init <- rep(init[1], maxpq)
-        init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+        init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
     } else {
         init <- (abs(z[,seq_len(order[1]), drop = FALSE]) - kappa)
         init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
@@ -374,17 +390,14 @@
 
         if (!is.null(extra_args$arch_initial)) {
             init <- extra_args$arch_initial
-            if (length(init) != maxpq) init <- rep(init[1], maxpq)
-            init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+            init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
         } else {
             if (is.null(innov_init)) {
                 init <- kappa * (initv^(delta/2))
-                if (length(init) != maxpq) init <- rep(init[1], maxpq)
-                init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+                init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
             } else {
                 init <- (abs(epsilon[,seq_len(order[1])]) - gamma * epsilon[,seq_len(order[1])])^delta
-                if (length(init) != maxpq) init <- rep(init[1], maxpq)
-                init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+                init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
             }
         }
     }
@@ -473,8 +486,7 @@
 
     if (!is.null(extra_args$arch_initial)) {
         init <- extra_args$arch_initial
-        if (length(init) != maxpq) init <- rep(init[1], maxpq)
-        init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+        init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
     } else {
         init <- (epsilon[,seq_len(maxpq), drop = FALSE]^2 * kappa)
         init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
@@ -571,8 +583,7 @@
     if (maxpq > 0) {
         if (!is.null(extra_args$arch_initial)) {
             init <- extra_args$arch_initial
-            if (length(init) != maxpq) init <- rep(init[1], maxpq)
-            init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+            init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
         } else {
             if (is.null(innov_init)) {
                 init <- kappa
@@ -794,8 +805,7 @@
 
     if (!is.null(extra_args$arch_initial)) {
         init <- extra_args$arch_initial
-        if (length(init) != maxpq) init <- rep(init[1], maxpq)
-        init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+        init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
     } else {
         init <- epsilon[,seq_len(maxpq), drop = FALSE]^2
         init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
