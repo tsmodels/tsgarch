@@ -7,7 +7,7 @@ output:
         css: custom.css
         code_folding: show
 vignette: >
-  %\VignetteIndexEntry{ARMA GARCH Estimation}
+  %\VignetteIndexEntry{ARMA-GARCH Estimation}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -179,11 +179,12 @@ spans the unrestricted model, the restriction each convention imposes can be
 tested directly by fitting that larger model and inspecting $\hat\beta_1$.
 Simpler still, the likelihood discriminates sharply between the two: in a
 Monte Carlo experiment reported in the GARCH Models vignette the correctly
-specified convention had the higher likelihood in every one of 1000
-replications. That is worth doing rather than guessing, because choosing
-wrongly biases the autoregressive coefficient by roughly $\pm 0.36$ on a
-true value of 0.6, and depending on how persistent the regressor is, the
-error may land on $\tau$ or on $\phi$ - so a plausible looking regressor
+specified convention had the higher likelihood in all 1000 comparisons.
+That is worth doing rather than guessing, because the parameter most
+reliably damaged is the autoregressive one: the bias in $\phi_1$ is roughly
+$\pm 0.36$ on a true value of 0.6 in three of the four misspecified cells
+considered there. How the error divides between $\tau$ and $\phi$ turns on
+how persistent the regressor is, so a plausible looking regressor
 coefficient is no evidence that the convention is right.
 
 ## Stationarity and Invertibility

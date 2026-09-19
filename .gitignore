@@ -48,4 +48,5 @@ inst/.DS_Store
 *.Rproj
 .positai
 /.devin
-/experiments/
+/experiments/*
+!/experiments/xreg_type_montecarlo.R
