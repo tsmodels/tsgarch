@@ -165,3 +165,25 @@ test_that("estimate: igarch(2,1)-partially fixed parameters",{
     expect_equal(persistence(mod), 1.0)
     expect_equal(as.numeric(logLik(mod)), -1088.12, tolerance = 1e-3)
 })
+
+test_that("model_options from an older version is padded to the full length",{
+    spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1),
+                            distribution = "norm")
+    expect_length(spec$model_options, 9L)
+    # every released version up to 1.0.4 wrote six elements, before the
+    # ar/ma/armax flags were appended
+    legacy <- spec
+    legacy$model_options <- spec$model_options[1:6]
+    init <- tsgarch:::.tmb_initialize_model(legacy)
+    expect_length(init$data$cmodel, 9L)
+    expect_equal(as.integer(init$data$cmodel[7:9]), c(0L, 0L, 0L))
+})
+
+test_that("a spec without the mean equation rows is rejected with a clear message",{
+    spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "garch", order = c(1,1),
+                            distribution = "norm")
+    legacy <- spec
+    legacy$model_options <- spec$model_options[1:6]
+    legacy$parmatrix <- spec$parmatrix[!group %in% c("arpacf","mapacf","tau")]
+    expect_error(tsgarch:::.tmb_initialize_model(legacy), "older version of tsgarch")
+})

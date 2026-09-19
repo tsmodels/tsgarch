@@ -151,6 +151,20 @@ flavour has a positive implied seed and is unaffected.
 now renders the conditional mean equation `eq_mean` first in the
 equation block, covering the constant, ARMA terms and mean regressors
 under both `xreg_type` conventions.
+* A specification serialized by an older version of the package is now
+handled explicitly rather than failing obscurely. `model_options` gained
+the `ar`, `ma` and `xreg_type` flags during this cycle, while every
+released version up to 1.0.4 wrote only its first six elements; the
+padding applied on load added a single element, which left the last two
+flags to be read past the end of the vector. It is padded to the full
+length now. Such a specification also predates the `arpacf`, `mapacf` and
+`tau` rows of `parmatrix`, and is refused with a message naming
+`garch_modelspec()` as the remedy rather than the TMB error
+`Error when reading the variable: 'arpacf'`.
+* The hessian behind the standard errors in the scaled estimation step is
+now evaluated at the solution the optimizer returns, rather than at TMB's
+default of whichever point it last happened to evaluate. The two coincide
+for the solver in use, so reported standard errors are unchanged.
 
 # tsgarch 1.0.4
 

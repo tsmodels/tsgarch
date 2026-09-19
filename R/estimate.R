@@ -69,6 +69,13 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     # polynomial is fixed, the arpacf/mapacf values themselves - see below)
     # and must not leak those changes back into the caller's spec object.
     parmatrix <- copy(spec$parmatrix)
+    # A spec serialized by a version predating the ARMA-X mean equation has no
+    # arpacf/mapacf/tau rows at all. MakeADFun would otherwise fail on the
+    # first missing parameter with an opaque "Error when reading the variable:
+    # 'arpacf'", so report what is actually wrong and how to recover.
+    if (!all(c("arpacf","mapacf","tau") %in% parmatrix$group)) {
+        stop("\nspec$parmatrix has no mean equation (arpacf/mapacf/tau) rows: this specification was created by an older version of tsgarch. Re-create it with garch_modelspec().", call. = FALSE)
+    }
     arma_order <- spec$model$arma
     if (is.null(arma_order)) arma_order <- c(0,0)
     # Users can fix an entire AR and/or MA polynomial at target coefficients
@@ -96,10 +103,13 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     map <- lapply(split(parmatrix[,list(P = 1:.N * include), by = "group"], by = "group", keep.by = FALSE, drop = T), function(x) as.factor(x$P))
     parameters <- lapply(split(parmatrix[,list(value, group)], by = "group", keep.by = FALSE), function(x) as.numeric(x$value))
     cmodel <- spec$model_options
-    # specs serialized by an earlier version have a length-8 cmodel (no
-    # armax flag) and no $xreg slot; cmodel(8) on a length-8 IVECTOR is an
-    # out-of-bounds read in C++, so pad the flag and default x here
-    if (length(cmodel) < 9) cmodel <- c(cmodel, 0L)
+    # Specs serialized by an older version carry a shorter model_options. Every
+    # released version up to 1.0.4 wrote six elements ([maxpq, arch, garch,
+    # variance_targeting, multiplicative, distribution]) and the ar/ma/armax
+    # flags were appended only afterwards, so the shortfall is not always one
+    # element. The templates read cmodel(6..8) unconditionally, so pad to the
+    # full length rather than by a fixed count.
+    if (length(cmodel) < 9L) cmodel <- c(cmodel, rep(0L, 9L - length(cmodel)))
     # augment data with max(p,q) vectors
     y <- c(rep(0, cmodel[1]), as.numeric(spec$target$y))
     v <- spec$vreg$vreg
@@ -249,7 +259,11 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     scaled_sol <- solve_model(init_pars = scaled_init_pars, env = scaled_env, const = scaled_const, lower = scaled_lower, upper = scaled_upper, control = control)
     #scaled_sol <- solve_solnp_model(init_pars = scaled_init_pars, env = scaled_env, const = scaled_const, lower = scaled_lower, upper = scaled_upper, control = control)
     scaled_sol$par_scale <- par_scale
-    hessian <- scaled_tmb$he()
+    # evaluate at the solution actually returned rather than relying on TMB's
+    # default (x = last.par, the optimizer's last evaluated point, which need
+    # not be the point it returns); this hessian feeds bread() and therefore
+    # every standard error
+    hessian <- scaled_tmb$he(scaled_sol$solution)
     if (any(is.na(hessian))) {
         warning("\nunable to calculate hessian for parameter scaling in scaling step. Reverting to numerical estimation.")
         hessian <- hessian(scaled_env$fun, x = scaled_sol$solution, env = scaled_env)
