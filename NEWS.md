@@ -206,6 +206,33 @@ practice never validated; it now fits an `egarch` model.
 With more than one simulated path this left the paths differing from one
 another even when handed identical innovations. All flavors now agree
 across identical paths, which is checked directly.
+* Fixed the pre-sample initialization of `simulate()` for more than one sample
+path. `innov_init` is documented as applying identically to every path, but
+it was assigned into the pre-sample block column-major for `egarch`,
+`gjrgarch`, `aparch`, `fgarch` and `cgarch`, so the paths were handed
+different initial innovations; `garch` and `igarch` instead re-wrapped an
+already correct pre-sample matrix row-wise, which scrambled it. Both forms
+are replaced by the one explicit row-wise broadcast. The two faults happened
+to cancel for some flavors, which is why a single sample path, and any
+symmetric `innov_init`, hid them.
+* The ARCH initialization is indexed by lag, while the pre-sample block is
+chronological with its last column the most recent period. Lag `k` therefore
+pairs with pre-sample column `max(order, arma) - k + 1`, and that block is
+reversed now: previously lag 1 was given the oldest pre-sample value rather
+than the most recent, so lags and their coefficients were mismatched. Only
+observable when `max(order, arma) > 1`.
+* `aparch` and `fgarch` applied their per-lag `gamma` (and `fgarch` its `eta`)
+to the pre-sample block by column-major recycling, so with more than one path
+and an ARCH order above one the coefficients landed on the wrong lags, and
+the resulting matrix was then collapsed onto its first element. Both build
+the per-lag matrix directly now.
+* `predict()` no longer fails for an `egarch` model whose ARMA order exceeds
+its GARCH order. The higher order `egarch` forecast is approximated by
+simulation, there being no closed form for it (see the "Recursion
+Initialization" and `egarch` forecast sections of the GARCH Models vignette),
+and that call passed initialization vectors sized by the GARCH order alone
+where `simulate()` requires `max(order, arma)`, raising an error instead of
+forecasting.
 
 # tsgarch 1.0.4
 

@@ -355,13 +355,44 @@ test_that("fgarch(2,3) simulation: validate algoritm",{
 test_that("simulate: identical innovation rows give identical sigma rows across flavours",{
     set.seed(1); one <- rnorm(60)
     Z <- matrix(rep(one, 3), nrow = 3, byrow = TRUE)
-    for (m in c("garch","egarch","gjrgarch","aparch","fgarch","cgarch")) {
+    # asymmetric innov_init: the squaring/abs in several init formulas would
+    # mask a column-major scatter of a symmetric vector
+    flavours <- c("garch","egarch","gjrgarch","aparch","fgarch","cgarch","igarch")
+    for (m in flavours) {
         spec <- suppressWarnings(garch_modelspec(y[1:500,1], constant = TRUE, model = m,
                                   order = c(1,1), arma = c(2,1), distribution = "norm"))
         maxpq <- max(spec$model$order, spec$model$arma)
-        ii <- seq(0.7, by = -1.4, length.out = maxpq)
-        sg <- suppressWarnings(simulate(spec, nsim = 3, h = 60, innov = Z, innov_init = ii)$sigma)
-        expect_equal(sg[1,], sg[2,], info = m)
-        expect_equal(sg[1,], sg[3,], info = m)
+        ii <- seq(0.6, by = -1.1, length.out = maxpq)
+        s1 <- suppressWarnings(simulate(spec, nsim = 1, h = 60, innov = matrix(one, nrow = 1), innov_init = ii)$sigma)
+        s3 <- suppressWarnings(simulate(spec, nsim = 3, h = 60, innov = Z, innov_init = ii)$sigma)
+        expect_equal(s1[1,], s3[1,], info = m)
+        expect_equal(s3[1,], s3[2,], info = m)
+        expect_equal(s3[1,], s3[3,], info = m)
     }
+    # the same invariants with unequal per-lag parameters expose per-lag
+    # recycling of gamma/eta across the pre-sample columns
+    for (m in flavours) {
+        spec <- suppressWarnings(garch_modelspec(y[1:500,1], constant = TRUE, model = m,
+                                  order = c(2,1), arma = c(0,0), distribution = "norm"))
+        for (g in c("alpha","gamma","eta","beta")) {
+            idx <- which(spec$parmatrix$group == g)
+            if (length(idx) > 1) spec$parmatrix[idx, value := value * seq(0.6, 1.4, length.out = length(idx))]
+        }
+        maxpq <- max(spec$model$order, spec$model$arma)
+        ii <- seq(0.6, by = -1.1, length.out = maxpq)
+        s1 <- suppressWarnings(simulate(spec, nsim = 1, h = 60, innov = matrix(one, nrow = 1), innov_init = ii)$sigma)
+        s3 <- suppressWarnings(simulate(spec, nsim = 3, h = 60, innov = Z, innov_init = ii)$sigma)
+        expect_equal(s1[1,], s3[1,], info = m)
+        expect_equal(s3[1,], s3[2,], info = m)
+        expect_equal(s3[1,], s3[3,], info = m)
+    }
+})
+
+test_that("predict: egarch simulation branch works when arma order exceeds garch order",{
+    spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "egarch",
+                            order = c(2,1), arma = c(3,0), distribution = "norm")
+    mod <- suppressWarnings(estimate(spec))
+    p <- predict(mod, h = 5, nsim = 100, seed = 1)
+    expect_length(as.numeric(p$sigma), 5)
+    expect_true(all(is.finite(as.numeric(p$sigma)) & as.numeric(p$sigma) > 0))
 })
