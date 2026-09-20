@@ -116,7 +116,7 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
     if (is.null(model_name)) model_name <- object$model$model
     arma_order <- object$model$arma
     if (is.null(arma_order)) arma_order <- c(0,0)
-    b %<-% future_lapply(1:length(seqdates), function(i) {
+    b <- future_lapply(1:length(seqdates), function(i) {
         if (trace) prog_trace()
         y_train <- data[paste0("/", seqdates[i])]
         if (use_vreg) {
@@ -232,8 +232,10 @@ tsbacktest.tsgarch.spec <- function(object, start = floor(length(object$target$y
                               "actual" = as.numeric(y_test))
         }
         return(out)
-    }, future.packages = c("tsmethods","tsgarch","xts","data.table"), future.stdout	= FALSE, future.seed = FALSE)
-    b <- eval(b)
+    # the iterations draw random numbers via predict(), so they need parallel-safe
+    # streams; assigned directly rather than through %<-%, since an unseeded outer
+    # future would itself draw the inner seeds and warn (as R/multispec.R does)
+    }, future.packages = c("tsmethods","tsgarch","xts","data.table"), future.stdout	= FALSE, future.seed = TRUE)
     b <- rbindlist(b)
     out <- list(table = b, distribution = object$distribution, h = h, estimate_every = estimate_every, rolling = rolling)
     return(out)

@@ -30,7 +30,10 @@
 
 \item{var_init}{the seed value for initializing the variance equation recursion.
 If NULL, the variance target value is used based on the supplied parameters.
-This should be a vector and assumes all sample paths are seeded the same way.}
+This should be a vector and assumes all sample paths are seeded the same way.
+For a cgarch model it may alternatively be a \code{max(order, arma)} by 2
+matrix, whose first column initializes the permanent (long run) component
+and whose second column initializes the total conditional variance.}
 
 \item{innov}{an optional matrix of dimensions nsim by h of zero mean unit variance
 (standardized) innovations which will be used instead of the model distribution

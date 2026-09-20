@@ -293,9 +293,11 @@ initialize_arma_pacf <- function(y, arma, xreg = NULL)
     if (sum(arma) == 0) {
         return(list(ar = ar_pacf, ma = ma_pacf, tau = tau))
     }
-    fit <- try(stats::arima(as.numeric(y), order = c(ar, 0, ma), include.mean = FALSE,
+    # this fit only supplies starting values and has a fallback on failure,
+    # so its optimizer chatter should not surface from a specification call
+    fit <- try(suppressWarnings(stats::arima(as.numeric(y), order = c(ar, 0, ma), include.mean = FALSE,
                             xreg = if (has_xreg) xreg else NULL,
-                            method = "ML", transform.pars = TRUE), silent = TRUE)
+                            method = "ML", transform.pars = TRUE)), silent = TRUE)
     if (!inherits(fit, "try-error")) {
         cf <- stats::coef(fit)
         if (ar > 0) {

@@ -265,6 +265,27 @@ per-lag `kappa_k` is also paired with the pre-sample period belonging to lag
 `k` now, consistent with the `innov_init` branch. `fgarch` was never
 affected: its recursion multiplies by `sigma^delta` explicitly, so its
 initialization is the standardized `kappa_k` alone.
+* `garch_modelspec()` no longer emits optimizer warnings of its own. The
+`stats::arima` fit used to obtain starting values for the ARMA and regressor
+blocks could report a convergence problem, even though the fit only supplies
+warm starts and already falls back when it fails.
+* `tsbacktest()` no longer warns that its iterations drew random numbers
+without declaring a seed. The iterations do draw them, through `predict()`,
+so they are now given parallel-safe streams via `future.seed`, as
+`estimate()` on a multi-specification already did.
+* A standard error that is legitimately undefined is now reported as `NaN`
+without the low-level warning behind it. When a parameter is estimated at
+one of its bounds - an over-parameterized ARMA whose partial autocorrelation
+terms reach the edge of the stationary region, or `ewma`, whose unit
+persistence constraint leaves its two coefficients perfectly dependent - the
+Hessian has no positive definite direction there and the delta method
+variance is negative. The `NaN` itself is retained, and `kkt1`/`kkt2` in the
+estimated object's `conditions` remain the signal that the solution sits on
+a bound.
+* Documented the matrix form of `var_init` accepted by `simulate()` for a
+`cgarch` model: a `max(order, arma)` by 2 matrix whose first column
+initializes the permanent (long run) component and whose second column
+initializes the total conditional variance.
 
 # tsgarch 1.0.4
 
