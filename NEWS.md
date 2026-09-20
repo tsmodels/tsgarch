@@ -286,6 +286,21 @@ a bound.
 `cgarch` model: a `max(order, arma)` by 2 matrix whose first column
 initializes the permanent (long run) component and whose second column
 initializes the total conditional variance.
+* A pre-sample innovation supplied to an `egarch` simulation through
+`innov_init` now carries its leverage effect. Only the magnitude was being
+used, through the `gamma_j` term, while the sign entered nowhere: the
+`alpha_j z_{t-j}` part of the ARCH equation was absent from the pre-sample.
+The three initialization cases need different treatment, so the coefficients
+are applied when the initialization is built rather than inside the
+recursion: `arch_initial` keeps the `gamma_j` term alone, reproducing the
+likelihood, which zeroes the pre-sample standardized residual; no
+`innov_init` keeps the expectation, which is zero; and a supplied
+`innov_init` is evaluated through the whole equation. Simulations that pass
+`arch_initial`, which includes every reproduction path, are unchanged. The
+`egarch` predictive distribution and the simulation-approximated higher order
+forecast both move, and at a horizon of one the mean of the simulated
+distribution now agrees with the closed form forecast to machine precision,
+where it was previously out by around 3 percent.
 
 # tsgarch 1.0.4
 

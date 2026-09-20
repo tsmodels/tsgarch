@@ -302,19 +302,27 @@
 
     order <- as.integer(object$model$order)
 
+    # lag k pairs with pre-sample column maxpq - k + 1, which is why the
+    # pre-sample is reversed below, matching the other flavors; k_idx clamps
+    # the coefficient index to [1, order[1]] since columns past order[1] are
+    # never read by the recursion (and order[1] = 0 would otherwise index
+    # alpha/gamma with 0 and yield NA)
+    k_idx <- pmax(pmin(seq_len(maxpq), order[1]), 1L)
+    a_lag <- matrix(alpha[k_idx], ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+    g_lag <- matrix(gamma[k_idx], ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
     if (!is.null(extra_args$arch_initial)) {
-        init <- extra_args$arch_initial
-        init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
+        # reproduce the likelihood: egarchfun.hpp zeroes the pre-sample z and
+        # evaluates gamma(j) * initial_arch(j), so only the gamma part survives
+        init <- g_lag * .expand_arch_initial(extra_args$arch_initial, maxpq, nrow(epsilon))
+    } else if (is.null(innov_init)) {
+        # with nothing to evaluate the arch equation at, use its expectation:
+        # alpha_j E(z) + gamma_j (E|z| - kappa) = 0 by the definition of kappa
+        init <- matrix(0, nrow = nrow(epsilon), ncol = maxpq)
     } else {
-        if (is.null(innov_init)) {
-            # with nothing to evaluate the arch equation at, use its expectation,
-            # as the other asymmetric flavors do: E(|z| - kappa) = 0 by the
-            # definition of kappa. This is also exactly what the likelihood uses,
-            # initial_arch being zeroed in egarchfun.hpp
-            init <- matrix(0, nrow = nrow(epsilon), ncol = maxpq)
-        } else {
-            init <- (abs(z[, rev(seq_len(maxpq)), drop = FALSE]) - kappa)
-        }
+        # evaluate the full arch equation at the user's pre-sample innovations,
+        # leverage included
+        z_pre <- z[, rev(seq_len(maxpq)), drop = FALSE]
+        init <- a_lag * z_pre + g_lag * (abs(z_pre) - kappa)
     }
 
     simc <- .egarchsimvec(z = z, sigma_log_sim = sigma_log_sim, variance_intercept = variance_intercept, init = init, alpha = alpha, gamma = gamma, beta = beta, kappa = kappa, mu = mu, order = order, presample = maxpq)
