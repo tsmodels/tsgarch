@@ -306,7 +306,15 @@
         init <- extra_args$arch_initial
         init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
     } else {
-        init <- (abs(z[, rev(seq_len(maxpq)), drop = FALSE]) - kappa)
+        if (is.null(innov_init)) {
+            # with nothing to evaluate the arch equation at, use its expectation,
+            # as the other asymmetric flavors do: E(|z| - kappa) = 0 by the
+            # definition of kappa. This is also exactly what the likelihood uses,
+            # initial_arch being zeroed in egarchfun.hpp
+            init <- matrix(0, nrow = nrow(epsilon), ncol = maxpq)
+        } else {
+            init <- (abs(z[, rev(seq_len(maxpq)), drop = FALSE]) - kappa)
+        }
     }
 
     simc <- .egarchsimvec(z = z, sigma_log_sim = sigma_log_sim, variance_intercept = variance_intercept, init = init, alpha = alpha, gamma = gamma, beta = beta, kappa = kappa, mu = mu, order = order, presample = maxpq)

@@ -240,6 +240,18 @@ rotated across sample paths rather than applied identically to each, as it
 is documented to be. It is broadcast row-wise now, as `garch` and `igarch`
 already did. Only observable with more than one sample path and
 `max(order, arma) > 1`.
+* The default ARCH initialization of an `egarch` simulation no longer biases
+the first `max(order, arma)` steps downwards. With no `innov_init` to
+evaluate the ARCH equation at, the pre-sample standardized innovations are
+zero, and the equation was evaluated there literally, giving
+`|0| - kappa = -kappa` and so a contribution of `-gamma_j kappa` to the log
+variance. The other asymmetric flavors instead use the expectation of their
+ARCH equation, which here is `E(|z|) - kappa = 0` by the definition of
+`kappa`, and which is also what the likelihood uses (`initial_arch` is
+zeroed in the `egarch` TMB template). `egarch` now does the same, so a
+default simulation, a simulation initialized from a fit, and the likelihood
+all share one convention. Simulations that pass `innov_init` or
+`arch_initial` (including those behind `predict()`) are unaffected.
 
 # tsgarch 1.0.4
 

@@ -397,6 +397,26 @@ test_that("simulate: identical innovation rows give identical sigma rows across 
     }
 })
 
+test_that("simulate: egarch default arch initialization matches the likelihood",{
+    # egarchfun.hpp zeroes initial_arch, so the pre-sample arch term contributes
+    # exactly nothing; with no innov_init to evaluate the equation at, the
+    # simulation default must agree rather than use |0| - kappa = -kappa
+    set.seed(1); one <- rnorm(40)
+    spec <- suppressWarnings(garch_modelspec(y[1:500,1], constant = TRUE, model = "egarch",
+                              order = c(2,1), arma = c(0,0), distribution = "norm"))
+    idx <- which(spec$parmatrix$group == "gamma")
+    spec$parmatrix[idx, value := c(0.12, 0.2)]
+    maxpq <- max(spec$model$order, spec$model$arma)
+    sdef <- suppressWarnings(simulate(spec, nsim = 1, h = 40, innov = matrix(one, nrow = 1))$sigma)
+    szero <- suppressWarnings(simulate(spec, nsim = 1, h = 40, innov = matrix(one, nrow = 1),
+                                       arch_initial = rep(0, maxpq))$sigma)
+    expect_equal(as.numeric(sdef), as.numeric(szero))
+    # the previous default, to show the check above is not vacuous
+    skappa <- suppressWarnings(simulate(spec, nsim = 1, h = 40, innov = matrix(one, nrow = 1),
+                                        arch_initial = rep(-sqrt(2/pi), maxpq))$sigma)
+    expect_false(isTRUE(all.equal(as.numeric(sdef), as.numeric(skappa))))
+})
+
 test_that("predict: egarch simulation branch works when arma order exceeds garch order",{
     spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "egarch",
                             order = c(2,1), arma = c(3,0), distribution = "norm")
