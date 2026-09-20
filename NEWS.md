@@ -233,6 +233,13 @@ Initialization" and `egarch` forecast sections of the GARCH Models vignette),
 and that call passed initialization vectors sized by the GARCH order alone
 where `simulate()` requires `max(order, arma)`, raising an error instead of
 forecasting.
+* `var_init` was seeded column-major into the pre-sample variance block for
+`egarch`, `gjrgarch`, `aparch`, `fgarch` and `cgarch` (including the
+permanent component of the latter), so a vector of initial variances was
+rotated across sample paths rather than applied identically to each, as it
+is documented to be. It is broadcast row-wise now, as `garch` and `igarch`
+already did. Only observable with more than one sample path and
+`max(order, arma) > 1`.
 
 # tsgarch 1.0.4
 

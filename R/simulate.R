@@ -293,8 +293,10 @@
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
     if (maxpq > 0) {
-        sigma_log_sim[,seq_len(maxpq)] <- initv
-        sigma_sim[,seq_len(maxpq)] <- sqrt(exp(initv))
+        # var_init seeds every sample path identically, so it must be broadcast
+        # row-wise; a bare subscript assignment fills column-major and rotates it.
+        sigma_log_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sim[,seq_len(maxpq)] <- matrix(sqrt(exp(initv)), ncol = maxpq, nrow = nsim, byrow = TRUE)
         epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
     }
 
@@ -387,8 +389,8 @@
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
     if (maxpq > 0) {
-        sigma_power_sim[,seq_len(maxpq)] <- initv
-        sigma_sim[,seq_len(maxpq)] <- initv^(1/delta)
+        sigma_power_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sim[,seq_len(maxpq)] <- matrix(initv^(1/delta), ncol = maxpq, nrow = nsim, byrow = TRUE)
         epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
 
         if (!is.null(extra_args$arch_initial)) {
@@ -489,8 +491,8 @@
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
     if (maxpq > 0) {
-        sigma_squared_sim[,seq_len(maxpq)] <- initv
-        sigma_sim[,seq_len(maxpq)] <- sqrt(initv)
+        sigma_squared_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sim[,seq_len(maxpq)] <- matrix(sqrt(initv), ncol = maxpq, nrow = nsim, byrow = TRUE)
         epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
     }
 
@@ -579,13 +581,14 @@
         initv <- var_init^(delta/2)
     }
     .validate_sim_initv(initv)
+    order <- as.integer(object$model$order)
 
     sigma_sim <- sigma_power_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
     if (maxpq > 0) {
-        sigma_power_sim[,seq_len(maxpq)] <- initv
-        sigma_sim[,seq_len(maxpq)] <- initv^(1/delta)
+        sigma_power_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sim[,seq_len(maxpq)] <- matrix(initv^(1/delta), ncol = maxpq, nrow = nsim, byrow = TRUE)
         epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
     }
 
@@ -598,10 +601,9 @@
                 init <- kappa
                 init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
             } else {
-                # see .simulate_aparch() for the reversal and the index clamp;
-                # note order is not yet in scope at this point in this function
+                # see .simulate_aparch() for the reversal and the index clamp
                 z_pre <- z[, rev(seq_len(maxpq)), drop = FALSE]
-                g_idx <- pmax(pmin(seq_len(maxpq), object$model$order[1]), 1L)
+                g_idx <- pmax(pmin(seq_len(maxpq), order[1]), 1L)
                 e_lag <- matrix(eta[g_idx], ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
                 g_lag <- matrix(gamma[g_idx], ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
                 d_pre <- z_pre - e_lag
@@ -609,8 +611,6 @@
             }
         }
     }
-
-    order <- as.integer(object$model$order)
 
     simc <- .fgarchsimvec(epsilon = epsilon, sigma_power_sim = sigma_power_sim, z = z, variance_intercept = variance_intercept, init = init,
                           alpha = alpha, gamma = gamma, eta = eta, beta = beta, delta = delta, mu = mu, order = order, presample = maxpq)
@@ -703,9 +703,9 @@
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
     if (maxpq > 0) {
-        permanent_component_sim[,seq_len(maxpq)] <- initq
-        sigma_sqr_sim[,seq_len(maxpq)] <- initv
-        sigma_sim[,seq_len(maxpq)] <- sqrt(initv)
+        permanent_component_sim[,seq_len(maxpq)] <- matrix(initq, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sqr_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sim[,seq_len(maxpq)] <- matrix(sqrt(initv), ncol = maxpq, nrow = nsim, byrow = TRUE)
         epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
     }
     order <- as.integer(object$model$order)

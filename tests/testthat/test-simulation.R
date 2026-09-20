@@ -363,8 +363,12 @@ test_that("simulate: identical innovation rows give identical sigma rows across 
                                   order = c(1,1), arma = c(2,1), distribution = "norm"))
         maxpq <- max(spec$model$order, spec$model$arma)
         ii <- seq(0.6, by = -1.1, length.out = maxpq)
-        s1 <- suppressWarnings(simulate(spec, nsim = 1, h = 60, innov = matrix(one, nrow = 1), innov_init = ii)$sigma)
-        s3 <- suppressWarnings(simulate(spec, nsim = 3, h = 60, innov = Z, innov_init = ii)$sigma)
+        # var_init is subject to the same broadcast contract as innov_init, and a
+        # non-constant vector is needed for a column-major fill to be visible
+        vi <- seq(0.9, by = 0.7, length.out = maxpq)
+        if (m == "cgarch") vi <- cbind(vi, vi)
+        s1 <- suppressWarnings(simulate(spec, nsim = 1, h = 60, innov = matrix(one, nrow = 1), innov_init = ii, var_init = vi)$sigma)
+        s3 <- suppressWarnings(simulate(spec, nsim = 3, h = 60, innov = Z, innov_init = ii, var_init = vi)$sigma)
         expect_equal(s1[1,], s3[1,], info = m)
         expect_equal(s3[1,], s3[2,], info = m)
         expect_equal(s3[1,], s3[3,], info = m)
@@ -380,8 +384,10 @@ test_that("simulate: identical innovation rows give identical sigma rows across 
         }
         maxpq <- max(spec$model$order, spec$model$arma)
         ii <- seq(0.6, by = -1.1, length.out = maxpq)
-        s1 <- suppressWarnings(simulate(spec, nsim = 1, h = 60, innov = matrix(one, nrow = 1), innov_init = ii)$sigma)
-        s3 <- suppressWarnings(simulate(spec, nsim = 3, h = 60, innov = Z, innov_init = ii)$sigma)
+        vi <- seq(0.9, by = 0.7, length.out = maxpq)
+        if (m == "cgarch") vi <- cbind(vi, vi)
+        s1 <- suppressWarnings(simulate(spec, nsim = 1, h = 60, innov = matrix(one, nrow = 1), innov_init = ii, var_init = vi)$sigma)
+        s3 <- suppressWarnings(simulate(spec, nsim = 3, h = 60, innov = Z, innov_init = ii, var_init = vi)$sigma)
         expect_equal(s1[1,], s3[1,], info = m)
         expect_equal(s3[1,], s3[2,], info = m)
         expect_equal(s3[1,], s3[3,], info = m)
