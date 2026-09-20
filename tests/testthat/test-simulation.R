@@ -158,17 +158,24 @@ test_that("cgarch(2,1) simulation: validate algoritm",{
 })
 
 test_that("egarch(1,1) simulation: validate algoritm",{
-    spec <- copy(global_spec_garch)
-    spec$parmatrix <- copy(global_mod_garch$parmatrix)
-    v <- c(as.numeric(y[1:1800,2]) * coef(global_mod_garch)["xi1"])
-    z <- matrix(as.numeric(residuals(global_mod_garch, standardize = TRUE)), nrow = 1)
+    # this copied the garch globals throughout, so egarch was never actually
+    # validated here; it now builds and fits an egarch spec
+    local_spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "egarch",
+                                  order = c(1,1), arma = c(0,0), vreg = y[1:1800,2],
+                                  distribution = "norm")
+    local_mod <- suppressWarnings(estimate(local_spec))
+    spec <- copy(local_spec)
+    spec$parmatrix <- copy(local_mod$parmatrix)
+    v <- c(as.numeric(y[1:1800,2]) * coef(local_mod)["xi1"])
+    z <- matrix(as.numeric(residuals(local_mod, standardize = TRUE)), nrow = 1)
+    maxpq <- max(local_spec$model$order, local_spec$model$arma)
     # use fixed innovation and replicate the initial conditions to guarantee a deterministic
     # simulation which serves to validate the algorithm for correctness and reproducability
     sim <- simulate(spec, nsim = 1, h = length(spec$target$y_orig),
-                    var_init = global_mod_garch$var_initial,
-                    innov = z, vreg = v,
-                    arch_initial = global_mod_garch$arch_initial)
-    expect_equal(sim$sigma[1,], global_mod_garch$sigma, tolerance = 0.001)
+                    var_init = local_mod$var_initial,
+                    innov = z, vreg = v, innov_init = rep(1, maxpq),
+                    arch_initial = local_mod$arch_initial)
+    expect_equal(sim$sigma[1,], local_mod$sigma)
 })
 
 test_that("simulate norm: same seed same output",{
@@ -229,4 +236,222 @@ test_that("simulate: a non-positive implied initial variance errors rather than 
         s <- suppressWarnings(simulate(sp, h = 5, nsim = 2, seed = 1))
         expect_true(all(as.matrix(s$sigma) > 0), info = m)
     }
+})
+
+test_that("gjrgarch(1,1) arma(2,1) simulation: validate algoritm",{
+    local_spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "gjrgarch",
+                                  order = c(1,1), arma = c(2,1), vreg = y[1:1800,2],
+                                  distribution = "norm")
+    local_mod <- suppressWarnings(estimate(local_spec))
+    spec <- copy(local_spec)
+    spec$parmatrix <- copy(local_mod$parmatrix)
+    v <- c(as.numeric(y[1:1800,2]) * coef(local_mod)["xi1"])
+    z <- matrix(as.numeric(residuals(local_mod, standardize = TRUE)), nrow = 1)
+    maxpq <- max(local_spec$model$order, local_spec$model$arma)
+    # use fixed innovation and replicate the initial conditions to guarantee a deterministic
+    # simulation which serves to validate the algorithm for correctness and reproducability
+    sim <- simulate(spec, nsim = 1, h = length(spec$target$y_orig),
+                    var_init = local_mod$var_initial,
+                    innov = z, vreg = v, innov_init = rep(1, maxpq),
+                    arch_initial = local_mod$arch_initial)
+    expect_equal(sim$sigma[1,], local_mod$sigma)
+})
+
+test_that("gjrgarch(2,3) simulation: validate algoritm",{
+    local_spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "gjrgarch",
+                                  order = c(2,3), arma = c(0,0), vreg = y[1:1800,2],
+                                  distribution = "norm")
+    local_mod <- suppressWarnings(estimate(local_spec))
+    spec <- copy(local_spec)
+    spec$parmatrix <- copy(local_mod$parmatrix)
+    v <- c(as.numeric(y[1:1800,2]) * coef(local_mod)["xi1"])
+    z <- matrix(as.numeric(residuals(local_mod, standardize = TRUE)), nrow = 1)
+    maxpq <- max(local_spec$model$order, local_spec$model$arma)
+    # use fixed innovation and replicate the initial conditions to guarantee a deterministic
+    # simulation which serves to validate the algorithm for correctness and reproducability
+    sim <- simulate(spec, nsim = 1, h = length(spec$target$y_orig),
+                    var_init = local_mod$var_initial,
+                    innov = z, vreg = v, innov_init = rep(1, maxpq),
+                    arch_initial = local_mod$arch_initial)
+    expect_equal(sim$sigma[1,], local_mod$sigma)
+})
+
+test_that("aparch(1,1) arma(2,1) simulation: validate algoritm",{
+    local_spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "aparch",
+                                  order = c(1,1), arma = c(2,1), vreg = y[1:1800,2],
+                                  distribution = "norm")
+    local_mod <- suppressWarnings(estimate(local_spec))
+    spec <- copy(local_spec)
+    spec$parmatrix <- copy(local_mod$parmatrix)
+    v <- c(as.numeric(y[1:1800,2]) * coef(local_mod)["xi1"])
+    z <- matrix(as.numeric(residuals(local_mod, standardize = TRUE)), nrow = 1)
+    maxpq <- max(local_spec$model$order, local_spec$model$arma)
+    # use fixed innovation and replicate the initial conditions to guarantee a deterministic
+    # simulation which serves to validate the algorithm for correctness and reproducability
+    sim <- simulate(spec, nsim = 1, h = length(spec$target$y_orig),
+                    var_init = local_mod$var_initial,
+                    innov = z, vreg = v, innov_init = rep(1, maxpq),
+                    arch_initial = local_mod$arch_initial)
+    expect_equal(sim$sigma[1,], local_mod$sigma)
+})
+
+test_that("aparch(2,3) simulation: validate algoritm",{
+    local_spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "aparch",
+                                  order = c(2,3), arma = c(0,0), vreg = y[1:1800,2],
+                                  distribution = "norm")
+    local_mod <- suppressWarnings(estimate(local_spec))
+    spec <- copy(local_spec)
+    spec$parmatrix <- copy(local_mod$parmatrix)
+    v <- c(as.numeric(y[1:1800,2]) * coef(local_mod)["xi1"])
+    z <- matrix(as.numeric(residuals(local_mod, standardize = TRUE)), nrow = 1)
+    maxpq <- max(local_spec$model$order, local_spec$model$arma)
+    # use fixed innovation and replicate the initial conditions to guarantee a deterministic
+    # simulation which serves to validate the algorithm for correctness and reproducability
+    sim <- simulate(spec, nsim = 1, h = length(spec$target$y_orig),
+                    var_init = local_mod$var_initial,
+                    innov = z, vreg = v, innov_init = rep(1, maxpq),
+                    arch_initial = local_mod$arch_initial)
+    expect_equal(sim$sigma[1,], local_mod$sigma)
+})
+
+test_that("fgarch(1,1) arma(2,1) simulation: validate algoritm",{
+    local_spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "fgarch",
+                                  order = c(1,1), arma = c(2,1), vreg = y[1:1800,2],
+                                  distribution = "norm")
+    local_mod <- suppressWarnings(estimate(local_spec))
+    spec <- copy(local_spec)
+    spec$parmatrix <- copy(local_mod$parmatrix)
+    v <- c(as.numeric(y[1:1800,2]) * coef(local_mod)["xi1"])
+    z <- matrix(as.numeric(residuals(local_mod, standardize = TRUE)), nrow = 1)
+    maxpq <- max(local_spec$model$order, local_spec$model$arma)
+    # use fixed innovation and replicate the initial conditions to guarantee a deterministic
+    # simulation which serves to validate the algorithm for correctness and reproducability
+    sim <- simulate(spec, nsim = 1, h = length(spec$target$y_orig),
+                    var_init = local_mod$var_initial,
+                    innov = z, vreg = v, innov_init = rep(1, maxpq),
+                    arch_initial = local_mod$arch_initial)
+    expect_equal(sim$sigma[1,], local_mod$sigma)
+})
+
+test_that("fgarch(2,3) simulation: validate algoritm",{
+    local_spec <- garch_modelspec(y[1:1800,1], constant = TRUE, model = "fgarch",
+                                  order = c(2,3), arma = c(0,0), vreg = y[1:1800,2],
+                                  distribution = "norm")
+    local_mod <- suppressWarnings(estimate(local_spec))
+    spec <- copy(local_spec)
+    spec$parmatrix <- copy(local_mod$parmatrix)
+    v <- c(as.numeric(y[1:1800,2]) * coef(local_mod)["xi1"])
+    z <- matrix(as.numeric(residuals(local_mod, standardize = TRUE)), nrow = 1)
+    maxpq <- max(local_spec$model$order, local_spec$model$arma)
+    # use fixed innovation and replicate the initial conditions to guarantee a deterministic
+    # simulation which serves to validate the algorithm for correctness and reproducability
+    sim <- simulate(spec, nsim = 1, h = length(spec$target$y_orig),
+                    var_init = local_mod$var_initial,
+                    innov = z, vreg = v, innov_init = rep(1, maxpq),
+                    arch_initial = local_mod$arch_initial)
+    expect_equal(sim$sigma[1,], local_mod$sigma)
+})
+
+test_that("simulate: identical innovation rows give identical sigma rows across flavours",{
+    set.seed(1); one <- rnorm(60)
+    Z <- matrix(rep(one, 3), nrow = 3, byrow = TRUE)
+    # asymmetric innov_init: the squaring/abs in several init formulas would
+    # mask a column-major scatter of a symmetric vector
+    flavours <- c("garch","egarch","gjrgarch","aparch","fgarch","cgarch","igarch")
+    for (m in flavours) {
+        spec <- suppressWarnings(garch_modelspec(y[1:500,1], constant = TRUE, model = m,
+                                  order = c(1,1), arma = c(2,1), distribution = "norm"))
+        maxpq <- max(spec$model$order, spec$model$arma)
+        ii <- seq(0.6, by = -1.1, length.out = maxpq)
+        # var_init is subject to the same broadcast contract as innov_init, and
+        # it has to vary over the pre-sample for a column-major fill to show up.
+        # cgarch takes a maxpq by 2 matrix because it carries two variances: the
+        # permanent (long run) component in column 1, and the total conditional
+        # variance in column 2
+        vi <- seq(0.9, by = 0.7, length.out = maxpq)
+        if (m == "cgarch") vi <- cbind(vi, vi + 0.3)
+        s1 <- suppressWarnings(simulate(spec, nsim = 1, h = 60, innov = matrix(one, nrow = 1), innov_init = ii, var_init = vi)$sigma)
+        s3 <- suppressWarnings(simulate(spec, nsim = 3, h = 60, innov = Z, innov_init = ii, var_init = vi)$sigma)
+        expect_equal(s1[1,], s3[1,], info = m)
+        expect_equal(s3[1,], s3[2,], info = m)
+        expect_equal(s3[1,], s3[3,], info = m)
+    }
+    # the same invariants with unequal per-lag parameters expose per-lag
+    # recycling of gamma/eta across the pre-sample columns
+    for (m in flavours) {
+        spec <- suppressWarnings(garch_modelspec(y[1:500,1], constant = TRUE, model = m,
+                                  order = c(2,1), arma = c(0,0), distribution = "norm"))
+        for (g in c("alpha","gamma","eta","beta")) {
+            idx <- which(spec$parmatrix$group == g)
+            if (length(idx) > 1) spec$parmatrix[idx, value := value * seq(0.6, 1.4, length.out = length(idx))]
+        }
+        maxpq <- max(spec$model$order, spec$model$arma)
+        ii <- seq(0.6, by = -1.1, length.out = maxpq)
+        vi <- seq(0.9, by = 0.7, length.out = maxpq)
+        if (m == "cgarch") vi <- cbind(vi, vi + 0.3)
+        s1 <- suppressWarnings(simulate(spec, nsim = 1, h = 60, innov = matrix(one, nrow = 1), innov_init = ii, var_init = vi)$sigma)
+        s3 <- suppressWarnings(simulate(spec, nsim = 3, h = 60, innov = Z, innov_init = ii, var_init = vi)$sigma)
+        expect_equal(s1[1,], s3[1,], info = m)
+        expect_equal(s3[1,], s3[2,], info = m)
+        expect_equal(s3[1,], s3[3,], info = m)
+    }
+})
+
+test_that("simulate: egarch default arch initialization matches the likelihood",{
+    # egarchfun.hpp zeroes initial_arch, so the pre-sample arch term contributes
+    # exactly nothing; with no innov_init to evaluate the equation at, the
+    # simulation default must agree rather than use |0| - kappa = -kappa
+    set.seed(1); one <- rnorm(40)
+    spec <- suppressWarnings(garch_modelspec(y[1:500,1], constant = TRUE, model = "egarch",
+                              order = c(2,1), arma = c(0,0), distribution = "norm"))
+    idx <- which(spec$parmatrix$group == "gamma")
+    spec$parmatrix[idx, value := c(0.12, 0.2)]
+    maxpq <- max(spec$model$order, spec$model$arma)
+    sdef <- suppressWarnings(simulate(spec, nsim = 1, h = 40, innov = matrix(one, nrow = 1))$sigma)
+    szero <- suppressWarnings(simulate(spec, nsim = 1, h = 40, innov = matrix(one, nrow = 1),
+                                       arch_initial = rep(0, maxpq))$sigma)
+    expect_equal(as.numeric(sdef), as.numeric(szero))
+    # the previous default, to show the check above is not vacuous
+    skappa <- suppressWarnings(simulate(spec, nsim = 1, h = 40, innov = matrix(one, nrow = 1),
+                                        arch_initial = rep(-sqrt(2/pi), maxpq))$sigma)
+    expect_false(isTRUE(all.equal(as.numeric(sdef), as.numeric(skappa))))
+})
+
+test_that("simulate: aparch default arch initialization opens at the unconditional level",{
+    # the pre-sample arch term is the expectation of the arch equation,
+    # kappa_k sigma^delta, and initv already holds sigma^delta (var_init^(delta/2),
+    # or the fixed point omega/(1 - p)). Raising it to delta/2 a second time is
+    # the identity only at delta = 2, which is why this needs other deltas
+    for (d in c(1.5, 2, 3)) {
+        spec <- suppressWarnings(garch_modelspec(y[1:500,1], constant = TRUE, model = "aparch",
+                                  order = c(1,1), distribution = "norm"))
+        spec$parmatrix[parameter == "delta", value := d]
+        first <- as.numeric(suppressWarnings(simulate(spec, nsim = 1, h = 5))$sigma)[1]
+        expect_equal(first, sqrt(unconditional(spec)), info = paste("delta =", d))
+    }
+})
+
+test_that("simulate: a default simulation opens at the unconditional level",{
+    # with no var_init, innov_init or arch_initial the pre-sample is seeded at the
+    # unconditional level and the arch term at its expectation, so the first
+    # simulated step reproduces that level exactly; it does not involve z, so this
+    # is not a distributional check. egarch is excluded because its unconditional
+    # variance carries a Jensen term that its log variance seed does not, and
+    # igarch has no finite unconditional variance
+    for (m in c("garch","gjrgarch","aparch","fgarch","cgarch")) {
+        spec <- suppressWarnings(garch_modelspec(y[1:500,1], constant = TRUE, model = m,
+                                  order = c(1,1), distribution = "norm"))
+        first <- as.numeric(suppressWarnings(simulate(spec, nsim = 1, h = 5))$sigma)[1]
+        # cgarch names its unconditional value ("permanent")
+        expect_equal(first, as.numeric(sqrt(unconditional(spec))), info = m)
+    }
+})
+
+test_that("predict: egarch simulation branch works when arma order exceeds garch order",{
+    spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "egarch",
+                            order = c(2,1), arma = c(3,0), distribution = "norm")
+    mod <- suppressWarnings(estimate(spec))
+    p <- predict(mod, h = 5, nsim = 100, seed = 1)
+    expect_length(as.numeric(p$sigma), 5)
+    expect_true(all(is.finite(as.numeric(p$sigma)) & as.numeric(p$sigma) > 0))
 })

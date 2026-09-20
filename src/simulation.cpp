@@ -11,9 +11,13 @@ List garchsimvec(Eigen::Map<Eigen::MatrixXd>& epsilon, Eigen::Map<Eigen::MatrixX
     // and the (optional) ARMA mean overlay in .armasimvec() below share the
     // same presample boundary (mirroring rugarch's combined maxOrder used
     // by both its variance (sgarchsimC) and mean (armaxsim) simulation
-    // routines). The ARCH/GARCH lag lookback logic below is unaffected by
-    // how large the presample region is, since it always indexes backward
-    // by an absolute column offset from i.
+    // routines). For the asymmetric recursions below the ARCH lag lookback
+    // DOES depend on the size of the presample region: a lookback lands in
+    // the pre-sample whenever (maxpq + j) >= i, so their guards test maxpq
+    // rather than order(0). garchsimvec is unaffected because its
+    // pre-sample ARCH input is constant (epsilon^2 = var_init on every
+    // pre-sample column), so its order(0) test selects the same value
+    // either way.
     const int maxpq = presample;
     int h = z.cols() - maxpq; // Assuming z already includes space for burn-in
     int nsim = z.rows();
@@ -110,8 +114,11 @@ List egarchsimvec(const Eigen::MatrixXd& z, Eigen::MatrixXd& sigma_log_sim, cons
         sigma_log_sim.col(i).setConstant(variance_intercept(i));
         if (order(0) > 0) {
             for(j = 0; j < order(0); j++) {
-                if((order(0) + j) >= i) {
-                    sigma_log_sim.col(i) += alpha(j) * z.col(i - j - 1) + gamma(j) * init.col(j);
+                if((maxpq + j) >= i) {
+                    // init carries the complete pre-sample contribution for arch lag j+1, coefficients
+                    // already applied on the R side, because the alpha and gamma parts need different
+                    // treatment depending on how the pre-sample was initialized
+                    sigma_log_sim.col(i) += init.col(j);
                 } else {
                     sigma_log_sim.col(i).array() += alpha(j) * z.col(i - j - 1).array() + gamma(j) * (z.col(i - j - 1).array().abs() - kappa);
                 }
@@ -146,7 +153,7 @@ List aparchsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_power_sim, co
         sigma_power_sim.col(i).setConstant(variance_intercept(i));
         if (order(0) > 0) {
             for (j = 0; j < order(0); j++) {
-                if ((order(0) + j) >= i) {
+                if ((maxpq + j) >= i) {
                     sigma_power_sim.col(i) += alpha(j) * init.col(j);
                 } else {
                     sigma_power_sim.col(i).array() += alpha(j) *
@@ -184,7 +191,7 @@ List gjrsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_sqr_sim, const E
         sigma_sqr_sim.col(i).setConstant(variance_intercept(i));
         if (order(0) > 0) {
             for(j = 0; j < order(0); j++) {
-                if((order(0) + j) >= i) {
+                if((maxpq + j) >= i) {
                     sigma_sqr_sim.col(i).array() += alpha(j) * epsilon.col(i - j - 1).array().square() + gamma(j) * init.col(j).array();
                 } else {
                     tmp = epsilon.col(i - j - 1);
@@ -222,7 +229,7 @@ List fgarchsimvec(Eigen::MatrixXd& epsilon, Eigen::MatrixXd& sigma_power_sim, co
         sigma_power_sim.col(i).setConstant(variance_intercept(i));
         if (order(0) > 0) {
             for (j = 0; j < order(0); j++) {
-                if ((order(0) + j) >= i) {
+                if ((maxpq + j) >= i) {
                     sigma_power_sim.col(i).array() += alpha(j) * sigma_power_sim.col(i - j - 1).array() * init.col(j).array();
                 } else {
                     sigma_power_sim.col(i).array() += alpha(j) * sigma_power_sim.col(i - j - 1).array() *

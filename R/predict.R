@@ -370,7 +370,22 @@ simulated_distribution <- function(object, sigma, h = 1, nsim = 1,
         # model with xreg does not emit a spurious missing-regressor warning
         xreg_sim <- NULL
         if (isTRUE(spec_copy$xreg$include_xreg)) xreg_sim <- matrix(0, nrow = h, ncol = NCOL(spec_copy$xreg$xreg))
-        sigma <- simulate(spec_copy, nsim = 10000, h = h, var_init = init_states$variance, innov_init = init_states$std_residuals, xreg = xreg_sim, seed = seed)
+        # simulate() sizes its pre-sample by max(garch order, arma order) while
+        # initialize_states() sizes these by the garch order alone; pad the older
+        # end from the fitted history so the vectors keep their chronological
+        # (oldest-to-most-recent) order when the arma order is the longer one
+        sim_arma <- object$spec$model$arma
+        if (is.null(sim_arma)) sim_arma <- c(0,0)
+        sim_maxpq <- max(object$spec$model$order, sim_arma)
+        sim_v <- init_states$variance
+        sim_z <- init_states$std_residuals
+        if (sim_maxpq > length(sim_v)) {
+            v_hist <- tail(as.numeric(object$sigma), sim_maxpq)^2
+            z_hist <- tail(as.numeric(residuals(object, standardize = TRUE)), sim_maxpq)
+            sim_v <- c(head(v_hist, sim_maxpq - length(sim_v)), sim_v)
+            sim_z <- c(head(z_hist, sim_maxpq - length(sim_z)), sim_z)
+        }
+        sigma <- simulate(spec_copy, nsim = 10000, h = h, var_init = sim_v, innov_init = sim_z, xreg = xreg_sim, seed = seed)
         sigma <- sqrt(as.numeric(apply(sigma$sigma^2, 2, mean)))
     }
     y <- .arma_mean_forecast(object, h, model_parameters, xtau = init_model$mean_regressors)

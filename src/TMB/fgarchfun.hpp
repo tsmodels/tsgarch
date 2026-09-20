@@ -227,7 +227,10 @@ Type fgarchfun(objective_function<Type>* obj) {
     for(int i = cmodel(0);i<timesteps;i++){
         sigma_power(i) += power_sigma_intercept(i);
         for(j = 0;j<cmodel(1);j++){
-            if((cmodel(1) + j) >= i ) {
+            // a lookback lands in the pre-sample whenever (cmodel(0) + j) >= i:
+            // the boundary is the pre-sample length, not the ARCH order, and the
+            // two coincide only when cmodel(1) equals cmodel(0)
+            if((cmodel(0) + j) >= i ) {
                 sigma_power(i) += alpha(j) * sigma_power(i - j - 1) * initial_arch(j);
             } else {
                 sigma_power(i) += alpha(j) * sigma_power(i - j - 1) * pow(fabs(std_residuals(i - j - 1) - eta(j)) - gamma(j) * (std_residuals(i - j - 1) - eta(j)), delta);

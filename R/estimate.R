@@ -274,7 +274,18 @@ solve_model <- function(init_pars, env, const, lower, upper, control) {
     var_initial <- scaled_env$tmb$report(scaled_sol$solution)$initial_variance
     arch_initial <- scaled_env$tmb$report(scaled_sol$solution)$initial_arch
     target_omega <- scaled_env$tmb$report(scaled_sol$solution)$target_omega
-    rr <- summary(sdreport(scaled_tmb, par.fixed = scaled_sol$solution, getReportCovariance = T), p.value = TRUE)
+    # A parameter estimated at one of its bounds - an over-parameterized ARMA whose
+    # pacf terms reach +/-0.995, or ewma settling at alpha = 0, beta = 1 - leaves the
+    # hessian with no positive definite direction there, so the delta method variance
+    # is negative and the standard error is legitimately NaN. Report that NaN instead
+    # of the low-level sqrt() warning behind it; kkt1/kkt2 in $conditions are the
+    # proper signal that the solution sits on a bound. Only this one warning is
+    # muffled, so anything else sdreport has to report still surfaces.
+    rr <- withCallingHandlers(
+        summary(sdreport(scaled_tmb, par.fixed = scaled_sol$solution, getReportCovariance = T), p.value = TRUE),
+        warning = function(w) {
+            if (grepl("NaNs produced", conditionMessage(w), fixed = TRUE)) invokeRestart("muffleWarning")
+        })
     persistence_table <- rr["persistence", ]
     variance_target_table <- rr["target_omega", ]
     ll_vector <- -1 * log(scaled_env$tmb$report(scaled_sol$solution)$ll_vector)

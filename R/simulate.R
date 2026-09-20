@@ -91,6 +91,24 @@
                 xtau = xtau_full, armax = as.integer(armax), presample = maxpq)
 }
 
+# init.col(j) in the simulation recursions is indexed by ARCH lag j, not by
+# pre-sample column, so only the first order[1] entries are ever read and
+# the remaining columns merely fill the pre-sample block. A short per-lag
+# vector is therefore padded rather than collapsed onto its first entry,
+# which would put lag 1's initialization into every lag slot. Anything
+# longer than maxpq (the nsim x p matrix derived from innov_init) keeps the
+# previous behaviour, since it is not a per-lag vector.
+.expand_arch_initial <- function(init, maxpq, nsim)
+{
+    init <- as.numeric(init)
+    if (length(init) > maxpq) {
+        init <- rep(init[1], maxpq)
+    } else if (length(init) < maxpq) {
+        init <- c(init, rep(init[length(init)], maxpq - length(init)))
+    }
+    matrix(init, ncol = maxpq, nrow = nsim, byrow = TRUE)
+}
+
 # validate the simulate() mean-regressor argument: a matrix/xts of h + burn
 # rows by NCOL(xreg) columns (deliberately unlike the legacy vreg argument,
 # which is a pre-multiplied vector - see AGENTS.md). NULL with regressors in
@@ -191,17 +209,18 @@
     if (maxpq > 0) {
         sigma_sqr_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
         sigma_sim[,seq_len(maxpq)] <- matrix(sqrt(initv), ncol = maxpq, nrow = nsim, byrow = TRUE)
-        epsilon[,seq_len(maxpq)] <- matrix(z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)], ncol = maxpq, nrow = nsim, byrow = TRUE)
+        epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
     }
     order <- as.integer(object$model$order)
 
     if (!is.null(extra_args$arch_initial)) {
         init <- extra_args$arch_initial
-        if (length(init) != maxpq) init <- rep(init[1], maxpq)
-        init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+        init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
     } else {
-        init <- epsilon[,seq_len(maxpq), drop = FALSE]^2
-        init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+        # init column k feeds ARCH lag k, whose first lookback is pre-sample
+        # column maxpq - k + 1 (column maxpq is the most recent pre-sample
+        # period), so the chronological block must be reversed
+        init <- epsilon[, rev(seq_len(maxpq)), drop = FALSE]^2
     }
     simc <- .garchsimvec(z = z, epsilon = epsilon, sigma_sqr_sim = sigma_sqr_sim, variance_intercept = variance_intercept, order = order, init = init, alpha = alpha, beta = beta, mu = mu, presample = maxpq)
     sigma <- simc$sigma
@@ -265,27 +284,45 @@
     }
     if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
-        z[,seq_len(maxpq)] <- innov_init
+        # innov_init is documented as applying identically to every sample
+        # path, so it must be broadcast row-wise rather than assigned column-major
+        z[,seq_len(maxpq)] <- matrix(innov_init, ncol = maxpq, nrow = nsim, byrow = TRUE)
     }
 
     sigma_sim <- sigma_log_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
     if (maxpq > 0) {
-        sigma_log_sim[,seq_len(maxpq)] <- initv
-        sigma_sim[,seq_len(maxpq)] <- sqrt(exp(initv))
+        # var_init seeds every sample path identically, so it must be broadcast
+        # row-wise; a bare subscript assignment fills column-major and rotates it.
+        sigma_log_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sim[,seq_len(maxpq)] <- matrix(sqrt(exp(initv)), ncol = maxpq, nrow = nsim, byrow = TRUE)
         epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
     }
 
     order <- as.integer(object$model$order)
 
+    # lag k pairs with pre-sample column maxpq - k + 1, which is why the
+    # pre-sample is reversed below, matching the other flavors; k_idx clamps
+    # the coefficient index to [1, order[1]] since columns past order[1] are
+    # never read by the recursion (and order[1] = 0 would otherwise index
+    # alpha/gamma with 0 and yield NA)
+    k_idx <- pmax(pmin(seq_len(maxpq), order[1]), 1L)
+    a_lag <- matrix(alpha[k_idx], ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+    g_lag <- matrix(gamma[k_idx], ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
     if (!is.null(extra_args$arch_initial)) {
-        init <- extra_args$arch_initial
-        if (length(init) != maxpq) init <- rep(init[1], maxpq)
-        init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+        # reproduce the likelihood: egarchfun.hpp zeroes the pre-sample z and
+        # evaluates gamma(j) * initial_arch(j), so only the gamma part survives
+        init <- g_lag * .expand_arch_initial(extra_args$arch_initial, maxpq, nrow(epsilon))
+    } else if (is.null(innov_init)) {
+        # with nothing to evaluate the arch equation at, use its expectation:
+        # alpha_j E(z) + gamma_j (E|z| - kappa) = 0 by the definition of kappa
+        init <- matrix(0, nrow = nrow(epsilon), ncol = maxpq)
     } else {
-        init <- (abs(z[,seq_len(order[1]), drop = FALSE]) - kappa)
-        init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+        # evaluate the full arch equation at the user's pre-sample innovations,
+        # leverage included
+        z_pre <- z[, rev(seq_len(maxpq)), drop = FALSE]
+        init <- a_lag * z_pre + g_lag * (abs(z_pre) - kappa)
     }
 
     simc <- .egarchsimvec(z = z, sigma_log_sim = sigma_log_sim, variance_intercept = variance_intercept, init = init, alpha = alpha, gamma = gamma, beta = beta, kappa = kappa, mu = mu, order = order, presample = maxpq)
@@ -346,7 +383,7 @@
     }
     if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
-        z[,seq_len(maxpq)] <- innov_init
+        z[,seq_len(maxpq)] <- matrix(innov_init, ncol = maxpq, nrow = nsim, byrow = TRUE)
     }
 
     kappa <- aparch_moment_v(distribution = distribution, gamma = gamma, delta = delta,
@@ -368,23 +405,34 @@
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
     if (maxpq > 0) {
-        sigma_power_sim[,seq_len(maxpq)] <- initv
-        sigma_sim[,seq_len(maxpq)] <- initv^(1/delta)
+        sigma_power_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sim[,seq_len(maxpq)] <- matrix(initv^(1/delta), ncol = maxpq, nrow = nsim, byrow = TRUE)
         epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
 
         if (!is.null(extra_args$arch_initial)) {
             init <- extra_args$arch_initial
-            if (length(init) != maxpq) init <- rep(init[1], maxpq)
-            init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+            init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
         } else {
             if (is.null(innov_init)) {
-                init <- kappa * (initv^(delta/2))
-                if (length(init) != maxpq) init <- rep(init[1], maxpq)
-                init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+                # the expectation of the arch equation is
+                # E(|eps| - gamma_k eps)^delta = kappa_k sigma^delta, and initv is
+                # already sigma^delta: it is var_init^(delta/2), or the fixed point
+                # omega/(1 - p) of the sigma^delta recursion itself. Raising it to
+                # delta/2 a second time only left it unchanged at delta = 2. Lag k
+                # pairs with pre-sample column maxpq - k + 1, as in the branch below.
+                k_idx <- pmax(pmin(seq_len(maxpq), order[1]), 1L)
+                v_lag <- if (length(initv) == 1L) rep(initv, maxpq) else initv[rev(seq_len(maxpq))]
+                init <- matrix(kappa[k_idx] * v_lag, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
             } else {
-                init <- (abs(epsilon[,seq_len(order[1])]) - gamma * epsilon[,seq_len(order[1])])^delta
-                if (length(init) != maxpq) init <- rep(init[1], maxpq)
-                init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+                # init column k feeds ARCH lag k: pre-sample column maxpq - k + 1
+                # with gamma_k. Columns past order[1] are never read by the
+                # recursion; the index is clamped to [1, order[1]] so that those
+                # unread columns still hold a defined value rather than NA (an
+                # order[1] of zero would otherwise index gamma with 0).
+                e_pre <- epsilon[, rev(seq_len(maxpq)), drop = FALSE]
+                g_idx <- pmax(pmin(seq_len(maxpq), order[1]), 1L)
+                g_lag <- matrix(gamma[g_idx], ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+                init <- (abs(e_pre) - g_lag * e_pre)^delta
             }
         }
     }
@@ -446,7 +494,7 @@
     }
     if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
-        z[,seq_len(maxpq)] <- innov_init
+        z[,seq_len(maxpq)] <- matrix(innov_init, ncol = maxpq, nrow = nsim, byrow = TRUE)
     }
     kappa <- gjrgarch_moment(distribution = distribution, skew = dist[1], shape = dist[2], lambda = dist[3])
     if (is.null(var_init)) {
@@ -466,18 +514,16 @@
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
     if (maxpq > 0) {
-        sigma_squared_sim[,seq_len(maxpq)] <- initv
-        sigma_sim[,seq_len(maxpq)] <- sqrt(initv)
+        sigma_squared_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sim[,seq_len(maxpq)] <- matrix(sqrt(initv), ncol = maxpq, nrow = nsim, byrow = TRUE)
         epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
     }
 
     if (!is.null(extra_args$arch_initial)) {
         init <- extra_args$arch_initial
-        if (length(init) != maxpq) init <- rep(init[1], maxpq)
-        init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+        init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
     } else {
-        init <- (epsilon[,seq_len(maxpq), drop = FALSE]^2 * kappa)
-        init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+        init <- (epsilon[, rev(seq_len(maxpq)), drop = FALSE]^2 * kappa)
     }
 
     order <- as.integer(object$model$order)
@@ -541,7 +587,7 @@
     }
     if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
-        z[,seq_len(maxpq)] <- innov_init
+        z[,seq_len(maxpq)] <- matrix(innov_init, ncol = maxpq, nrow = nsim, byrow = TRUE)
     }
 
     kappa <- fgarch_moment_v(distribution = distribution, gamma = gamma, eta = eta, delta = delta,
@@ -558,33 +604,36 @@
         initv <- var_init^(delta/2)
     }
     .validate_sim_initv(initv)
+    order <- as.integer(object$model$order)
 
     sigma_sim <- sigma_power_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
     if (maxpq > 0) {
-        sigma_power_sim[,seq_len(maxpq)] <- initv
-        sigma_sim[,seq_len(maxpq)] <- initv^(1/delta)
+        sigma_power_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sim[,seq_len(maxpq)] <- matrix(initv^(1/delta), ncol = maxpq, nrow = nsim, byrow = TRUE)
         epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
     }
 
     if (maxpq > 0) {
         if (!is.null(extra_args$arch_initial)) {
             init <- extra_args$arch_initial
-            if (length(init) != maxpq) init <- rep(init[1], maxpq)
-            init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+            init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
         } else {
             if (is.null(innov_init)) {
                 init <- kappa
                 init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
             } else {
-                init <- (abs(z[,seq_len(maxpq)] - eta) - gamma * (z[,seq_len(maxpq)] - eta))^delta
-                init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+                # see .simulate_aparch() for the reversal and the index clamp
+                z_pre <- z[, rev(seq_len(maxpq)), drop = FALSE]
+                g_idx <- pmax(pmin(seq_len(maxpq), order[1]), 1L)
+                e_lag <- matrix(eta[g_idx], ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+                g_lag <- matrix(gamma[g_idx], ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+                d_pre <- z_pre - e_lag
+                init <- (abs(d_pre) - g_lag * d_pre)^delta
             }
         }
     }
-
-    order <- as.integer(object$model$order)
 
     simc <- .fgarchsimvec(epsilon = epsilon, sigma_power_sim = sigma_power_sim, z = z, variance_intercept = variance_intercept, init = init,
                           alpha = alpha, gamma = gamma, eta = eta, beta = beta, delta = delta, mu = mu, order = order, presample = maxpq)
@@ -644,7 +693,7 @@
     }
     if (!is.null(innov_init) & maxpq > 0) {
         if (length(innov_init) != maxpq) stop(paste0("\ninnov_init must be of length max(garch order, arma order) : ", maxpq))
-        z[,seq_len(maxpq)] <- innov_init
+        z[,seq_len(maxpq)] <- matrix(innov_init, ncol = maxpq, nrow = nsim, byrow = TRUE)
     }
 
     if (is.null(var_init)) {
@@ -677,9 +726,9 @@
     series_sim <- matrix(0, nrow = nsim, ncol = maxpq + h)
     epsilon <- matrix(0, nrow = nsim, ncol = maxpq + h)
     if (maxpq > 0) {
-        permanent_component_sim[,seq_len(maxpq)] <- initq
-        sigma_sqr_sim[,seq_len(maxpq)] <- initv
-        sigma_sim[,seq_len(maxpq)] <- sqrt(initv)
+        permanent_component_sim[,seq_len(maxpq)] <- matrix(initq, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sqr_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
+        sigma_sim[,seq_len(maxpq)] <- matrix(sqrt(initv), ncol = maxpq, nrow = nsim, byrow = TRUE)
         epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
     }
     order <- as.integer(object$model$order)
@@ -788,17 +837,15 @@
     if (maxpq > 0) {
         sigma_sqr_sim[,seq_len(maxpq)] <- matrix(initv, ncol = maxpq, nrow = nsim, byrow = TRUE)
         sigma_sim[,seq_len(maxpq)] <- matrix(sqrt(initv), ncol = maxpq, nrow = nsim, byrow = TRUE)
-        epsilon[,seq_len(maxpq)] <- matrix(z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)], ncol = maxpq, nrow = nsim, byrow = TRUE)
+        epsilon[,seq_len(maxpq)] <- z[,seq_len(maxpq)] * sigma_sim[,seq_len(maxpq)]
     }
     order <- as.integer(object$model$order)
 
     if (!is.null(extra_args$arch_initial)) {
         init <- extra_args$arch_initial
-        if (length(init) != maxpq) init <- rep(init[1], maxpq)
-        init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+        init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
     } else {
-        init <- epsilon[,seq_len(maxpq), drop = FALSE]^2
-        init <- matrix(init, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
+        init <- epsilon[, rev(seq_len(maxpq)), drop = FALSE]^2
     }
     simc <- .garchsimvec(z = z, epsilon = epsilon, sigma_sqr_sim = sigma_sqr_sim, variance_intercept = variance_intercept, order = order, init = init, alpha = alpha, beta = beta, mu = mu, presample = maxpq)
     sigma <- simc$sigma
