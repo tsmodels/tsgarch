@@ -363,10 +363,13 @@ test_that("simulate: identical innovation rows give identical sigma rows across 
                                   order = c(1,1), arma = c(2,1), distribution = "norm"))
         maxpq <- max(spec$model$order, spec$model$arma)
         ii <- seq(0.6, by = -1.1, length.out = maxpq)
-        # var_init is subject to the same broadcast contract as innov_init, and a
-        # non-constant vector is needed for a column-major fill to be visible
+        # var_init is subject to the same broadcast contract as innov_init, and
+        # it has to vary over the pre-sample for a column-major fill to show up.
+        # cgarch takes a maxpq by 2 matrix because it carries two variances: the
+        # permanent (long run) component in column 1, and the total conditional
+        # variance in column 2
         vi <- seq(0.9, by = 0.7, length.out = maxpq)
-        if (m == "cgarch") vi <- cbind(vi, vi)
+        if (m == "cgarch") vi <- cbind(vi, vi + 0.3)
         s1 <- suppressWarnings(simulate(spec, nsim = 1, h = 60, innov = matrix(one, nrow = 1), innov_init = ii, var_init = vi)$sigma)
         s3 <- suppressWarnings(simulate(spec, nsim = 3, h = 60, innov = Z, innov_init = ii, var_init = vi)$sigma)
         expect_equal(s1[1,], s3[1,], info = m)
@@ -385,7 +388,7 @@ test_that("simulate: identical innovation rows give identical sigma rows across 
         maxpq <- max(spec$model$order, spec$model$arma)
         ii <- seq(0.6, by = -1.1, length.out = maxpq)
         vi <- seq(0.9, by = 0.7, length.out = maxpq)
-        if (m == "cgarch") vi <- cbind(vi, vi)
+        if (m == "cgarch") vi <- cbind(vi, vi + 0.3)
         s1 <- suppressWarnings(simulate(spec, nsim = 1, h = 60, innov = matrix(one, nrow = 1), innov_init = ii, var_init = vi)$sigma)
         s3 <- suppressWarnings(simulate(spec, nsim = 3, h = 60, innov = Z, innov_init = ii, var_init = vi)$sigma)
         expect_equal(s1[1,], s3[1,], info = m)
