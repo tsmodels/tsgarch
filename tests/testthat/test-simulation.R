@@ -417,6 +417,36 @@ test_that("simulate: egarch default arch initialization matches the likelihood",
     expect_false(isTRUE(all.equal(as.numeric(sdef), as.numeric(skappa))))
 })
 
+test_that("simulate: aparch default arch initialization opens at the unconditional level",{
+    # the pre-sample arch term is the expectation of the arch equation,
+    # kappa_k sigma^delta, and initv already holds sigma^delta (var_init^(delta/2),
+    # or the fixed point omega/(1 - p)). Raising it to delta/2 a second time is
+    # the identity only at delta = 2, which is why this needs other deltas
+    for (d in c(1.5, 2, 3)) {
+        spec <- suppressWarnings(garch_modelspec(y[1:500,1], constant = TRUE, model = "aparch",
+                                  order = c(1,1), distribution = "norm"))
+        spec$parmatrix[parameter == "delta", value := d]
+        first <- as.numeric(suppressWarnings(simulate(spec, nsim = 1, h = 5))$sigma)[1]
+        expect_equal(first, sqrt(unconditional(spec)), info = paste("delta =", d))
+    }
+})
+
+test_that("simulate: a default simulation opens at the unconditional level",{
+    # with no var_init, innov_init or arch_initial the pre-sample is seeded at the
+    # unconditional level and the arch term at its expectation, so the first
+    # simulated step reproduces that level exactly; it does not involve z, so this
+    # is not a distributional check. egarch is excluded because its unconditional
+    # variance carries a Jensen term that its log variance seed does not, and
+    # igarch has no finite unconditional variance
+    for (m in c("garch","gjrgarch","aparch","fgarch","cgarch")) {
+        spec <- suppressWarnings(garch_modelspec(y[1:500,1], constant = TRUE, model = m,
+                                  order = c(1,1), distribution = "norm"))
+        first <- as.numeric(suppressWarnings(simulate(spec, nsim = 1, h = 5))$sigma)[1]
+        # cgarch names its unconditional value ("permanent")
+        expect_equal(first, as.numeric(sqrt(unconditional(spec))), info = m)
+    }
+})
+
 test_that("predict: egarch simulation branch works when arma order exceeds garch order",{
     spec <- garch_modelspec(y[1:800,1], constant = TRUE, model = "egarch",
                             order = c(2,1), arma = c(3,0), distribution = "norm")

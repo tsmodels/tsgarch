@@ -252,6 +252,19 @@ zeroed in the `egarch` TMB template). `egarch` now does the same, so a
 default simulation, a simulation initialized from a fit, and the likelihood
 all share one convention. Simulations that pass `innov_init` or
 `arch_initial` (including those behind `predict()`) are unaffected.
+* An `aparch` simulation with no `innov_init` no longer starts away from its
+own unconditional level when `delta` is not 2. The pre-sample ARCH term is
+the expectation of the ARCH equation,
+`E(|e| - gamma_k e)^delta = kappa_k sigma^delta`, and the initialization
+value already holds `sigma^delta` (it is `var_init^(delta/2)`, or the fixed
+point `omega/(1 - persistence)` of the `sigma^delta` recursion itself). It
+was raised to `delta/2` once more, which is the identity only at
+`delta = 2`, so the default simulation opened off its fixed point by around
+10 percent at `delta = 1.5`, 3 percent at 2.5 and 4 percent at 3. The
+per-lag `kappa_k` is also paired with the pre-sample period belonging to lag
+`k` now, consistent with the `innov_init` branch. `fgarch` was never
+affected: its recursion multiplies by `sigma^delta` explicitly, so its
+initialization is the standardized `kappa_k` alone.
 
 # tsgarch 1.0.4
 

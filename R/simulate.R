@@ -406,8 +406,15 @@
             init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
         } else {
             if (is.null(innov_init)) {
-                init <- kappa * (initv^(delta/2))
-                init <- .expand_arch_initial(init, maxpq, nrow(epsilon))
+                # the expectation of the arch equation is
+                # E(|eps| - gamma_k eps)^delta = kappa_k sigma^delta, and initv is
+                # already sigma^delta: it is var_init^(delta/2), or the fixed point
+                # omega/(1 - p) of the sigma^delta recursion itself. Raising it to
+                # delta/2 a second time only left it unchanged at delta = 2. Lag k
+                # pairs with pre-sample column maxpq - k + 1, as in the branch below.
+                k_idx <- pmax(pmin(seq_len(maxpq), order[1]), 1L)
+                v_lag <- if (length(initv) == 1L) rep(initv, maxpq) else initv[rev(seq_len(maxpq))]
+                init <- matrix(kappa[k_idx] * v_lag, ncol = maxpq, nrow = nrow(epsilon), byrow = TRUE)
             } else {
                 # init column k feeds ARCH lag k: pre-sample column maxpq - k + 1
                 # with gamma_k. Columns past order[1] are never read by the
