@@ -50,11 +50,17 @@ every model, including a fix for models with no ARMA (a small, purely
 internal simplification with no behavior change there). A pure regression
 with GARCH errors (`arma = c(0,0)` with `xreg`) therefore reports the
 regression fit rather than a constant.
-* `predict()`, `simulate()` and `tsfilter()` all account for the full
-ARMA-X mean equation: point forecasts, simulated paths and incremental
-filtering correctly reflect both the AR/MA dynamics and the regressor
-contribution. The combined pre-sample/burn-in length used internally is
-`max(garch order, arma order)`.
+* `predict()`, `simulate()`, `tsfilter()`, `garch_backtest()` and
+`tsprofile()` all account for the full ARMA-X mean equation: point
+forecasts, both the parametric and bootstrap predictive distributions,
+simulated paths, incremental filtering, each rolling window's refit and the
+simulate/re-estimate profile all reflect the AR/MA dynamics and the
+regressor contribution. Variance targeting uses the unconditional variance
+of the ARMA innovations rather than deviations from the constant `mu`, so
+the R side `unconditional()`/`target_omega` agree with the TMB side. Mean
+regressors are refused by `tsprofile()`, as `vreg` already was, since its
+simulation step does not carry them into the simulated sample. The combined
+pre-sample/burn-in length used internally is `max(garch order, arma order)`.
 * `summary()` (and its console `print()`/`as_flextable()` methods) now
 displays the transformed `ar`/`ma` coefficients with their delta-method
 standard errors, rather than the raw (not directly interpretable)
@@ -88,219 +94,93 @@ parameter estimation uncertainty. `type = "garch"` (the original
 volatility/news-impact/QQ panel) remains the default and is unchanged. New
 computational helpers `arma_inverse_roots()`, `arma_irf()` and
 `arma_near_cancellation()` are exported for programmatic use.
-* Fixed `tsbacktest()` silently refitting the wrong model inside its
-rolling windows: the inner `garch_modelspec()` call previously passed
-neither `model` nor `arma`, so e.g. an `egarch` spec was backtested as a
-vanilla `garch` and any ARMA mean equation was dropped. The spec now
-records the user-facing model name in `model$model_name` (necessary
-because `ewma` is coerced to `igarch` internally) and the backtest refits
-each window with the original model and ARMA order.
-* Fixed `predict(..., sim_method = "bootstrap")` ignoring the ARMA mean
-equation: `garch_bootstrap()` now uses the combined pre-sample length
-`max(garch order, arma order)` and passes `series_init`/`resid_init` to
-`simulate()`, so the bootstrap predictive distribution is centered on the
-ARMA mean forecast rather than on the unconditional mean `mu`.
-* Fixed `constant_variance` under `variance_targeting = TRUE` being
-computed as the mean squared deviation from the constant `mu` instead of
-the unconditional variance of the ARMA innovations `eps = y -
-conditional_mu` (see the "Variance Targeting" section of
-`vignettes/garch_models.Rmd`); the R-side `unconditional()`/`target_omega`
-now agree with the TMB-side variance target when `arma != c(0,0)`. Both
-the `estimate()` and `tsfilter()` code paths were fixed; non-ARMA models
-are numerically unchanged.
-* Fixed `simulate()` for `igarch`/`ewma` models with `arma != c(0,0)`
-dropping the ARMA mean equation entirely - the simulated series was
-just `mu + eps`. The ARMA overlay is now applied, which also corrects
-the simulated predictive distribution returned by
-`predict(..., nsim > 0)` for these models.
-* Fixed `tsfilter()`'s zero fill for a missing `newvreg` being built
-with `as.matrix(0, ...)` (a 1x1 matrix) instead of
-`matrix(0, nrow, ncol)`.
-* Fixed `simulate()` on a spec taken from an estimated object
-(`mod$spec`, which carries `parmatrix = NULL`) aborting the R session;
-it now raises a clean error asking the user to assign the estimated
-parmatrix onto the spec first.
-* `check_xreg()` now rejects `Inf` values (previously only `NA`/`NaN`),
-and its time-index match check, which previously never fired because
-`all.equal()` returns a description string rather than `FALSE`, now
-works as intended.
-* Fixed spec re-specification dropping the `ewma` restriction:
-`garch_modelspec` coerces `model = "ewma"` to `igarch` internally (the
-difference is only the fixed `omega` parmatrix row), and both
-`.spec2newspec()` and `garch_profile()` rebuilt specs from the coerced
-name, so a filtered `ewma` model carried a spurious free `omega` (npars
-and AIC/BIC off by one parameter's worth) and `garch_profile` re-fit an
-igarch model. Both now re-specify from the retained user-facing
-`model$model_name`. Filtered `sigma` is unchanged; filtered `ewma`
-AIC/BIC shift accordingly.
-* Fixed `tsprofile()` profiling the wrong mean equation: its inner
-`garch_modelspec()` call passed no `arma`, so the data were simulated from
-the full ARMA model while every re-estimation fitted a constant-mean
-model, and the ARMA parameters never appeared in the profile at all.
-Regressors in the mean equation are now refused explicitly (as `vreg`
-already was), since the simulation step does not carry them into the
-simulated sample.
+* `tsequation()`, and the `as_flextable` summary footer built from it, now
+render the conditional mean equation `eq_mean` first in the equation block,
+covering the constant, the ARMA terms and the mean regressors under both
+`xreg_type` conventions.
+* Fixed `tsbacktest()` silently refitting the wrong model inside its rolling
+windows: the inner `garch_modelspec()` call passed no `model`, so e.g. an
+`egarch` spec was backtested as a vanilla `garch`. The spec now records the
+user-facing model name in `model$model_name`, necessary because `ewma` is
+coerced to `igarch` internally, and each window is refit with it.
+* Fixed spec re-specification dropping the `ewma` restriction. `ewma` is
+coerced to `igarch` internally, the difference being only the fixed `omega`
+row of the `parmatrix`, and both `.spec2newspec()` and `garch_profile()`
+rebuilt specs from the coerced name. A filtered `ewma` model therefore
+carried a spurious free `omega`, leaving `npars` and AIC/BIC out by one
+parameter's worth, and `garch_profile()` re-fit an `igarch` model. Filtered
+`sigma` is unchanged; filtered `ewma` AIC/BIC shift accordingly.
 * `simulate()` now raises an error instead of silently returning zeros when
 the implied initial variance is not positive and finite. For an `ewma`
-specification `omega` is fixed at zero, so the seed
-`omega/(1 - 0.999)` was zero and the variance recursion stayed at zero for
-every step, returning `sigma` identically zero and a series equal to `mu`.
-Supply `var_init` for such models; `predict()` always did, and every other
-flavour has a positive implied seed and is unaffected.
-* `tsequation()` (and the `as_flextable` summary footer built from it)
-now renders the conditional mean equation `eq_mean` first in the
-equation block, covering the constant, ARMA terms and mean regressors
-under both `xreg_type` conventions.
-* A specification serialized by an older version of the package is now
-handled explicitly rather than failing obscurely. `model_options` gained
-the `ar`, `ma` and `xreg_type` flags during this cycle, while every
-released version up to 1.0.4 wrote only its first six elements; the
-padding applied on load added a single element, which left the last two
-flags to be read past the end of the vector. It is padded to the full
-length now. Such a specification also predates the `arpacf`, `mapacf` and
-`tau` rows of `parmatrix`, and is refused with a message naming
-`garch_modelspec()` as the remedy rather than the TMB error
-`Error when reading the variable: 'arpacf'`.
-* The hessian behind the standard errors in the scaled estimation step is
-now evaluated at the solution the optimizer returns, rather than at TMB's
-default of whichever point it last happened to evaluate. The two coincide
-for the solver in use, so reported standard errors are unchanged.
-* Fixed the pre-sample initialization of the ARCH recursion for the
-asymmetric flavors (`egarch`, `gjrgarch`, `aparch`, `fgarch`). The test
-deciding whether a lag lookback falls inside the pre-sample compared it
-against the ARCH order rather than against the pre-sample length, and the
-two coincide only when the ARCH order is the largest of the GARCH and ARMA
-orders. Observations just past the pre-sample therefore took a zeroed
-residual in place of the initial ARCH value, in the likelihood and in
-`simulate()` alike. Both now test the pre-sample length, in the TMB
-templates and in the Rcpp simulation recursions. This was already
-reachable through a GARCH order with `q > p`, and the new ARMA order made
-it reachable at the default `order = c(1,1)`, since the pre-sample spans
-the mean recursion as well as the variance one. `logLik` and the
-coefficients consequently shift for these four flavors whenever
-`max(order, arma)` exceeds the ARCH order; `order = c(1,1)` with no ARMA
-order is arithmetically unchanged, and `garch`, `igarch` and `ewma` are
-unaffected at every order, their pre-sample ARCH input being constant. A
-deterministic replication of a fitted model through `simulate()` now
-recovers its `sigma` to machine precision for `gjrgarch`, `aparch` and
-`fgarch` in these configurations, where the discrepancy previously reached
-5e-2. `egarch` improves but remains inexact, and is still under
-investigation.
-* `arch_initial` is indexed by ARCH lag when passed back into `simulate()`,
-so a vector shorter than the pre-sample is padded now rather than
-collapsed onto its first element, which had put the lag 1 initialization
-into every lag slot.
-* `simulate()` now reproduces a fitted `egarch` model exactly, as the other
-flavors already did. Its pre-sample branch added `alpha_j z_{t-j}` built
-from the synthetic pre-sample innovations, where the likelihood contributes
-nothing at all: pre-sample residuals are zeroed in the template, so the
-standardized residual there is identically zero and only the `gamma_j` term
-survives. The simulation matches now, which takes the discrepancy against a
-fitted model's `sigma` from around 9e-3 to machine precision. Free running
-`egarch` simulations shift accordingly over their first
-`max(order, arma)` steps. The test that was supposed to cover this had
-copied the `garch` fixtures throughout, so `egarch` simulation was in
-practice never validated; it now fits an `egarch` model.
-* An `egarch` simulation took its ARCH initialization from the first
-`order[1]` pre-sample columns instead of all `max(order, arma)` of them.
-With more than one simulated path this left the paths differing from one
-another even when handed identical innovations. All flavors now agree
-across identical paths, which is checked directly.
-* Fixed the pre-sample initialization of `simulate()` for more than one sample
-path. `innov_init` is documented as applying identically to every path, but
-it was assigned into the pre-sample block column-major for `egarch`,
-`gjrgarch`, `aparch`, `fgarch` and `cgarch`, so the paths were handed
-different initial innovations; `garch` and `igarch` instead re-wrapped an
-already correct pre-sample matrix row-wise, which scrambled it. Both forms
-are replaced by the one explicit row-wise broadcast. The two faults happened
-to cancel for some flavors, which is why a single sample path, and any
-symmetric `innov_init`, hid them.
-* The ARCH initialization is indexed by lag, while the pre-sample block is
-chronological with its last column the most recent period. Lag `k` therefore
-pairs with pre-sample column `max(order, arma) - k + 1`, and that block is
-reversed now: previously lag 1 was given the oldest pre-sample value rather
-than the most recent, so lags and their coefficients were mismatched. Only
-observable when `max(order, arma) > 1`.
-* `aparch` and `fgarch` applied their per-lag `gamma` (and `fgarch` its `eta`)
-to the pre-sample block by column-major recycling, so with more than one path
-and an ARCH order above one the coefficients landed on the wrong lags, and
-the resulting matrix was then collapsed onto its first element. Both build
-the per-lag matrix directly now.
-* `predict()` no longer fails for an `egarch` model whose ARMA order exceeds
-its GARCH order. The higher order `egarch` forecast is approximated by
-simulation, there being no closed form for it (see the "Recursion
-Initialization" and `egarch` forecast sections of the GARCH Models vignette),
-and that call passed initialization vectors sized by the GARCH order alone
-where `simulate()` requires `max(order, arma)`, raising an error instead of
-forecasting.
-* `var_init` was seeded column-major into the pre-sample variance block for
-`egarch`, `gjrgarch`, `aparch`, `fgarch` and `cgarch` (including the
-permanent component of the latter), so a vector of initial variances was
-rotated across sample paths rather than applied identically to each, as it
-is documented to be. It is broadcast row-wise now, as `garch` and `igarch`
-already did. Only observable with more than one sample path and
-`max(order, arma) > 1`.
-* The default ARCH initialization of an `egarch` simulation no longer biases
-the first `max(order, arma)` steps downwards. With no `innov_init` to
-evaluate the ARCH equation at, the pre-sample standardized innovations are
-zero, and the equation was evaluated there literally, giving
-`|0| - kappa = -kappa` and so a contribution of `-gamma_j kappa` to the log
-variance. The other asymmetric flavors instead use the expectation of their
-ARCH equation, which here is `E(|z|) - kappa = 0` by the definition of
-`kappa`, and which is also what the likelihood uses (`initial_arch` is
-zeroed in the `egarch` TMB template). `egarch` now does the same, so a
-default simulation, a simulation initialized from a fit, and the likelihood
-all share one convention. Simulations that pass `innov_init` or
-`arch_initial` (including those behind `predict()`) are unaffected.
-* An `aparch` simulation with no `innov_init` no longer starts away from its
-own unconditional level when `delta` is not 2. The pre-sample ARCH term is
-the expectation of the ARCH equation,
-`E(|e| - gamma_k e)^delta = kappa_k sigma^delta`, and the initialization
-value already holds `sigma^delta` (it is `var_init^(delta/2)`, or the fixed
-point `omega/(1 - persistence)` of the `sigma^delta` recursion itself). It
-was raised to `delta/2` once more, which is the identity only at
-`delta = 2`, so the default simulation opened off its fixed point by around
-10 percent at `delta = 1.5`, 3 percent at 2.5 and 4 percent at 3. The
-per-lag `kappa_k` is also paired with the pre-sample period belonging to lag
-`k` now, consistent with the `innov_init` branch. `fgarch` was never
-affected: its recursion multiplies by `sigma^delta` explicitly, so its
-initialization is the standardized `kappa_k` alone.
-* `garch_modelspec()` no longer emits optimizer warnings of its own. The
-`stats::arima` fit used to obtain starting values for the ARMA and regressor
-blocks could report a convergence problem, even though the fit only supplies
-warm starts and already falls back when it fails.
+specification `omega` is fixed at zero, so the seed was zero and the
+variance recursion stayed there at every step, returning `sigma` identically
+zero and a series equal to `mu`. Supply `var_init` for such models;
+`predict()` always did, and every other flavor has a positive implied seed
+and is unaffected.
+* `simulate()` on a spec taken from an estimated object (`mod$spec`, which
+carries `parmatrix = NULL`) no longer aborts the R session, raising a clean
+error asking for the estimated `parmatrix` to be assigned onto the spec
+first. A specification serialized by a version up to 1.0.4 predates the
+`arpacf`, `mapacf` and `tau` rows of the `parmatrix` and is likewise refused
+with a message naming `garch_modelspec()` as the remedy, rather than failing
+with `Error when reading the variable: 'arpacf'`.
+* Fixed `tsfilter()`'s zero fill for a missing `newvreg` being built with
+`as.matrix(0, ...)`, a 1x1 matrix, instead of `matrix(0, nrow, ncol)`.
+* Corrected the pre-sample initialization of the ARCH recursion for the
+asymmetric flavors (`egarch`, `gjrgarch`, `aparch`, `fgarch`). Whether a lag
+lookback falls inside the pre-sample was tested against the ARCH order
+rather than against the pre-sample length, and the two coincide only when
+the ARCH order is the larger. Observations just past the pre-sample
+therefore took a zeroed residual in place of the initial ARCH value, in the
+likelihood and in `simulate()` alike; both now test the pre-sample length.
+This is reachable through a GARCH order with `q > p`, so `logLik` and the
+coefficients shift for these four flavors in that case. `order = c(1,1)` is
+arithmetically unchanged, and `garch`, `igarch` and `ewma` are unaffected at
+every order, their pre-sample ARCH input being constant.
+* Corrected the pre-sample initialization of `simulate()`, which now
+reproduces a fitted model's `sigma` to machine precision for every flavor,
+where the discrepancy previously reached 5e-2. `var_init` and `innov_init`
+are documented as seeding every sample path identically, but were filled
+column-major for several flavors, rotating them across the paths instead of
+broadcasting them; the lag-indexed ARCH initialization was paired with the
+oldest pre-sample period rather than the most recent, mismatching each lag
+with its coefficient; `aparch` and `fgarch` recycled their per-lag `gamma`
+(and `fgarch` its `eta`) across paths rather than across lags; and an
+`arch_initial` shorter than the pre-sample was collapsed onto its first
+element rather than padded, putting the lag 1 value into every lag. These
+are observable with more than one sample path, or a pre-sample longer than
+one period.
+* Corrected the default ARCH initialization of a simulation, which is the
+expectation of each flavor's ARCH equation. `egarch` instead evaluated its
+equation at the zeroed pre-sample innovations literally, contributing
+`-gamma_j kappa` where both the expectation and the likelihood give zero,
+which biased the opening steps downwards. `aparch` raised its already
+power-transformed initial variance to `delta/2` a second time, the identity
+only at `delta = 2`, so a default simulation opened away from its own
+unconditional level by 3 to 10 percent for any other `delta`. A default
+simulation now opens exactly at the unconditional level for every flavor
+that has one.
+* A pre-sample innovation supplied to an `egarch` simulation through
+`innov_init` now carries its leverage effect; only its magnitude was used,
+the `alpha_j z_{t-j}` term of the ARCH equation being absent from the
+pre-sample. The `egarch` predictive distribution and the
+simulation-approximated higher order forecast both move, and at a horizon of
+one the mean of the simulated distribution now agrees with the closed form
+forecast to machine precision, where it was out by around 3 percent.
 * `tsbacktest()` no longer warns that its iterations drew random numbers
-without declaring a seed. The iterations do draw them, through `predict()`,
-so they are now given parallel-safe streams via `future.seed`, as
-`estimate()` on a multi-specification already did.
+without declaring a seed. They do draw them, through `predict()`, so they
+are now given parallel-safe streams.
 * A standard error that is legitimately undefined is now reported as `NaN`
 without the low-level warning behind it. When a parameter is estimated at
-one of its bounds - an over-parameterized ARMA whose partial autocorrelation
-terms reach the edge of the stationary region, or `ewma`, whose unit
-persistence constraint leaves its two coefficients perfectly dependent - the
-Hessian has no positive definite direction there and the delta method
-variance is negative. The `NaN` itself is retained, and `kkt1`/`kkt2` in the
-estimated object's `conditions` remain the signal that the solution sits on
-a bound.
+one of its bounds, or for `ewma`, whose unit persistence constraint leaves
+its two coefficients perfectly dependent, the Hessian has no positive
+definite direction there and the delta method variance is negative.
+`kkt1`/`kkt2` in the estimated object's `conditions` remain the signal that
+the solution sits on a bound.
 * Documented the matrix form of `var_init` accepted by `simulate()` for a
 `cgarch` model: a `max(order, arma)` by 2 matrix whose first column
 initializes the permanent (long run) component and whose second column
 initializes the total conditional variance.
-* A pre-sample innovation supplied to an `egarch` simulation through
-`innov_init` now carries its leverage effect. Only the magnitude was being
-used, through the `gamma_j` term, while the sign entered nowhere: the
-`alpha_j z_{t-j}` part of the ARCH equation was absent from the pre-sample.
-The three initialization cases need different treatment, so the coefficients
-are applied when the initialization is built rather than inside the
-recursion: `arch_initial` keeps the `gamma_j` term alone, reproducing the
-likelihood, which zeroes the pre-sample standardized residual; no
-`innov_init` keeps the expectation, which is zero; and a supplied
-`innov_init` is evaluated through the whole equation. Simulations that pass
-`arch_initial`, which includes every reproduction path, are unchanged. The
-`egarch` predictive distribution and the simulation-approximated higher order
-forecast both move, and at a horizon of one the mean of the simulated
-distribution now agrees with the closed form forecast to machine precision,
-where it was previously out by around 3 percent.
 
 # tsgarch 1.0.4
 
