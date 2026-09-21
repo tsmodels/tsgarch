@@ -1,19 +1,19 @@
 # Platform
 
-|field    |value                                  |
-|:--------|:--------------------------------------|
-|version  |R version 4.6.0 (2026-04-24)           |
-|os       |macOS Tahoe 26.6.2                     |
-|system   |aarch64, darwin23                      |
-|ui       |RStudio                                |
-|language |(EN)                                   |
-|collate  |en_US.UTF-8                            |
-|ctype    |en_US.UTF-8                            |
-|tz       |America/Los_Angeles                    |
-|date     |2026-09-12                             |
-|rstudio  |2026.09.0+174 Autumn Hawkbit (desktop) |
-|pandoc   |3.3 @ /opt/homebrew/bin/pandoc         |
-|quarto   |1.6.32 @ /usr/local/bin/quarto         |
+|field    |value                                                                                             |
+|:--------|:-------------------------------------------------------------------------------------------------|
+|version  |R version 4.6.0 (2026-04-24)                                                                      |
+|os       |macOS Tahoe 26.6.2                                                                                |
+|system   |aarch64, darwin23                                                                                 |
+|ui       |RStudio                                                                                           |
+|language |(EN)                                                                                              |
+|collate  |en_US.UTF-8                                                                                       |
+|ctype    |en_US.UTF-8                                                                                       |
+|tz       |America/Los_Angeles                                                                               |
+|date     |2026-09-19                                                                                        |
+|rstudio  |2026.09.0+174 Autumn Hawkbit (desktop)                                                            |
+|pandoc   |3.10 @ /Applications/RStudio.app/Contents/Resources/app/quarto/bin/tools/aarch64/ (via rmarkdown) |
+|quarto   |1.6.32 @ /usr/local/bin/quarto                                                                    |
 
 # Dependencies
 
