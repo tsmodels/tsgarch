@@ -24,6 +24,7 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
+      _R_CHECK_TIMINGS_: "0"
 
     steps:
       - uses: actions/checkout@v3
@@ -46,3 +47,20 @@ jobs:
         with:
           upload-snapshots: true
           args: 'c("--no-build-vignettes", "--no-manual")'
+
+      - name: Test timings by file
+        if: success() || failure()
+        shell: Rscript {0}
+        run: |
+          lib <- normalizePath("check/tsgarch.Rcheck", mustWork = FALSE)
+          if (!dir.exists(file.path(lib, "tsgarch"))) quit(save = "no")
+          .libPaths(c(lib, .libPaths()))
+          suppressMessages({library(testthat); library(tsgarch)})
+          r <- as.data.frame(test_dir("tests/testthat", package = "tsgarch", load_package = "installed",
+                                      reporter = "silent", stop_on_failure = FALSE))
+          options(width = 200)
+          a <- aggregate(real ~ file, r, sum)
+          print(a[order(-a$real), ], row.names = FALSE)
+          cat("Total:", round(sum(r$real), 1), "s\n\nSlowest tests:\n")
+          r <- r[order(-r$real), c("file", "test", "real")]
+          print(head(r, 15), row.names = FALSE, right = FALSE)
