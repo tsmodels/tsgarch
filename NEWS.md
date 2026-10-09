@@ -181,6 +181,13 @@ the solution sits on a bound.
 `cgarch` model: a `max(order, arma)` by 2 matrix whose first column
 initializes the permanent (long run) component and whose second column
 initializes the total conditional variance.
+* Fixed the build against Eigen 5.0, which removed the free elementwise
+`pow(ArrayBase, scalar)` for non-arithmetic scalar types such as TMB's
+`CppAD::AD<double>`. The ARCH initialization of the `aparch` and `fgarch`
+flavors in `src/TMB/garchextra.h` now raises to the power `delta` through a
+small `pow_cwise()` helper built on `unaryExpr`, which compiles under both
+Eigen 3.4 and 5.0 and leaves the results unchanged. Thanks to Dirk
+Eddelbuettel for the fix (PR #9).
 
 # tsgarch 1.0.4
 
