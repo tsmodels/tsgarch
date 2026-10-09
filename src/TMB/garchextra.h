@@ -1,4 +1,13 @@
 namespace garchextra {
+    // Eigen 5.0 removed the free pow(ArrayBase, scalar) for non-arithmetic
+    // (TMB CppAD::AD<double>) scalar exponents. Build the same elementwise
+    // pow-by-scalar via unaryExpr, which works across Eigen 3.4 and 5.0.
+    template <class Derived, class ExponentScalar>
+    inline auto pow_cwise(const Eigen::ArrayBase<Derived>& x, const ExponentScalar& e) {
+        typedef typename Derived::Scalar Scalar;
+        return x.derived().unaryExpr([e](const Scalar& v) { return Eigen::numext::pow(v, e); });
+    }
+
     template <class Type>
     Type init_power_variance(vector<Type> x, std::string method, Type lambda, Type delta, int samplen)
     {
@@ -29,11 +38,11 @@ namespace garchextra {
         const int n = x.rows();
         Type inite = 0.0;
         if (method == "unconditional") {
-            inite += pow(x.abs().array() - gamma * x.array(), delta).mean();
+            inite += pow_cwise(x.abs().array() - gamma * x.array(), delta).mean();
         } else if (method == "sample") {
-            inite += pow(x.head(samplen).abs().array() - gamma * x.head(samplen).array(), delta).mean();
+            inite += pow_cwise(x.head(samplen).abs().array() - gamma * x.head(samplen).array(), delta).mean();
         } else {
-            vector<Type> x_power = pow(x.abs().array() - gamma * x.array(), delta);
+            vector<Type> x_power = pow_cwise(x.abs().array() - gamma * x.array(), delta);
             Type mean_x_power = x_power.mean();
             vector<Type> powerlambda(n);
             powerlambda.setZero();
@@ -52,11 +61,11 @@ namespace garchextra {
         const int n = x.rows();
         Type inite = 0.0;
         if (method == "unconditional") {
-            inite += pow((x.array() - eta).abs() - gamma * (x.array() - eta), delta).mean();
+            inite += pow_cwise((x.array() - eta).abs() - gamma * (x.array() - eta), delta).mean();
         } else if (method == "sample") {
-            inite += pow((x.head(samplen).array() - eta).abs() - gamma * (x.head(samplen).array() - eta), delta).mean();
+            inite += pow_cwise((x.head(samplen).array() - eta).abs() - gamma * (x.head(samplen).array() - eta), delta).mean();
         } else {
-            vector<Type> x_power = pow((x.array() - eta).abs() - gamma * (x.array() - eta), delta);
+            vector<Type> x_power = pow_cwise((x.array() - eta).abs() - gamma * (x.array() - eta), delta);
             Type mean_x_power = x_power.mean();
             vector<Type> powerlambda(n);
             powerlambda.setZero();
